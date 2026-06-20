@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.10.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.11.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -83,6 +83,7 @@ const $=s=>document.querySelector(s);
 function uid(){ return 'c'+Math.random().toString(36).slice(2,9); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function firstName(n){ return (n||'').trim().split(/\s+/)[0]||''; }
+function callName(c){ return (c&&c.callName)?c.callName:firstName(c?c.name:''); }
 function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
 function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','#6A655B','#3C6E91','#8A5A99']; let h=0; for(const c of (n||'x')) h=(h*31+c.charCodeAt(0))%colors.length; return colors[h]; }
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -143,7 +144,7 @@ function gcalLink(title,date,details,yearly){
   return u;
 }
 function fillTemplate(body,c){
-  return (body||'').replace(/\{first\}/g,firstName(c.name)).replace(/\{name\}/g,c.name||'').replace(/\{me\}/g,DB.settings.myName||'');
+  return (body||'').replace(/\{first\}/g,callName(c)).replace(/\{name\}/g,c.callName||c.name||'').replace(/\{me\}/g,DB.settings.myName||'');
 }
 
 /* ---------- parsers ---------- */
@@ -253,11 +254,11 @@ function viewToday(){
   let heroId=null, heroOcc=null;
   if(soon.length){ const x=soon[0]; heroId=x.c.id; heroOcc=x;
     h+=heroCard(x.c, x.o.label, whenLabel(x.n),
-      '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(firstName(x.c.name))+'</button>'+
+      '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button>'+
       '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+esc(x.o.label)+'\')">+ Calendar</button>');
   } else if(due.length){ const c=due[0].c; heroId=c.id;
     h+=heroCard(c, 'time to reconnect', (due[0].overdue<0?(-due[0].overdue)+' days overdue':'due now'),
-      '<button class="btn primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message '+esc(firstName(c.name))+'</button>'+
+      '<button class="btn primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message '+esc(callName(c))+'</button>'+
       '<button class="btn ghost" onclick="logToday(\''+c.id+'\')">Log call</button>');
   }
   /* progress: warmth */
@@ -311,7 +312,7 @@ function viewMap(){
 }
 function personRow(c,pill,actions){
   return '<div class="card" data-cid="'+c.id+'"><div class="row"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
-    +'<div class="grow" onclick="go(\'person\',\''+c.id+'\')" style="cursor:pointer"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+(c.context?esc(c.context)+' · ':'')+pill+'</div></div></div>'
+    +'<div class="grow" onclick="go(\'person\',\''+c.id+'\')" style="cursor:pointer"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+(c.context?esc(c.context)+' · ':'')+pill+'</div></div>'+kebab(c.id)+'</div>'
     +'<div class="btn-row" style="margin-top:12px">'+actions+'</div></div>';
 }
 
@@ -568,7 +569,7 @@ window.exportICS=()=>{
   const tb=occ=>{ const t=DB.templates.find(x=>x.occasion===occ); return t?t.body:''; };
   const out=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Warmly//Keep in touch//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH']; let n=0;
   DB.contacts.forEach(c=>{
-    const fn=firstName(c.name)||c.name||'someone';
+    const fn=callName(c)||c.name||'someone';
     contactOccasions(c).forEach(o=>{
       const sum=(o.type==='birthday'?'Wish '+fn+' a happy birthday':o.type==='anniversary'?fn+"'s anniversary":fn+', '+o.label);
       const msg=o.type==='birthday'?fillTemplate(tb('birthday'),c):o.type==='anniversary'?fillTemplate(tb('anniversary'),c):'';
@@ -618,7 +619,8 @@ $('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeMod
 window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,customDates:[]};
   const dv=o=>o&&o.m?(o.y?o.y+'-':'')+String(o.m).padStart(2,'0')+'-'+String(o.d).padStart(2,'0'):'';
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+(id?'Edit':'New')+' contact</h3>';
-  h+='<label class="fl">Name</label><input id="e_name" value="'+esc(c.name||'')+'">';
+  h+='<label class="fl">Name &middot; how you find them, e.g. &ldquo;John from school&rdquo;</label><input id="e_name" value="'+esc(c.name||'')+'">';
+  h+='<label class="fl">Calling name &middot; used in your messages (required)</label><input id="e_call" value="'+esc(c.callName||firstName(c.name)||'')+'" placeholder="John">';
   h+='<div class="two"><div><label class="fl">Phone (with country code)</label><input id="e_phone" value="'+esc(c.phone||'')+'" placeholder="+44 7..."></div><div><label class="fl">Closeness</label><select id="e_tier"><option value="1"'+(c.tier===1?' selected':'')+'>inner circle</option><option value="2"'+(c.tier===2?' selected':'')+'>keep warm</option><option value="3"'+(c.tier===3?' selected':'')+'>loose tie</option></select></div></div>';
   h+='<div class="two"><div><label class="fl">Email</label><input id="e_email" value="'+esc(c.email||'')+'"></div><div><label class="fl">LinkedIn URL</label><input id="e_li" value="'+esc(c.linkedin||'')+'"></div></div>';
   h+='<div class="two"><div><label class="fl">Birthday (YYYY-MM-DD or --MM-DD)</label><input id="e_bday" value="'+dv(c.bday)+'" placeholder="1996-04-21"></div><div><label class="fl">Anniversary</label><input id="e_anniv" value="'+dv(c.anniv)+'"></div></div>';
@@ -627,6 +629,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
   h+='<label class="fl">Location for the map (city, country)</label><input id="e_loc" value="'+esc(c.location||'')+'" placeholder="London, UK">';
   h+='<div class="two"><div><label class="fl">Job title</label><input id="e_job" value="'+esc(c.jobTitle||'')+'"></div><div><label class="fl">Company</label><input id="e_co" value="'+esc(c.company||'')+'"></div></div>';
   h+='<div class="two"><div><label class="fl">How you met</label><input id="e_met" value="'+esc(c.howMet||'')+'"></div><div><label class="fl">Food / drink they like</label><input id="e_food" value="'+esc(c.food||'')+'"></div></div>';
+  h+='<label class="fl">How you talk to them (tone, nicknames, inside jokes)</label><input id="e_style" value="'+esc(c.style||'')+'" placeholder="casual, call him bro, no emojis">';
   h+='<label class="fl">Quick summary (shown in lists)</label><textarea id="e_ctx" style="min-height:58px">'+esc(c.context||'')+'</textarea>';
   h+='<div class="btn-row" style="margin-top:16px"><button class="btn primary block" onclick="saveContact(\''+(id||'')+'\')">Save</button></div>';
   openModal(h);
@@ -634,7 +637,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
 window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   let c=id?DB.contacts.find(x=>x.id===id):null;
   if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; DB.contacts.push(c); }
-  c.name=g('e_name')||'Unnamed'; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li');
+  c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.style=g('e_style'); c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li');
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   save(); closeModal(); route();
@@ -653,23 +656,25 @@ window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</b
   h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Warmly pulls out the details. Refine later on their page.</div>';
   h+='<textarea id="qa_blob" placeholder="Paste or type here" style="min-height:78px" oninput="qaParse()"></textarea>';
   h+='<div class="two"><div><label class="fl">Name</label><input id="qa_name"></div><div><label class="fl">Phone</label><input id="qa_phone"></div></div>';
+  h+='<label class="fl">Calling name &middot; used in messages</label><input id="qa_call" placeholder="John">';
   h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
   h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden">';
   h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="quickSave()">Add person</button></div>';
   openModal(h); };
 window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
   if(p.name&&!$('#qa_name').value) $('#qa_name').value=p.name;
+  if(p.name&&!$('#qa_call').value) $('#qa_call').value=firstName(p.name);
   if(p.phone&&!$('#qa_phone').value) $('#qa_phone').value=p.phone;
   if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
   if(p.email) $('#qa_email').value=p.email; if(p.linkedin) $('#qa_li').value=p.linkedin; };
 window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('Add a name first.'); return; }
-  const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name,phone:$('#qa_phone').value.trim(),location:$('#qa_loc').value.trim(),tier:+$('#qa_tier').value,email:$('#qa_email').value,linkedin:$('#qa_li').value};
+  const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name,callName:($('#qa_call').value.trim()||firstName(name)),phone:$('#qa_phone').value.trim(),location:$('#qa_loc').value.trim(),tier:+$('#qa_tier').value,email:$('#qa_email').value,linkedin:$('#qa_li').value};
   DB.contacts.push(c); save(); closeModal(); go('person',c.id); };
 
 window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const tpl=DB.templates.find(t=>t.occasion===occasion)||DB.templates.find(t=>t.occasion==='reconnect')||{body:''};
-  const draft=fillTemplate(tpl.body,c);
-  let h='<button class="x" onclick="closeModal()">&times;</button><h3>Message '+esc(firstName(c.name))+'</h3>';
+  let draft=fillTemplate(tpl.body,c); if(occasion==='reconnect' && c.lastMsg) draft=c.lastMsg;
+  let h='<button class="x" onclick="closeModal()">&times;</button><h3>Message '+esc(callName(c))+'</h3>';
   const _last=(c.log||[]).slice(-1)[0]; const _bits=[];
   if(c.jobTitle||c.company) _bits.push([c.jobTitle,c.company].filter(Boolean).join(' at '));
   if(c.location) _bits.push(c.location);
@@ -677,8 +682,9 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   if(c.partner&&c.partner.name) _bits.push('partner '+c.partner.name);
   if(c.children&&c.children.length) _bits.push('kids: '+c.children.map(k=>k.name).join(', '));
   if(c.food) _bits.push('likes '+c.food);
+  if(c.style) _bits.push('tone: '+c.style);
   if(_last||_bits.length){ h+='<div class="ctx">'+(_last?'<div class="sub">last contacted '+esc(_last.date)+(_last.note?' &mdash; &ldquo;'+esc(_last.note)+'&rdquo;':'')+'</div>':'')+(_bits.length?'<div class="sub">'+esc(_bits.join(' · '))+'</div>':'')+'</div>'; }
-  h+='<div class="btn-row" style="margin:10px 0">'+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
+  h+='<div class="btn-row" style="margin:10px 0">'+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">&#8635; last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
   h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';
   h+='<div class="btn-row">'+(c.phone?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No phone number on file. Add one to message on WhatsApp.</div>')+'</div>';
@@ -686,7 +692,8 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   openModal(h);
 };
 window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid); $('#msg').value=fillTemplate(t.body,c); };
-window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value; window.open(waLink(c.phone,txt),'_blank','noopener'); };
+window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value; if(c){ c.lastMsg=txt; save(); } window.open(waLink(c.phone,txt),'_blank','noopener'); };
+window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg) $('#msg').value=c.lastMsg; };
 
 window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); const date=nextOccurrence(+m,+d);
   const title=esc(firstName(c.name))+"'s "+label; const details=(c.context?c.context+' · ':'')+(c.phone?('WhatsApp: '+waLink(c.phone,'')):'');
