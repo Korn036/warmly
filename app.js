@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.11.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.12.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -491,15 +491,34 @@ window.delRemind=(id,i)=>patch(id,c=>{ (c.customDates||[]).splice(i,1); });
 
 /* ---------- import ---------- */
 function viewImport(){
-  let h='<div class="view"><h1 class="title">Import contacts</h1><p class="muted">Drop a CSV (Google Contacts export) or a vCard (.vcf). It stays on this device. You choose exactly who to keep.</p>';
-  h+='<div class="card" style="text-align:center;padding:30px"><input type="file" id="file" accept=".csv,.vcf,.vcard,text/csv,text/vcard" onchange="onFile(event)" style="display:none"><button class="btn primary" onclick="document.getElementById(\'file\').click()">Choose a file</button>'
-    +'<div class="muted" style="margin-top:12px">In Google Contacts: Export → Google CSV. On iPhone: share a contact / use a .vcf.</div></div>';
+  let h='<div class="view"><h1 class="title">Import contacts</h1><p class="muted">Bring people in from your phone, a Google CSV, or a vCard. Everything stays on this device, and you pick exactly who to keep.</p>';
+  const hasPicker = !!(navigator.contacts && navigator.contacts.select);
+  if(hasPicker){
+    h+='<div class="card" style="text-align:center;padding:24px"><button class="btn primary block" onclick="pickContacts()">Import from this phone&rsquo;s contacts</button><div class="muted" style="margin-top:10px;font-size:12.5px">Opens your address book (including SIM contacts saved to the phone) so you can pick who to add. Nothing is read until you choose.</div></div>';
+  } else {
+    h+='<div class="note">On iPhone, browsers can&rsquo;t read your address book directly (Apple blocks it for privacy) and the SIM isn&rsquo;t reachable from the web. Quickest route: open <b>iCloud.com &rarr; Contacts</b> &rarr; select all &rarr; <b>Export vCard</b>, then drop that <b>.vcf</b> below. (Or use the iOS <b>Shortcuts</b> app to export contacts to a file.)</div>';
+  }
+  h+='<div class="card" style="text-align:center;padding:30px"><input type="file" id="file" accept=".csv,.vcf,.vcard,text/csv,text/vcard" onchange="onFile(event)" style="display:none"><button class="'+(hasPicker?'btn ghost':'btn primary')+'" onclick="document.getElementById(\'file\').click()">Choose a file (CSV or vCard)</button>'
+    +'<div class="muted" style="margin-top:12px">In Google Contacts: Export &rarr; Google CSV. On iPhone: export a .vcf as above.</div></div>';
   h+='<div id="preview"></div></div>'; render(h);
 }
 window.onFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=()=>{ const text=rd.result; const rows = /vcard|vcf/i.test(f.name)? parseVCF(text) : parseCSV(text);
     window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview(); };
   rd.readAsText(f);
+};
+window.pickContacts=async()=>{
+  if(!(navigator.contacts && navigator.contacts.select)){ alert('This browser cannot read device contacts. Use the file option instead.'); return; }
+  try{
+    let props=['name','tel'];
+    try{ const sup=await navigator.contacts.getProperties(); if(sup.includes('email')) props.push('email'); }catch(e){}
+    const sel=await navigator.contacts.select(props,{multiple:true});
+    if(!sel||!sel.length) return;
+    const rows=sel.map(c=>({ name:(c.name&&c.name[0])||((c.tel&&c.tel[0])||''), phone:(c.tel&&c.tel[0])||'', email:(c.email&&c.email[0])||'', bday:null, context:'' })).filter(r=>r.name||r.phone);
+    if(!rows.length){ alert('No usable contacts were selected.'); return; }
+    window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview();
+    const pv=document.getElementById('preview'); if(pv) pv.scrollIntoView({behavior:'smooth'});
+  }catch(e){ /* user cancelled the picker */ }
 };
 function renderPreview(){
   const rows=window._imp||[]; const box=$('#preview');
