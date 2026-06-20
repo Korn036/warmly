@@ -1,0 +1,15 @@
+name = "warmly-auth"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Public values (safe to commit). The CLIENT SECRET is NOT here — it is set
+# separately as an encrypted secret (see README, step 4).
+[vars]
+GOOGLE_CLIENT_ID = "331804388562-k4qajob707mft6f5vrvvtsq2cvjbukoa.apps.googleusercontent.com"
+ALLOWED_ORIGINS = "https://karthikonteddu306.workers.dev,https://warmly.karthikonteddu.com,http://localhost:8000"
+
+# Stores the refresh token + login sessions. Create it once (README step 3)
+# and paste the id below.
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "REPLACE_WITH_YOUR_KV_ID"
