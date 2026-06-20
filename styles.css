@@ -23,6 +23,39 @@
   --accent:#3D6BFF; --on-accent:#14151B; --hero-ink:#ECE7DA;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px rgba(0,0,0,.5);
 }
+/* ===== D · Brutalist Mono skin (toggled via [data-theme="brutal"]) ===== */
+[data-theme="brutal"]{
+  --bg:#F2F1EA; --bg-2:#FFFFFF; --card:#FFFFFF;
+  --ink:#111111; --ink-soft:#555555; --ink-faint:#8a8a8a;
+  --line:#111111;
+  --green:#0B5FFF; --green-2:#111111; --gold:#C99700; --gold-soft:#FFD400; --rose:#E5484D;
+  --accent:#0B5FFF; --on-accent:#FFFFFF; --hero-ink:#FFFFFF;
+  --shadow:4px 4px 0 #111111; --r:12px;
+}
+[data-theme="brutal"] .card{ border-width:2px; }
+[data-theme="brutal"] .hero{ background:var(--accent); border:2px solid #111; box-shadow:5px 5px 0 #111; }
+[data-theme="brutal"] .hero .btn.primary{ background:#fff; color:#111; border:2px solid #111; box-shadow:2px 2px 0 #111; }
+[data-theme="brutal"] .hero .btn.ghost{ color:#fff; border-color:#fff; }
+[data-theme="brutal"] .btn{ border:2px solid #111; box-shadow:2px 2px 0 #111; border-radius:9px; }
+[data-theme="brutal"] .btn:hover{ transform:translate(-1px,-1px); box-shadow:3px 3px 0 #111; }
+[data-theme="brutal"] .btn.primary{ background:var(--accent); color:#fff; }
+[data-theme="brutal"] .tile{ border-width:2px; box-shadow:4px 4px 0 #111; }
+[data-theme="brutal"] input,[data-theme="brutal"] select,[data-theme="brutal"] textarea{ border:2px solid #111; border-radius:8px; }
+[data-theme="brutal"] .pill{ border:1.5px solid #111; border-radius:6px; }
+[data-theme="brutal"] .chip{ border:1.5px solid #111; }
+[data-theme="brutal"] .chip.on{ background:var(--accent); color:#fff; }
+[data-theme="brutal"] .seg{ border:2px solid #111; border-radius:9px; background:#fff; }
+[data-theme="brutal"] .seg button.on{ background:var(--accent); color:#fff; border-radius:6px; }
+[data-theme="brutal"] .sortsel{ border:2px solid #111; border-radius:8px; }
+[data-theme="brutal"] .tabs a.active{ background:var(--accent); color:#fff; }
+[data-theme="brutal"] .topbar{ border-bottom:2px solid #111; background:var(--bg); }
+[data-theme="brutal"] .icon-btn{ border:2px solid #111; box-shadow:2px 2px 0 #111; font-weight:700; }
+[data-theme="brutal"] h1.title,[data-theme="brutal"] .brand,[data-theme="brutal"] .nm,[data-theme="brutal"] .who{ font-weight:700; }
+[data-theme="brutal"] .fab{ border:2px solid #111; box-shadow:4px 4px 0 #111; }
+[data-theme="brutal"] .review-badge{ border:1.5px solid #111; }
+[data-theme="brutal"] .prog .bar{ border:1.5px solid #111; background:#fff; }
+[data-theme="brutal"] .prog .bar span{ background:var(--accent); }
+[data-theme="brutal"] .voicebar{ border:2px solid #111; box-shadow:3px 3px 0 #111; }
 *{ margin:0; padding:0; box-sizing:border-box; }
 html{ -webkit-text-size-adjust:100%; }
 body{ background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased; padding-bottom:50px; }

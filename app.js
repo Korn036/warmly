@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.15.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.16.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -789,8 +789,10 @@ function render(h){ $('#app').innerHTML=h; }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',()=>$('#tabs').classList.toggle('open'));
 const tb=$('#themeBtn');
-if(localStorage.getItem('kith.theme')==='dark'){ document.documentElement.dataset.theme='dark'; tb.textContent='☀'; }
-tb.addEventListener('click',()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'':'dark'; tb.textContent=d?'☾':'☀'; localStorage.setItem('kith.theme',d?'light':'dark'); });
+if(localStorage.getItem('warmly.skin')==='brutal') document.documentElement.dataset.theme='brutal';
+tb.textContent = (document.documentElement.dataset.theme==='brutal')?'A':'D';
+tb.title='Switch skin: Warm Ember (A) / Brutalist (D)';
+tb.addEventListener('click',()=>{ const isB=document.documentElement.dataset.theme==='brutal'; document.documentElement.dataset.theme=isB?'':'brutal'; tb.textContent=isB?'D':'A'; localStorage.setItem('warmly.skin', isB?'ember':'brutal'); });
 if(!location.hash) location.hash='#today';
 snapInit();
 route();
