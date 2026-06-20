@@ -1,4 +1,4 @@
-/* Kith service worker - cache the app shell so it opens offline and installs */
+/* Warmly service worker - cache the app shell so it opens offline and installs */
 const CACHE = 'kith-v1';
 const SHELL = ['./','index.html','app.js','styles.css','manifest.webmanifest','icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

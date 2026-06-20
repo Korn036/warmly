@@ -1,5 +1,5 @@
 /* ===================================================================
-   KITH  ·  personal keep-in-touch CRM  ·  Phase 1 (local, no backend)
+   WARMLY  ·  personal keep-in-touch CRM  ·  Phase 1 (local, no backend)
    Everything stays in this browser (localStorage). Nothing is sent to
    anyone until you tap send in WhatsApp / confirm in Google Calendar.
    =================================================================== */
@@ -344,7 +344,7 @@ function viewSettings(){
     +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
     +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".kith,.json" style="display:none" onchange="importFile(event)"></div></div>';
   h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
-  h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Kith v1 · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
+  h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Warmly v1 · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
 }
 window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
 window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings }; save(); go('today'); } };

@@ -1,4 +1,4 @@
-# Kith — personal keep-in-touch CRM (Phase 1)
+# Warmly — personal keep-in-touch CRM (Phase 1)
 
 A simple, private relationship manager. Import your contacts, mark who matters, store
 birthdays/anniversaries + a little context, get nudged before each occasion, send a warm
