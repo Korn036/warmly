@@ -223,6 +223,17 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .soc-wa{ color:#25D366 } .soc-call{ color:var(--green-2) } .soc-mail{ color:#EA4335 } .soc-in{ color:#0A66C2 } .soc-ig{ color:#E1306C } .soc-x{ color:var(--ink) } .soc-tg{ color:#229ED9 } .soc-web{ color:var(--ink-soft) }
 .socadd{ color:var(--ink-faint); font-size:21px; font-weight:600; border-style:dashed; }
 
+/* My Card */
+.mycard{ text-align:center; }
+.mc-photo{ width:84px; height:84px; border-radius:50%; margin:4px auto 10px; background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-weight:600; font-size:30px; overflow:hidden; cursor:pointer; }
+.mc-photo img{ width:100%; height:100%; object-fit:cover; }
+.mc-name{ font-family:var(--serif); font-weight:600; font-size:22px; letter-spacing:-.01em; }
+.mc-title{ font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+.mycard .socrow{ justify-content:center; }
+.qrwrap{ display:flex; flex-direction:column; align-items:center; margin:10px 0; }
+.qrbox{ background:#fff; padding:12px; border-radius:18px; border:1px solid var(--line); box-shadow:var(--shadow); display:inline-block; }
+.qrcanvas{ display:block; image-rendering:pixelated; border-radius:4px; }
+
 /* voice capture (Wispr-style live listening) */
 .voicebar{ display:flex; align-items:center; gap:12px; background:var(--accent); color:var(--hero-ink); border-radius:14px; padding:10px 14px; margin:8px 0; }
 .vbars{ display:inline-flex; align-items:flex-end; gap:3px; height:20px; }

@@ -22,6 +22,7 @@
       <a data-go="today">Today</a>
       <a data-go="people">People</a>
       <a data-go="map">Map</a>
+      <a data-go="mycard">My Card</a>
       <a data-go="import">Import</a>
       <a data-go="templates">Templates</a>
       <a data-go="settings">Settings</a>
@@ -50,6 +51,7 @@
   <a href="privacy.html" style="color:var(--ink-soft)">Privacy</a> · <a href="terms.html" style="color:var(--ink-soft)">Terms</a> · © 2026 Karthik Onteddu
 </footer>
 
+<script src="qr.js"></script>
 <script src="app.js"></script>
 <script>
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }

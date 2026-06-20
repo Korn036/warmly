@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.17.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.18.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -275,7 +275,7 @@ function route(){
   const v=view||'today';
   if(v==='today' && _lastView!=='today') _shuffleId='reroll';
   _lastView=v;
-  ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
+  ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, mycard:viewMyCard, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
   window.scrollTo(0,0);
 }
 
@@ -637,6 +637,56 @@ window.saveTemplate=()=>{ const name=$('#t_name').value.trim()||'My template'; c
 window.delTemplate=(id)=>{ if(['t_b','t_a','t_r'].indexOf(id)>=0) return; if(!confirm('Delete this template?')) return; DB.templates=DB.templates.filter(t=>t.id!==id); save(); route(); };
 
 /* ---------- settings + backup ---------- */
+/* ---- My Card: your shareable profile + offline QR (nothing leaves the phone) ---- */
+let _qrT=null;
+function myVCard(){ const me=DB.me||{}; const L=['BEGIN:VCARD','VERSION:3.0','FN:'+(me.name||'')];
+  if(me.title) L.push('TITLE:'+me.title);
+  if(me.phone) L.push('TEL;TYPE=CELL:'+me.phone);
+  if(me.email) L.push('EMAIL:'+me.email);
+  if(me.website) L.push('URL:'+_abs(me.website));
+  if(me.linkedin) L.push('URL:'+liUrl(me.linkedin));
+  if(me.instagram) L.push('URL:https://instagram.com/'+_handle(me.instagram));
+  if(me.x) L.push('URL:https://x.com/'+_handle(me.x));
+  L.push('END:VCARD'); return L.join('\n');
+}
+function myVCardFull(){ const me=DB.me||{}; let v=myVCard();
+  if(me.photo){ const b=me.photo.replace(/^data:[^,]+,/,''); v=v.replace('END:VCARD','PHOTO;ENCODING=b;TYPE=JPEG:'+b+'\nEND:VCARD'); }
+  return v;
+}
+function renderQR(text, el){ if(!el) return; const q=window.QR&&QR.matrix(text);
+  if(!q){ el.innerHTML='<div class="muted" style="text-align:center;padding:20px">Your card has a lot of links. Remove one or two so it fits a QR (Share and .vcf still include everything).</div>'; return; }
+  const n=q.size, quiet=4, total=n+quiet*2, scale=Math.max(3,Math.floor(264/total));
+  const cv=document.createElement('canvas'); cv.width=cv.height=total*scale; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.fillStyle='#000';
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(q.modules[r][c]) ctx.fillRect((c+quiet)*scale,(r+quiet)*scale,scale,scale); }
+  cv.className='qrcanvas'; el.innerHTML=''; el.appendChild(cv);
+}
+window.setMe=(k,v)=>{ DB.me=DB.me||{}; DB.me[k]=v; save(); clearTimeout(_qrT); _qrT=setTimeout(()=>{ const el=document.getElementById('qrbox'); if(el) renderQR(myVCard(), el); },400); };
+window.mePhoto=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return;
+  const rd=new FileReader(); rd.onload=()=>{ const img=new Image();
+    img.onload=()=>{ const s=Math.min(1,256/Math.max(img.width,img.height)); const w=Math.round(img.width*s), h=Math.round(img.height*s); const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); DB.me=DB.me||{}; try{ DB.me.photo=cv.toDataURL('image/jpeg',0.6); }catch(e){ DB.me.photo=rd.result; } save(); route(); };
+    img.onerror=()=>alert('Could not read that photo.'); img.src=rd.result; }; rd.readAsDataURL(f);
+};
+window.shareCard=async()=>{ const full=myVCardFull();
+  try{ const file=new File([full],'warmly-card.vcf',{type:'text/vcard'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:(DB.me&&DB.me.name)||'My card'}); return; } }catch(e){}
+  try{ if(navigator.share){ await navigator.share({title:'My contact card', text:myVCard()}); return; } }catch(e){}
+  downloadCard();
+};
+window.downloadCard=()=>download('warmly-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
+function viewMyCard(){ const me=DB.me=DB.me||{};
+  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your shareable card. Let anyone scan the QR to save you. Nothing here leaves your phone.</p>';
+  const pseudo={id:'me',name:me.name,phone:me.phone,email:me.email,linkedin:me.linkedin,instagram:me.instagram,x:me.x,website:me.website};
+  h+='<div class="card mycard"><div class="mc-photo" onclick="document.getElementById(\'mephoto\').click()">'+(me.photo?('<img src="'+me.photo+'">'):esc(initials(me.name||'You')))+'</div>'
+    +'<div class="mc-name">'+esc(me.name||'Your name')+'</div><div class="mc-title">'+esc(me.title||'tap the photo to add yours')+'</div>'
+    +socialRow(pseudo,false)+'</div>';
+  h+='<input type="file" id="mephoto" accept="image/*" style="display:none" onchange="mePhoto(event)">';
+  h+='<div class="qrwrap"><div id="qrbox" class="qrbox"></div><div class="muted" style="text-align:center;font-size:12px;margin-top:6px">Point a phone camera at this to save me. Test-scan once to confirm.</div></div>';
+  h+='<div class="btn-row" style="justify-content:center;margin:12px 0 16px"><button class="btn primary" onclick="shareCard()">Share my card</button><button class="btn ghost" onclick="downloadCard()">Download .vcf</button></div>';
+  h+='<div class="kick">Your details</div><div class="card">';
+  [['name','Name'],['title','Title / what you do'],['phone','Phone (with country code)'],['email','Email'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X / Twitter'],['website','Website']].forEach(function(f){ h+='<label class="fl">'+f[1]+'</label><input value="'+esc(me[f[0]]||'')+'" oninput="setMe(\''+f[0]+'\',this.value)">'; });
+  h+='</div></div>'; render(h);
+  renderQR(myVCard(), document.getElementById('qrbox'));
+}
 function viewSettings(){
   const s=DB.settings;
   const connected=localStorage.getItem('warmly.gsync')==='1';
