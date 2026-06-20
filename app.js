@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.20.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.21.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -684,10 +684,33 @@ window.shareCard=async()=>{ const full=myVCardFull();
 };
 window.downloadCard=()=>download('warmly-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
 let _editCard=false;
-const CARDSTYLES=['ember','sunset','mosaic','noir','candy','paper'];
+const CARDSTYLES=['lava','oil','marble','ember','aurora','royal'];
 window.setCardStyle=(s)=>{ DB.me=DB.me||{}; DB.me.cardStyle=s; save(); route(); };
 window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
 window.saveCard=()=>{ _editCard=false; route(); };
+function interestIcon(w){ w=w.toLowerCase(); const M=[
+  [/anime|manga|otaku/, '<path d="M5 8c2-3 12-3 14 0M4 11c0 5 4 9 8 9s8-4 8-9"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/>'],
+  [/dog|pup|cat|pet/, '<circle cx="6" cy="9" r="1.5"/><circle cx="18" cy="9" r="1.5"/><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><path d="M12 11c-3 0-5 2-5 4s2 3 5 3 5-1 5-3-2-4-5-4z"/>'],
+  [/plant|garden|nature|tree|green/, '<path d="M12 21V9M12 13C8 13 6 10 6 6c4 0 6 3 6 7zM12 11c4 0 6-2 6-6-4 0-6 2-6 6z"/>'],
+  [/music|guitar|sing|song|dj|piano/, '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
+  [/travel|trip|wander|explore|fly/, '<path d="M2 22l20-10L2 2v7l14 3-14 3z"/>'],
+  [/coffee|tea|cafe|chai/, '<path d="M4 9h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM17 10h2a2 2 0 0 1 0 4h-2"/>'],
+  [/gym|fitness|lift|workout|muscle/, '<path d="M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10"/>'],
+  [/run|marathon|jog/, '<circle cx="14" cy="5" r="1.6"/><path d="M5 20l3-4 3 1 1-5 3 3 3 1"/>'],
+  [/art|paint|draw|design/, '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5 1-2 2.5-2H18a3 3 0 0 0 3-3c0-5-4-9-9-9z"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="11" r="1"/>'],
+  [/game|gaming|gamer|xbox|playstation/, '<rect x="3" y="8" width="18" height="9" rx="4"/><path d="M7 12h3M8.5 10.5v3"/><circle cx="16" cy="11.5" r="0.8"/><circle cx="18" cy="13.5" r="0.8"/>'],
+  [/book|read|novel|writ/, '<path d="M4 4h7v16H4zM13 4h7v16h-7z"/>'],
+  [/film|movie|cinema|netflix/, '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4"/>'],
+  [/food|cook|chef|eat|foodie/, '<path d="M5 3v8a2 2 0 0 0 4 0V3M7 3v18M14 3c-1 2-1 5 1 6v12"/>'],
+  [/photo|camera|shoot/, '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l1.5-2h5L16 7"/><circle cx="12" cy="13" r="3.2"/>']
+];
+  for(var i=0;i<M.length;i++){ if(M[i][0].test(w)) return '<svg viewBox="0 0 24 24">'+M[i][1]+'</svg>'; }
+  return '';
+}
+function bizTags(me){ if(!me||!me.interests) return ''; const items=String(me.interests).split(',').map(s=>s.trim()).filter(Boolean).slice(0,6);
+  if(!items.length) return '';
+  return '<div class="biz-tags">'+items.map(function(w){ return '<span class="biz-tag">'+interestIcon(w)+esc(w)+'</span>'; }).join('')+'</div>';
+}
 function viewMyCard(){ const me=DB.me=DB.me||{}; const style=me.cardStyle||'ember';
   const pseudo={id:'me',name:me.name,phone:me.phone,email:me.email,linkedin:me.linkedin,instagram:me.instagram,x:me.x,website:me.website};
   let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your funky, shareable card. Anyone can scan the QR to save you. Nothing leaves your phone.</p>';
@@ -695,6 +718,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{}; const style=me.cardStyle||'embe
     +'<div class="biz-photo" onclick="document.getElementById(\'mephoto\').click()">'+(me.photo?('<img src="'+me.photo+'">'):esc(initials(me.name||'You')))+'</div>'
     +'<div class="biz-name">'+esc(me.name||'Your name')+'</div>'
     +'<div class="biz-title">'+esc(me.title||'tap the pencil to fill your card')+'</div>'
+    +bizTags(me)
     +socialRow(pseudo,false)+'</div>';
   h+='<input type="file" id="mephoto" accept="image/*" style="display:none" onchange="mePhoto(event)">';
   h+='<div class="biz-styles">'+CARDSTYLES.map(function(s){ return '<button class="biz-sw mc-'+s+(style===s?' on':'')+'" onclick="setCardStyle(\''+s+'\')" title="'+s+'"></button>'; }).join('')+'</div>';
@@ -702,7 +726,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{}; const style=me.cardStyle||'embe
   h+='<div class="btn-row" style="justify-content:center;margin:12px 0 16px"><button class="btn primary" onclick="shareCard()">Share my card</button><button class="btn ghost" onclick="downloadCard()">Download .vcf</button></div>';
   if(_editCard){
     h+='<div id="cardedit" class="kick">Fill your details</div><div class="card">';
-    [['name','Name'],['title','Title / what you do'],['phone','Phone (with country code)'],['email','Email'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X / Twitter'],['website','Website']].forEach(function(f){ h+='<label class="fl">'+f[1]+'</label><input value="'+esc(me[f[0]]||'')+'" oninput="setMe(\''+f[0]+'\',this.value)">'; });
+    [['name','Name'],['title','Title / what you do'],['interests','Interests / your vibe (comma separated, e.g. anime, coffee, dogs)'],['phone','Phone (with country code)'],['email','Email'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X / Twitter'],['website','Website']].forEach(function(f){ h+='<label class="fl">'+f[1]+'</label><input value="'+esc(me[f[0]]||'')+'" oninput="setMe(\''+f[0]+'\',this.value)">'; });
     h+='<div class="btn-row" style="margin-top:16px"><button class="btn primary block" onclick="saveCard()">Save card</button></div></div>';
   }
   h+='</div>'; render(h);

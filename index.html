@@ -36,6 +36,15 @@
 
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
+  <filter id="liquid" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.013" numOctaves="3" seed="7" result="n">
+      <animate attributeName="baseFrequency" dur="28s" values="0.008 0.013;0.013 0.009;0.008 0.013" repeatCount="indefinite"/>
+    </feTurbulence>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="90" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</defs></svg>
+
 <div class="fab-wrap">
   <div class="fab-menu" id="fabMenu">
     <button class="fab-opt" onclick="fabPick('camera')">Scan a card</button>
