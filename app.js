@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.5.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.6.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! 🎉 Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
