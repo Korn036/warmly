@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.19.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.20.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -683,18 +683,29 @@ window.shareCard=async()=>{ const full=myVCardFull();
   downloadCard();
 };
 window.downloadCard=()=>download('warmly-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
-function viewMyCard(){ const me=DB.me=DB.me||{};
-  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your shareable card. Let anyone scan the QR to save you. Nothing here leaves your phone.</p>';
+let _editCard=false;
+const CARDSTYLES=['ember','sunset','mosaic','noir','candy','paper'];
+window.setCardStyle=(s)=>{ DB.me=DB.me||{}; DB.me.cardStyle=s; save(); route(); };
+window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
+window.saveCard=()=>{ _editCard=false; route(); };
+function viewMyCard(){ const me=DB.me=DB.me||{}; const style=me.cardStyle||'ember';
   const pseudo={id:'me',name:me.name,phone:me.phone,email:me.email,linkedin:me.linkedin,instagram:me.instagram,x:me.x,website:me.website};
-  h+='<div class="card mycard"><div class="mc-photo" onclick="document.getElementById(\'mephoto\').click()">'+(me.photo?('<img src="'+me.photo+'">'):esc(initials(me.name||'You')))+'</div>'
-    +'<div class="mc-name">'+esc(me.name||'Your name')+'</div><div class="mc-title">'+esc(me.title||'tap the photo to add yours')+'</div>'
+  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your funky, shareable card. Anyone can scan the QR to save you. Nothing leaves your phone.</p>';
+  h+='<div class="biz mc-'+style+'"><button class="biz-edit" onclick="toggleEditCard()" aria-label="edit card"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>'
+    +'<div class="biz-photo" onclick="document.getElementById(\'mephoto\').click()">'+(me.photo?('<img src="'+me.photo+'">'):esc(initials(me.name||'You')))+'</div>'
+    +'<div class="biz-name">'+esc(me.name||'Your name')+'</div>'
+    +'<div class="biz-title">'+esc(me.title||'tap the pencil to fill your card')+'</div>'
     +socialRow(pseudo,false)+'</div>';
   h+='<input type="file" id="mephoto" accept="image/*" style="display:none" onchange="mePhoto(event)">';
+  h+='<div class="biz-styles">'+CARDSTYLES.map(function(s){ return '<button class="biz-sw mc-'+s+(style===s?' on':'')+'" onclick="setCardStyle(\''+s+'\')" title="'+s+'"></button>'; }).join('')+'</div>';
   h+='<div class="qrwrap"><div id="qrbox" class="qrbox"></div><div class="muted" style="text-align:center;font-size:12px;margin-top:6px">Point a phone camera at this to save me. Test-scan once to confirm.</div></div>';
   h+='<div class="btn-row" style="justify-content:center;margin:12px 0 16px"><button class="btn primary" onclick="shareCard()">Share my card</button><button class="btn ghost" onclick="downloadCard()">Download .vcf</button></div>';
-  h+='<div class="kick">Your details</div><div class="card">';
-  [['name','Name'],['title','Title / what you do'],['phone','Phone (with country code)'],['email','Email'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X / Twitter'],['website','Website']].forEach(function(f){ h+='<label class="fl">'+f[1]+'</label><input value="'+esc(me[f[0]]||'')+'" oninput="setMe(\''+f[0]+'\',this.value)">'; });
-  h+='</div></div>'; render(h);
+  if(_editCard){
+    h+='<div id="cardedit" class="kick">Fill your details</div><div class="card">';
+    [['name','Name'],['title','Title / what you do'],['phone','Phone (with country code)'],['email','Email'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X / Twitter'],['website','Website']].forEach(function(f){ h+='<label class="fl">'+f[1]+'</label><input value="'+esc(me[f[0]]||'')+'" oninput="setMe(\''+f[0]+'\',this.value)">'; });
+    h+='<div class="btn-row" style="margin-top:16px"><button class="btn primary block" onclick="saveCard()">Save card</button></div></div>';
+  }
+  h+='</div>'; render(h);
   renderQR(myVCard(), document.getElementById('qrbox'));
 }
 function viewSettings(){
