@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.13.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.14.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -246,16 +246,15 @@ function route(){
 
 function viewToday(){
   const due=dueToReach(), up=upcoming(21);
-  const soon=up.filter(x=>x.n<=DB.settings.leadDays+1);
   let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+'Keep your people warm.</p>';
   if(!DB.contacts.length){
     h+='<div class="empty"><div class="big">No one here yet.</div>Import your contacts to begin, then mark the handful who matter.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
   }
   h+='<div class="today-top">';
-  /* hero: the single most pressing thing */
+  /* hero: the nearest upcoming celebration leads; otherwise the most overdue reconnect */
   let heroId=null, heroOcc=null;
-  if(soon.length){ const x=soon[0]; heroId=x.c.id; heroOcc=x;
+  if(up.length){ const x=up[0]; heroId=x.c.id; heroOcc=x;
     h+=heroCard(x.c, x.o.label, whenLabel(x.n),
       '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button>'+
       '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>');
@@ -270,22 +269,24 @@ function viewToday(){
   const pct=tracked.length?Math.max(4,Math.min(100,Math.round(warm/tracked.length*100))):100;
   h+='<div class="card prog"><div class="row between"><div><div class="kick" style="margin:0">Your warmth</div><div class="pstat">'+(tracked.length?('Keeping '+warm+' of '+tracked.length+' people warm'):'Set a reconnect rhythm on a few people')+'</div></div><span class="floaty">'+occShape('reconnect',42)+'</span></div><div class="bar"><span style="width:'+pct+'%"></span></div></div>';
   h+='</div>';
-  /* reach out */
-  h+='<div class="kick">Time to reach out ('+due.length+')</div>';
-  const dueList=due.filter(d=>d.c.id!==heroId).slice(0,12);
-  if(!due.length) h+='<div class="card muted" style="text-align:center">Nobody is overdue. Nicely kept.</div>';
-  else { h+='<div class="grid">'; dueList.forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
-      '<button class="btn sm primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message</button> <button class="btn sm ghost" onclick="logToday(\''+c.id+'\')">Log call</button>'); }); h+='</div>'; }
-  /* coming up */
-  h+='<div class="kick">Coming up</div>';
+  /* coming up FIRST: upcoming celebrations on top */
+  h+='<div class="kick">Coming up'+(up.length?' ('+up.length+')':'')+'</div>';
   const upList=up.filter(x=>x!==heroOcc).slice(0,20);
   if(!up.length) h+='<div class="card muted" style="text-align:center">No birthdays or anniversaries in the next three weeks.</div>';
+  else if(!upList.length) h+='<div class="card muted" style="text-align:center">The nearest celebration is up top.</div>';
   else { h+='<div class="grid">'; upList.forEach(({c,o,n})=>{
     const pill='<span class="pill '+(o.type==='birthday'?'bday':o.type==='anniversary'?'anniv':'warm')+'">'+esc(o.label)+' '+whenLabel(n)+'</span>';
     h+=personRow(c, pill,
       '<button class="btn sm gold" onclick="compose(\''+c.id+'\',\''+(o.type==='anniversary'?'anniversary':o.type==='birthday'?'birthday':'reconnect')+'\')">Wish</button> '+
       '<button class="btn sm ghost" onclick="addCal(\''+c.id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+jsq(o.label)+'\')">+ Calendar</button>');
   }); h+='</div>'; }
+  /* reach out SECOND */
+  h+='<div class="kick">Time to reach out ('+due.length+')</div>';
+  const dueList=due.filter(d=>d.c.id!==heroId).slice(0,12);
+  if(!due.length) h+='<div class="card muted" style="text-align:center">Nobody is overdue. Nicely kept.</div>';
+  else if(!dueList.length) h+='<div class="card muted" style="text-align:center">Your most overdue person is up top.</div>';
+  else { h+='<div class="grid">'; dueList.forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
+      '<button class="btn sm primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message</button> <button class="btn sm ghost" onclick="logToday(\''+c.id+'\')">Log call</button>'); }); h+='</div>'; }
   h+='</div>'; render(h);
 }
 function heroCard(c, label, whenText, actions){
@@ -394,14 +395,17 @@ function fabClose(){ const m=document.getElementById('fabMenu'),b=document.getEl
 window.fabPick=(mode)=>{ fabClose(); if(mode==='manual') quickAdd(); else if(mode==='voice') voiceAdd(); else if(mode==='camera'){ const el=document.getElementById('cardCam'); if(el) el.click(); } };
 window.voiceAdd=()=>{ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; quickAdd();
   const blob=document.getElementById('qa_blob');
-  if(!SR){ if(blob) blob.placeholder='Voice isn’t supported here — tap the mic on your keyboard to dictate'; return; }
-  if(blob) blob.placeholder='Listening… say their name, city, where you met';
-  try{ const rec=new SR(); rec.lang='en-US'; rec.interimResults=false; rec.maxAlternatives=1;
-    rec.onresult=(e)=>{ const t=(e.results[0][0].transcript)||''; const b=document.getElementById('qa_blob'); if(b){ b.value=(b.value?b.value+' ':'')+t; qaParse(); } };
-    rec.onerror=()=>{ const b=document.getElementById('qa_blob'); if(b) b.placeholder='Didn’t catch that — type it instead'; };
-    rec.start();
-  }catch(e){}
+  if(!SR){ if(blob) blob.placeholder='Voice not supported in this browser. Tap the mic on your keyboard to dictate.'; return; }
+  const bar=document.getElementById('qaVoice'); if(bar) bar.style.display='flex';
+  let finalT='';
+  const rec=new SR(); rec.lang='en-US'; rec.interimResults=true; rec.continuous=true; window._rec=rec;
+  rec.onresult=(e)=>{ let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal) finalT+=r[0].transcript+' '; else interim+=r[0].transcript; }
+    if(blob) blob.value=(finalT+interim).replace(/\s+/g,' ').trim(); };
+  rec.onend=()=>{ const b=document.getElementById('qaVoice'); if(b) b.style.display='none'; window._rec=null; qaParse(); };
+  rec.onerror=()=>{ const b=document.getElementById('qaVoice'); if(b) b.style.display='none'; window._rec=null; };
+  try{ rec.start(); }catch(e){ if(bar) bar.style.display='none'; window._rec=null; }
 };
+window.voiceStop=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } };
 window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return;
   const rd=new FileReader();
   rd.onload=()=>{ const img=new Image();
@@ -674,7 +678,7 @@ window.importFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=ne
    MODALS  (edit, compose, calendar, log)
    =================================================================== */
 function openModal(html){ $('#modal').innerHTML=html; $('#modalBg').classList.add('show'); }
-window.closeModal=()=>$('#modalBg').classList.remove('show');
+window.closeModal=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } $('#modalBg').classList.remove('show'); };
 $('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
 
 window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,customDates:[]};
@@ -717,7 +721,8 @@ function quickParse(t){ t=t||'';
 }
 window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
   h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Warmly pulls out the details. Refine later on their page.</div>';
-  h+='<textarea id="qa_blob" placeholder="Paste or type here" style="min-height:78px" oninput="qaParse()"></textarea>';
+  h+='<div id="qaVoice" class="voicebar" style="display:none"><span class="vbars"><i></i><i></i><i></i><i></i><i></i></span><span class="vtext">Listening, speak now</span><button class="btn sm" style="background:var(--hero-ink);color:var(--accent)" onclick="voiceStop()">Done</button></div>';
+  h+='<textarea id="qa_blob" placeholder="Paste, type, or tap Speak it: name, city, where you met" style="min-height:78px" oninput="qaParse()"></textarea>';
   h+='<div class="two"><div><label class="fl">Name</label><input id="qa_name"></div><div><label class="fl">Phone</label><input id="qa_phone"></div></div>';
   h+='<label class="fl">Calling name &middot; used in messages</label><input id="qa_call" placeholder="John">';
   h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
