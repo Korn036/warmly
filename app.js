@@ -6,9 +6,9 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.6.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.7.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
-  {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! 🎉 Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
+  {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
   {id:'t_r',occasion:'reconnect',name:'Reconnect',body:"Hey {first}, you crossed my mind today, it's been too long! How have you been? Would genuinely love to catch up, free for a quick call sometime?"}
 ];
@@ -68,7 +68,7 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
     const up=await gUpload(_gfile,DB);
     if(up&&up.ok&&!_gfile){ const j=await up.json(); _gfile=j.id; }
     if(changed) route();
-    _gstatus((up&&up.ok)?('Synced ✓ '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})):'Sync failed, will retry');
+    _gstatus((up&&up.ok)?('Synced · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})):'Sync failed, will retry');
   }catch(e){ _gstatus('Sync error'); }
   finally{ _gsyncing=false; } }
 window.syncNow=syncNow;
@@ -187,6 +187,42 @@ function parseVCF(text){
   return out;
 }
 
+/* ---------- shape icons (replace emojis) ---------- */
+function occShape(type,size){ size=size||34; const o='<svg class="ico" width="'+size+'" height="'+size+'" viewBox="0 0 48 48" aria-hidden="true">';
+  if(type==='birthday') return o+'<circle cx="24" cy="28" r="13" fill="var(--gold-soft)"/><circle cx="24" cy="28" r="6.5" fill="var(--green)"/><circle cx="24" cy="8" r="4.2" fill="var(--rose)"/></svg>';
+  if(type==='anniversary') return o+'<circle cx="20" cy="24" r="12.5" fill="var(--rose)"/><circle cx="30" cy="24" r="12.5" fill="var(--gold-soft)" style="mix-blend-mode:multiply"/></svg>';
+  if(type==='reconnect'||type==='warm'||type==='call') return o+'<circle cx="24" cy="24" r="19" fill="none" stroke="var(--green-2)" stroke-width="4"/><circle cx="24" cy="24" r="11" fill="none" stroke="var(--green)" stroke-width="4"/><circle cx="24" cy="24" r="3.5" fill="var(--green)"/></svg>';
+  if(type==='connection') return o+'<circle cx="19" cy="24" r="11" fill="none" stroke="var(--green)" stroke-width="5"/><circle cx="29" cy="24" r="11" fill="none" stroke="var(--gold)" stroke-width="5"/></svg>';
+  return o+'<circle cx="24" cy="24" r="18" fill="none" stroke="var(--green-2)" stroke-width="4"/><circle cx="24" cy="24" r="4" fill="var(--green-2)"/></svg>';
+}
+/* ---------- offline geocoding for the world map (no network, stays private) ---------- */
+const GEO={
+ 'london':[51.5,-0.12],'manchester':[53.48,-2.24],'birmingham':[52.48,-1.9],'edinburgh':[55.95,-3.19],'glasgow':[55.86,-4.25],'leeds':[53.8,-1.55],'bristol':[51.45,-2.59],
+ 'paris':[48.86,2.35],'berlin':[52.52,13.4],'munich':[48.14,11.58],'frankfurt':[50.11,8.68],'madrid':[40.42,-3.7],'barcelona':[41.39,2.17],'rome':[41.9,12.5],'milan':[45.46,9.19],'turin':[45.07,7.69],'amsterdam':[52.37,4.9],'warsaw':[52.23,21.01],'lisbon':[38.72,-9.14],'zurich':[47.37,8.54],'geneva':[46.2,6.14],'vienna':[48.21,16.37],'dublin':[53.35,-6.26],'brussels':[50.85,4.35],'stockholm':[59.33,18.06],'copenhagen':[55.68,12.57],'oslo':[59.91,10.75],'helsinki':[60.17,24.94],'prague':[50.08,14.44],'budapest':[47.5,19.04],'athens':[37.98,23.73],'moscow':[55.75,37.62],
+ 'new york':[40.71,-74.01],'san francisco':[37.77,-122.42],'los angeles':[34.05,-118.24],'chicago':[41.88,-87.63],'boston':[42.36,-71.06],'seattle':[47.61,-122.33],'austin':[30.27,-97.74],'washington':[38.9,-77.04],'miami':[25.76,-80.19],'toronto':[43.65,-79.38],'vancouver':[49.28,-123.12],'montreal':[45.5,-73.57],
+ 'dubai':[25.2,55.27],'abu dhabi':[24.45,54.38],'doha':[25.29,51.53],'riyadh':[24.71,46.68],'tel aviv':[32.08,34.78],'istanbul':[41.01,28.98],
+ 'mumbai':[19.08,72.88],'delhi':[28.61,77.21],'new delhi':[28.61,77.21],'bangalore':[12.97,77.59],'bengaluru':[12.97,77.59],'hyderabad':[17.39,78.49],'chennai':[13.08,80.27],'pune':[18.52,73.86],'kolkata':[22.57,88.36],'ahmedabad':[23.03,72.58],'gurgaon':[28.46,77.03],'gurugram':[28.46,77.03],'noida':[28.54,77.39],
+ 'singapore':[1.35,103.82],'hong kong':[22.32,114.17],'tokyo':[35.68,139.69],'seoul':[37.57,126.98],'shanghai':[31.23,121.47],'beijing':[39.9,116.4],'bangkok':[13.76,100.5],'jakarta':[-6.21,106.85],'kuala lumpur':[3.14,101.69],'manila':[14.6,120.98],'sydney':[-33.87,151.21],'melbourne':[-37.81,144.96],'auckland':[-36.85,174.76],
+ 'cairo':[30.04,31.24],'lagos':[6.52,3.38],'nairobi':[-1.29,36.82],'johannesburg':[-26.2,28.05],'cape town':[-33.92,18.42],'sao paulo':[-23.55,-46.63],'rio de janeiro':[-22.91,-43.17],'buenos aires':[-34.6,-58.38],'mexico city':[19.43,-99.13],'bogota':[4.71,-74.07],'santiago':[-33.45,-70.67],
+ 'india':[22,79],'uk':[54,-2],'united kingdom':[54,-2],'england':[52.5,-1.5],'usa':[39,-98],'united states':[39,-98],'america':[39,-98],'canada':[56,-106],'france':[46,2],'germany':[51,10],'spain':[40,-4],'italy':[42,12],'netherlands':[52,5],'poland':[52,19],'portugal':[39.5,-8],'switzerland':[47,8],'ireland':[53,-8],'sweden':[62,15],'uae':[24,54],'qatar':[25.3,51.2],'saudi arabia':[24,45],'china':[35,103],'japan':[36,138],'south korea':[36.5,127.8],'australia':[-25,134],'brazil':[-10,-55],'mexico':[23,-102],'south africa':[-29,24],'nigeria':[9,8],'kenya':[1,38],'egypt':[26,30],'thailand':[15,101],'indonesia':[-2,118],'malaysia':[4,102],'philippines':[13,122] };
+function geocode(loc){ if(!loc) return null; const s=String(loc).toLowerCase().trim();
+  if(GEO[s]) return {ll:GEO[s],key:s};
+  const parts=s.split(/[,/|]/).map(x=>x.trim()).filter(Boolean);
+  for(const p of parts){ if(GEO[p]) return {ll:GEO[p],key:p}; }
+  for(const k in GEO){ if(k.length>3 && s.indexOf(k)>=0) return {ll:GEO[k],key:k}; }
+  return null;
+}
+const WORLD_PATHS='<g class="map-land">'
+ +'<polygon points="32,36 72,26 112,30 122,44 104,58 96,74 82,72 68,58 52,54 36,52"/>'
+ +'<polygon points="104,78 120,82 110,92 100,88"/>'
+ +'<polygon points="110,96 130,92 140,106 132,130 118,148 108,140 104,118"/>'
+ +'<polygon points="168,34 196,26 214,32 210,46 192,50 176,48 170,42"/>'
+ +'<polygon points="176,56 214,54 224,72 214,100 198,124 184,118 178,92 172,72"/>'
+ +'<polygon points="216,30 266,22 312,28 330,46 318,62 286,66 252,58 232,70 222,52"/>'
+ +'<polygon points="286,96 312,98 326,104 300,110 290,102"/>'
+ +'<polygon points="300,110 332,106 340,122 318,134 300,124"/>'
+ +'</g>';
+
 /* ===================================================================
    ROUTER + VIEWS
    =================================================================== */
@@ -197,7 +233,7 @@ function route(){
   document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
   $('#tabs').classList.remove('open');
   const v=view||'today';
-  ({ today:viewToday, people:viewPeople, person:viewPerson, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
+  ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
   window.scrollTo(0,0);
 }
 
@@ -209,20 +245,62 @@ function viewToday(){
     h+='<div class="empty"><div class="big">No one here yet.</div>Import your contacts to begin, then mark the handful who matter.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
   }
+  /* hero: the single most pressing thing */
+  let heroId=null, heroOcc=null;
+  if(soon.length){ const x=soon[0]; heroId=x.c.id; heroOcc=x;
+    h+=heroCard(x.c, x.o.label, whenLabel(x.n),
+      '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(firstName(x.c.name))+'</button>'+
+      '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+esc(x.o.label)+'\')">+ Calendar</button>');
+  } else if(due.length){ const c=due[0].c; heroId=c.id;
+    h+=heroCard(c, 'time to reconnect', (due[0].overdue<0?(-due[0].overdue)+' days overdue':'due now'),
+      '<button class="btn primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message '+esc(firstName(c.name))+'</button>'+
+      '<button class="btn ghost" onclick="logToday(\''+c.id+'\')">Log call</button>');
+  }
+  /* progress: warmth */
+  const tracked=DB.contacts.filter(c=>c.cadence);
+  const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
+  const pct=tracked.length?Math.max(4,Math.min(100,Math.round(warm/tracked.length*100))):100;
+  h+='<div class="card prog"><div class="row between"><div><div class="kick" style="margin:0">Your warmth</div><div class="pstat">'+(tracked.length?('Keeping '+warm+' of '+tracked.length+' people warm'):'Set a reconnect rhythm on a few people')+'</div></div><span class="floaty">'+occShape('reconnect',42)+'</span></div><div class="bar"><span style="width:'+pct+'%"></span></div></div>';
   /* reach out */
   h+='<div class="kick">Time to reach out ('+due.length+')</div>';
-  if(!due.length) h+='<div class="card muted" style="text-align:center">Nobody is overdue. Nicely kept. ✦</div>';
-  due.slice(0,12).forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
+  if(!due.length) h+='<div class="card muted" style="text-align:center">Nobody is overdue. Nicely kept.</div>';
+  due.filter(d=>d.c.id!==heroId).slice(0,12).forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
       '<button class="btn sm primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message</button> <button class="btn sm ghost" onclick="logToday(\''+c.id+'\')">Log call</button>'); });
   /* coming up */
   h+='<div class="kick">Coming up</div>';
+  const upList=up.filter(x=>x!==heroOcc);
   if(!up.length) h+='<div class="card muted" style="text-align:center">No birthdays or anniversaries in the next three weeks.</div>';
-  up.slice(0,20).forEach(({c,o,n})=>{
+  upList.slice(0,20).forEach(({c,o,n})=>{
     const pill='<span class="pill '+(o.type==='birthday'?'bday':o.type==='anniversary'?'anniv':'warm')+'">'+esc(o.label)+' '+whenLabel(n)+'</span>';
     h+=personRow(c, pill,
       '<button class="btn sm gold" onclick="compose(\''+c.id+'\',\''+(o.type==='anniversary'?'anniversary':o.type==='birthday'?'birthday':'reconnect')+'\')">Wish</button> '+
       '<button class="btn sm ghost" onclick="addCal(\''+c.id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+esc(o.label)+'\')">+ Calendar</button>');
   });
+  h+='</div>'; render(h);
+}
+function heroCard(c, label, whenText, actions){
+  return '<div class="hero"><svg class="blob" viewBox="0 0 64 44" aria-hidden="true"><circle cx="26" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7" opacity=".5"/><circle cx="40" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7"/></svg>'
+    +'<div class="kick" style="color:var(--hero-ink);opacity:.85;margin:0 0 8px">'+esc(label)+'</div>'
+    +'<div class="nm">'+esc(c.name)+'</div>'
+    +'<div class="sub">'+(c.context?esc(c.context)+' · ':'')+'<span class="circ">'+esc(whenText)+'<svg viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M82 7 C 98 13, 92 27, 48 28 C 8 29, 4 16, 12 9 C 20 3, 66 3, 90 12"/></svg></span></div>'
+    +'<div class="btn-row" style="margin-top:14px">'+actions+'</div></div>';
+}
+function viewMap(){
+  const groups={}, noloc=[];
+  DB.contacts.forEach(c=>{ const raw=c.location||c.address||''; const g=raw?geocode(raw):null;
+    if(g){ (groups[g.key]=groups[g.key]||{ll:g.ll,people:[]}).people.push(c); }
+    else noloc.push(c); });
+  const keys=Object.keys(groups).sort((a,b)=>groups[b].people.length-groups[a].people.length);
+  const placed=keys.reduce((n,k)=>n+groups[k].people.length,0);
+  let h='<div class="view"><h1 class="title">Where your people are</h1><p class="muted">'+placed+' of '+DB.contacts.length+' on the map. Add a city to anyone and they appear here.</p>';
+  let dots='';
+  keys.forEach(k=>{ const g=groups[k]; const cx=(g.ll[1]+180), cy=(90-g.ll[0]); const n=g.people.length; const r=Math.min(11,3+n*1.6);
+    dots+='<circle class="map-dot'+(n>2?' big':'')+'" cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r.toFixed(1)+'"><title>'+esc(k)+' · '+n+'</title></circle>'; });
+  h+='<div class="map-wrap"><svg class="world" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet">'+WORLD_PATHS+dots+'</svg></div>';
+  if(keys.length){ h+='<div class="kick">By location</div><div class="card" style="padding:2px 14px">';
+    keys.forEach(k=>{ h+='<div class="geo-row"><span class="geo-dot"></span><span style="text-transform:capitalize">'+esc(k)+'</span><span class="ct">'+groups[k].people.length+'</span></div>'; });
+    h+='</div>'; }
+  if(noloc.length){ h+='<div class="kick">Not placed yet ('+noloc.length+')</div><div class="card muted" style="line-height:1.7">Add a city to these people (open them &rarr; Edit details &rarr; Location): '+noloc.slice(0,40).map(c=>esc(firstName(c.name)||c.name)).join(', ')+(noloc.length>40?'…':'')+'</div>'; }
   h+='</div>'; render(h);
 }
 function personRow(c,pill,actions){
@@ -294,14 +372,14 @@ function viewPerson(id){
 
   /* reminders */
   h+='<div class="card"><div class="row between"><div class="kick" style="margin-top:0">Reminders</div><button class="btn ghost sm" onclick="addRemind(\''+id+'\')">+ Add</button></div>';
-  if(c.bday&&c.bday.m) h+=detailRow('🎂 Wish happy birthday', MONTHS[c.bday.m]+' '+c.bday.d+' · every year');
-  (c.customDates||[]).forEach((cd,i)=>h+=detailRow('🔔 '+esc(cd.label||'reminder'), MONTHS[cd.m]+' '+cd.d+' · yearly <a style="color:var(--rose)" onclick="delRemind(\''+id+'\','+i+')">×</a>'));
+  if(c.bday&&c.bday.m) h+=detailRow(occShape('birthday',22)+' Wish happy birthday', MONTHS[c.bday.m]+' '+c.bday.d+' · every year');
+  (c.customDates||[]).forEach((cd,i)=>h+=detailRow(esc(cd.label||'reminder'), MONTHS[cd.m]+' '+cd.d+' · yearly <a style="color:var(--rose)" onclick="delRemind(\''+id+'\','+i+')">×</a>'));
   if(!(c.bday&&c.bday.m)&&!(c.customDates||[]).length) h+='<div class="muted">No reminders yet. Birthdays add one automatically.</div>';
   h+='</div>';
 
   /* calls & activities */
   h+='<div class="card"><div class="row between"><div class="kick" style="margin-top:0">Calls &amp; activities</div><button class="btn ghost sm" onclick="addActivity(\''+id+'\')">+ Activity</button></div>';
-  const tl=[].concat((c.log||[]).map(l=>({d:l.date,t:(l.type==='call'?'📞 Call':'✓ Contacted'),n:l.note})),(c.activities||[]).map(a=>({d:a.date,t:'✦ '+a.text,n:''}))).sort((x,y)=>(y.d||'').localeCompare(x.d||''));
+  const tl=[].concat((c.log||[]).map(l=>({d:l.date,t:(l.type==='call'?'Call':'Contacted'),n:l.note})),(c.activities||[]).map(a=>({d:a.date,t:a.text,n:''}))).sort((x,y)=>(y.d||'').localeCompare(x.d||''));
   if(!tl.length) h+='<div class="muted">Nothing logged. Log a call you had, or an activity you did together.</div>';
   tl.forEach(e=>h+='<div class="row between" style="padding:8px 0;border-bottom:0.5px solid var(--line)"><span style="font-size:14px">'+esc(e.t)+(e.n?' <span class="sub">— '+esc(e.n)+'</span>':'')+'</span><span class="sub">'+esc(e.d)+'</span></div>');
   h+='</div>';
@@ -430,14 +508,14 @@ window.exportICS=()=>{
   DB.contacts.forEach(c=>{
     const fn=firstName(c.name)||c.name||'someone';
     contactOccasions(c).forEach(o=>{
-      const sum=(o.type==='birthday'?'🎂 '+fn+"'s birthday, wish them":o.type==='anniversary'?'💞 '+fn+"'s anniversary":'🔔 '+fn+', '+o.label);
+      const sum=(o.type==='birthday'?'Wish '+fn+' a happy birthday':o.type==='anniversary'?fn+"'s anniversary":fn+', '+o.label);
       const msg=o.type==='birthday'?fillTemplate(tb('birthday'),c):o.type==='anniversary'?fillTemplate(tb('anniversary'),c):'';
       const desc=(c.context?c.context+'. ':'')+(c.phone?('Message on WhatsApp: '+waLink(c.phone,msg)):'');
       out.push(icsEvent('warmly-'+c.id+'-'+o.type+'-'+o.raw.m+'-'+o.raw.d+'@warmly.app', o.date, 'FREQ=YEARLY', sum, desc, '-PT15H')); n++;
     });
     if(c.cadence){ const nd=nextDue(c)||today(); const d=nd<today()?today():nd;
       const desc=(c.context?c.context+'. ':'')+(c.phone?('Call or message: '+waLink(c.phone,fillTemplate(tb('reconnect'),c))):'');
-      out.push(icsEvent('warmly-'+c.id+'-reconnect@warmly.app', d, 'FREQ=MONTHLY;INTERVAL='+c.cadence, '📞 Reconnect with '+fn+', keep it warm', desc, 'PT9H')); n++;
+      out.push(icsEvent('warmly-'+c.id+'-reconnect@warmly.app', d, 'FREQ=MONTHLY;INTERVAL='+c.cadence, 'Reconnect with '+fn+', keep it warm', desc, 'PT9H')); n++;
     }
   });
   out.push('END:VCALENDAR');
@@ -484,6 +562,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
   h+='<div class="two"><div><label class="fl">Birthday (YYYY-MM-DD or --MM-DD)</label><input id="e_bday" value="'+dv(c.bday)+'" placeholder="1996-04-21"></div><div><label class="fl">Anniversary</label><input id="e_anniv" value="'+dv(c.anniv)+'"></div></div>';
   h+='<label class="fl">Reconnect every (months, blank = off)</label><input id="e_cad" type="number" min="1" value="'+(c.cadence||'')+'" placeholder="5">';
   h+='<label class="fl">Address</label><input id="e_addr" value="'+esc(c.address||'')+'">';
+  h+='<label class="fl">Location for the map (city, country)</label><input id="e_loc" value="'+esc(c.location||'')+'" placeholder="London, UK">';
   h+='<div class="two"><div><label class="fl">Job title</label><input id="e_job" value="'+esc(c.jobTitle||'')+'"></div><div><label class="fl">Company</label><input id="e_co" value="'+esc(c.company||'')+'"></div></div>';
   h+='<div class="two"><div><label class="fl">How you met</label><input id="e_met" value="'+esc(c.howMet||'')+'"></div><div><label class="fl">Food / drink they like</label><input id="e_food" value="'+esc(c.food||'')+'"></div></div>';
   h+='<label class="fl">Quick summary (shown in lists)</label><textarea id="e_ctx" style="min-height:58px">'+esc(c.context||'')+'</textarea>';
@@ -495,7 +574,7 @@ window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; DB.contacts.push(c); }
   c.name=g('e_name')||'Unnamed'; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li');
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; c.context=g('e_ctx');
-  c.address=g('e_addr'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
+  c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   save(); closeModal(); route();
 };
 
