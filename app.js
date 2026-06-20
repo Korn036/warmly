@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.18.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.19.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -118,6 +118,15 @@ function socialRow(c, withAdd){ const links=socialLinks(c); if(!links.length && 
   if(withAdd) h+='<button class="soc socadd" onclick="event.stopPropagation();editContact(\''+c.id+'\')" title="add a link" aria-label="add a link">+</button>';
   return h+'</div>';
 }
+/* ---- peer-to-peer "ask for their details": they fill a static page, the reply comes back to you on WhatsApp, no server ---- */
+window.askDetails=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const me=DB.me||{};
+  if(!me.phone){ alert('Add your own WhatsApp number in My Card first, so their reply comes back to you.'); go('mycard'); return; }
+  if(!c.phone){ alert('Add their phone number first so you can message them.'); editContact(id); return; }
+  const base=location.origin + location.pathname.replace(/[^\/]*$/, '');
+  const link=base+'card.html?to='+encodeURIComponent(normalizePhone(me.phone))+'&from='+encodeURIComponent(me.name||DB.settings.myName||'a friend');
+  const msg='Hey '+callName(c)+'! I keep the people I care about close on Warmly. Mind sharing a few details so I never miss your birthday? Takes 20 seconds: '+link;
+  window.open(waLink(c.phone,msg),'_blank','noopener');
+};
 function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
 function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','#6A655B','#3C6E91','#8A5A99']; let h=0; for(const c of (n||'x')) h=(h*31+c.charCodeAt(0))%colors.length; return colors[h]; }
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -478,6 +487,7 @@ function viewPerson(id){
   h+='<div class="chips" style="margin-top:10px">'+(c.tags||[]).map((t,i)=>'<span class="chip on" onclick="delTag(\''+id+'\','+i+')">'+esc(t)+' ×</span>').join('')+'<span class="chip" onclick="addTag(\''+id+'\')">+ tag</span></div>';
   h+='<div class="btn-row" style="margin-top:6px">';
   if(c.phone) h+='<button class="btn wa sm" onclick="compose(\''+id+'\',\'reconnect\')">WhatsApp</button>';
+  if(c.phone) h+='<button class="btn ghost sm" onclick="askDetails(\''+id+'\')">Ask for details</button>';
   h+='<button class="btn ghost sm" onclick="logCall(\''+id+'\')">Log a call</button>';
   h+='<button class="btn ghost sm" onclick="editContact(\''+id+'\')">Edit details</button></div></div>';
   h+=socialRow(c,true);
@@ -810,11 +820,13 @@ function quickParse(t){ t=t||'';
   const instagram=(t.match(/instagram\.com\/([A-Za-z0-9_.]+)/i)||[])[1]||'';
   const x=(t.match(/(?:x|twitter)\.com\/([A-Za-z0-9_]+)/i)||[])[1]||'';
   const telegram=(t.match(/t\.me\/([A-Za-z0-9_]+)/i)||[])[1]||'';
-  const phone=(t.match(/\+?\d[\d ()\-]{7,}\d/)||[])[0]||'';
+  const bdayM=t.match(/(?:birthday|bday|dob|born)[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}[\/.\- ][0-9]{1,2}(?:[\/.\- ][0-9]{2,4})?)/i);
+  const bday=bdayM?bdayM[1]:'';
+  const phone=((bdayM?t.replace(bdayM[0],' '):t).match(/\+?\d[\d ()\-]{7,}\d/)||[])[0]||'';
   let location=''; const low=t.toLowerCase(); for(const k in GEO){ if(k.length>3 && low.indexOf(k)>=0){ location=k; break; } }
   let name=''; const lines=t.split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
   for(const ln of lines){ if(/@|linkedin|https?:|\d{4,}/i.test(ln)) continue; if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
-  return {name,email,linkedin,instagram,x,telegram,phone,location};
+  return {name,email,linkedin,instagram,x,telegram,bday,phone,location};
 }
 window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
   h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Warmly pulls out the details. Refine later on their page.</div>';
@@ -823,6 +835,7 @@ window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</b
   h+='<div class="two"><div><label class="fl">Name</label><input id="qa_name"></div><div><label class="fl">Phone</label><input id="qa_phone"></div></div>';
   h+='<label class="fl">Calling name &middot; used in messages</label><input id="qa_call" placeholder="John">';
   h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
+  h+='<label class="fl">Birthday (optional)</label><input id="qa_bday" type="date">';
   h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden">';
   h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="quickSave()">Add person</button></div>';
   openModal(h); };
@@ -832,10 +845,26 @@ window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
   if(p.phone&&!$('#qa_phone').value) $('#qa_phone').value=p.phone;
   if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
   if(p.email) $('#qa_email').value=p.email; if(p.linkedin) $('#qa_li').value=p.linkedin;
-  if(p.instagram) $('#qa_ig').value=p.instagram; if(p.x) $('#qa_x').value=p.x; if(p.telegram) $('#qa_tg').value=p.telegram; };
+  if(p.instagram) $('#qa_ig').value=p.instagram; if(p.x) $('#qa_x').value=p.x; if(p.telegram) $('#qa_tg').value=p.telegram;
+  if(p.bday && $('#qa_bday')) $('#qa_bday').value=p.bday; };
 window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('Add a name first.'); return; }
-  const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name,callName:($('#qa_call').value.trim()||firstName(name)),phone:$('#qa_phone').value.trim(),location:$('#qa_loc').value.trim(),tier:+$('#qa_tier').value,email:$('#qa_email').value,linkedin:$('#qa_li').value,instagram:$('#qa_ig').value,x:$('#qa_x').value,telegram:$('#qa_tg').value,review:true};
-  DB.contacts.push(c); save(); closeModal(); go('person',c.id); };
+  const g=i=>{ const el=$('#'+i); return el?el.value.trim():''; };
+  const phone=g('qa_phone'), norm=phone?normalizePhone(phone):'', bd=parseDateStr(g('qa_bday'));
+  let c=norm? DB.contacts.find(x=>x.id!=='me' && x.phone && normalizePhone(x.phone)===norm) : null;
+  if(c){ /* a returned card: merge into the existing contact, fill blanks, never clobber */
+    if(!c.name||c.name==='Unnamed') c.name=name;
+    if(g('qa_call')) c.callName=g('qa_call');
+    if(g('qa_loc')&&!c.location) c.location=g('qa_loc');
+    if(g('qa_email')&&!c.email) c.email=g('qa_email');
+    if(g('qa_li')&&!c.linkedin) c.linkedin=g('qa_li');
+    if(g('qa_ig')&&!c.instagram) c.instagram=g('qa_ig');
+    if(g('qa_x')&&!c.x) c.x=g('qa_x');
+    if(g('qa_tg')&&!c.telegram) c.telegram=g('qa_tg');
+    if(bd&&!c.bday) c.bday=bd;
+    c.review=false; save(); closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); return;
+  }
+  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),bday:bd,review:true};
+  DB.contacts.push(nc); save(); closeModal(); go('person',nc.id); };
 
 window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const tpl=DB.templates.find(t=>t.occasion===occasion)||DB.templates.find(t=>t.occasion==='reconnect')||{body:''};

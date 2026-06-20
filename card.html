@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warmly · share your details</title>
+<meta name="theme-color" content="#E2613C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#F4EBDB; --card:#FFFCF6; --ink:#241C14; --soft:#867A66; --line:rgba(36,28,20,.13); --accent:#E2613C; --mono:'IBM Plex Mono',monospace; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ font-family:'Space Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:34px 18px 60px; -webkit-text-size-adjust:100%; }
+.wrap{ width:100%; max-width:440px; }
+.brand{ font-weight:700; font-size:22px; letter-spacing:-.01em; } .brand span{ color:var(--accent); }
+h1{ font-size:27px; font-weight:600; letter-spacing:-.02em; margin:14px 0 8px; line-height:1.12; }
+.lede{ color:var(--soft); font-size:15px; line-height:1.5; }
+form{ background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px 16px; margin-top:18px; box-shadow:0 12px 30px rgba(36,28,20,.07); }
+label{ display:block; font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--soft); margin:12px 0 5px; }
+label:first-child{ margin-top:0; }
+input{ width:100%; font-family:inherit; font-size:16px; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:12px 13px; }
+input:focus{ outline:none; border-color:var(--accent); }
+.send{ width:100%; margin-top:18px; background:#25D366; color:#053; border:none; font-family:inherit; font-weight:600; font-size:16px; padding:14px; border-radius:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+.send:active{ transform:scale(.99); }
+.privacy{ font-family:var(--mono); font-size:11.5px; color:var(--soft); text-align:center; margin-top:16px; line-height:1.6; }
+.privacy b{ color:var(--ink); }
+.wa{ width:18px; height:18px; fill:#053; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Warmly<span>.</span></div>
+  <h1><span data-from>A friend</span> wants to keep in touch</h1>
+  <p class="lede">Share a few details so <span data-from>they</span> never miss your birthday and can stay in touch properly. Takes 20 seconds.</p>
+  <form id="f" onsubmit="return false">
+    <label>Your name</label><input id="name" autocomplete="name" placeholder="Your name">
+    <label>Birthday</label><input id="bday" type="date">
+    <label>City</label><input id="city" placeholder="where you're based">
+    <label>Email (optional)</label><input id="email" type="email" inputmode="email" placeholder="you@email.com">
+    <label>LinkedIn (optional)</label><input id="li" placeholder="linkedin.com/in/you">
+    <label>Instagram (optional)</label><input id="ig" placeholder="@you">
+    <button type="button" class="send" id="send"><svg class="wa" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg>Send to <span data-from>them</span> on WhatsApp</button>
+  </form>
+  <p class="privacy"><b>Private by design.</b> Warmly stores nothing. Your details go straight to <span data-from>your friend</span> over WhatsApp, and nowhere else.</p>
+</div>
+<script>
+(function(){
+  var p = new URLSearchParams(location.search);
+  var to = (p.get('to')||'').replace(/[^0-9]/g,'');
+  var from = (p.get('from')||'A friend').slice(0,40);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-from]'), function(e){ e.textContent = from; });
+  function v(id){ return document.getElementById(id).value.trim(); }
+  document.getElementById('send').onclick = function(){
+    var name=v('name'); if(!name){ alert('Please add your name.'); return; }
+    if(!to){ alert('This link is missing the recipient. Ask them to resend it.'); return; }
+    var L=[name];
+    var b=v('bday'); if(b) L.push('Birthday: '+b);
+    var city=v('city'); if(city) L.push(city);
+    var email=v('email'); if(email) L.push(email);
+    var li=v('li'); if(li) L.push(/linkedin\.com/i.test(li)?li:('linkedin.com/in/'+li.replace(/^@/,'')));
+    var ig=v('ig'); if(ig) L.push('instagram.com/'+ig.replace(/^@/,''));
+    L.push('— shared via Warmly');
+    location.href = 'https://wa.me/' + to + '?text=' + encodeURIComponent(L.join('\n'));
+  };
+})();
+</script>
+</body>
+</html>
