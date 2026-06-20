@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.8.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.9.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -35,15 +35,18 @@ let _gtok=null,_gclient=null,_gfile=null,_gsyncing=false,_gpush=null,_gpending=n
 function _gstatus(t){ const e=document.getElementById('gstat'); if(e) e.textContent=t; }
 function gisReady(cb){ if(window.google&&google.accounts&&google.accounts.oauth2) return cb();
   const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.onload=cb; s.onerror=()=>_gstatus('Could not reach Google'); document.head.appendChild(s); }
+function gCacheTok(r){ if(r&&r.access_token){ _gtok=r.access_token; try{ localStorage.setItem('warmly.gtok', JSON.stringify({t:_gtok, exp:Date.now()+((r.expires_in||3600)*1000)-90000})); }catch(e){} localStorage.setItem('warmly.gsync','1'); } }
+function gCachedTok(){ try{ const o=JSON.parse(localStorage.getItem('warmly.gtok')); if(o&&o.t&&o.exp>Date.now()) return o.t; }catch(e){} return null; }
 function gInitClient(){ if(_gclient) return; _gclient=google.accounts.oauth2.initTokenClient({ client_id:GCLIENT_ID, scope:GSCOPE,
-  callback:(r)=>{ if(r&&r.access_token){ _gtok=r.access_token; localStorage.setItem('warmly.gsync','1'); }
+  callback:(r)=>{ gCacheTok(r);
     if(_gpending){ const p=_gpending; _gpending=null; p(r); } else { syncNow(); } } }); }
-function gToken(interactive){ return new Promise(res=>{ gInitClient(); _gpending=res; try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ _gpending=null; res(null); } }); }
+function gToken(interactive){ if(!interactive){ const c=gCachedTok(); if(c){ _gtok=c; return Promise.resolve({access_token:c}); } }
+  return new Promise(res=>{ gInitClient(); _gpending=res; try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ _gpending=null; res(null); } }); }
 window.gConnect=()=>{ gisReady(async()=>{ _gstatus('Opening Google…'); const r=await gToken(true); if(r&&r.access_token) syncNow(); else _gstatus('Sign-in cancelled'); }); };
-window.gDisconnect=()=>{ _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); route(); };
+window.gDisconnect=()=>{ _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); localStorage.removeItem('warmly.gtok'); route(); };
 async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'Authorization':'Bearer '+_gtok},opts.headers||{});
   let r=await fetch(url,opts);
-  if(r.status===401){ const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }
+  if(r.status===401){ try{ localStorage.removeItem('warmly.gtok'); }catch(e){} const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }
   return r; }
 async function gFindFile(){ const r=await gFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+encodeURIComponent("name='warmly.json'")); if(!r.ok) return null; const j=await r.json(); return j.files&&j.files[0]?j.files[0].id:null; }
 async function gDownload(id){ const r=await gFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media'); return r.ok?await r.json():null; }
@@ -73,7 +76,7 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
   finally{ _gsyncing=false; } }
 window.syncNow=syncNow;
 function schedulePush(){ if(localStorage.getItem('warmly.gsync')!=='1'||!_gtok) return; clearTimeout(_gpush); _gpush=setTimeout(syncNow,2500); }
-function gBoot(){ if(localStorage.getItem('warmly.gsync')!=='1') return; gisReady(async()=>{ const r=await gToken(false); if(r&&r.access_token) syncNow(); else _gstatus('Tap Connect to resume sync'); }); }
+function gBoot(){ if(localStorage.getItem('warmly.gsync')!=='1') return; const c=gCachedTok(); if(c){ _gtok=c; syncNow(); return; } gisReady(async()=>{ const r=await gToken(false); if(r&&r.access_token) syncNow(); else _gstatus('Tap Sign in to resume sync'); }); }
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -327,14 +330,21 @@ function peopleRow(c){ const occ=contactOccasions(c)[0];
 function viewPeople(){
   const f=window._pfilter||{q:'',tier:0};
   const mode=localStorage.getItem('warmly.pview')||'tiles';
-  let list=DB.contacts.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const sort=localStorage.getItem('warmly.psort')||'name';
+  let list=DB.contacts.slice();
   if(f.tier) list=list.filter(c=>c.tier===f.tier);
   if(f.q){ const q=f.q.toLowerCase(); list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.context||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||(c.company||'').toLowerCase().includes(q)); }
-  let h='<div class="view"><div class="row between"><h1 class="title">People</h1><button class="btn primary sm" onclick="editContact()">+ Add</button></div>';
+  const byName=(a,b)=>(a.name||'').localeCompare(b.name||'');
+  if(sort==='overdue') list.sort((a,b)=>overdueScore(b)-overdueScore(a)||byName(a,b));
+  else if(sort==='recent') list.sort((a,b)=>lastTs(b)-lastTs(a)||byName(a,b));
+  else if(sort==='close') list.sort((a,b)=>(a.tier||3)-(b.tier||3)||byName(a,b));
+  else list.sort(byName);
+  let h='<div class="view"><div class="row between"><h1 class="title">People</h1><button class="btn primary sm" onclick="quickAdd()">+ Add</button></div>';
   h+='<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pq" placeholder="search '+DB.contacts.length+' people, cities, companies" value="'+esc(f.q)+'" oninput="pSearch(this.value)"></div>';
   h+='<div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">';
   h+='<div class="chips" style="margin:6px 0">'+[[0,'all'],[1,'inner circle'],[2,'keep warm'],[3,'loose ties']].map(([t,l])=>'<span class="chip '+(f.tier===t?'on':'')+'" onclick="pTier('+t+')">'+l+'</span>').join('')+'</div>';
   h+='<div class="seg">'+[['tiles','tiles'],['list','list'],['area','area']].map(([m,l])=>'<button class="'+(mode===m?'on':'')+'" onclick="pView(\''+m+'\')">'+l+'</button>').join('')+'</div>';
+  h+='<select class="sortsel" onchange="pSort(this.value)">'+[['name','A to Z'],['overdue','most overdue'],['recent','recently contacted'],['close','closeness']].map(([v,l])=>'<option value="'+v+'"'+(sort===v?' selected':'')+'>'+l+'</option>').join('')+'</select>';
   h+='</div>';
   if(!list.length){ h+='<div class="empty">No matches.</div></div>'; return render(h); }
   if(mode==='area'){
@@ -351,7 +361,10 @@ function viewPeople(){
   h+='</div>'; render(h);
 }
 window.pView=m=>{ localStorage.setItem('warmly.pview',m); viewPeople(); };
+window.pSort=v=>{ localStorage.setItem('warmly.psort',v); viewPeople(); };
 window.pLoc=k=>{ window._pfilter={q:k,tier:0}; localStorage.setItem('warmly.pview','area'); go('people'); };
+function overdueScore(c){ if(!c.cadence) return -1e9; const nd=nextDue(c); if(!nd) return -1e9; return (today()-nd)/86400000; }
+function lastTs(c){ const l=(c.log||[]).slice(-1)[0]; if(l&&l.date) return Date.parse(l.date)||0; return c.lastContacted?(Date.parse(c.lastContacted)||0):0; }
 window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); const list=document.querySelectorAll('.view .card.row'); viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } };
 window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t}); viewPeople(); };
 
@@ -372,6 +385,10 @@ function viewPerson(id){
   if(c.phone) h+='<button class="btn wa sm" onclick="compose(\''+id+'\',\'reconnect\')">WhatsApp</button>';
   h+='<button class="btn ghost sm" onclick="logCall(\''+id+'\')">Log a call</button>';
   h+='<button class="btn ghost sm" onclick="editContact(\''+id+'\')">Edit details</button></div></div>';
+
+  /* quick triage */
+  h+='<div class="card"><div class="kick" style="margin-top:0">Quick triage</div><div class="btn-row">'+[[1,'inner circle'],[2,'keep warm'],[3,'loose tie']].map(([t,l])=>'<button class="btn sm '+(c.tier===t?'primary':'ghost')+'" onclick="setTier(\''+id+'\','+t+')">'+l+'</button>').join('')+'</div>'
+    +'<div class="btn-row" style="margin-top:8px;align-items:center"><span class="sub" style="margin-right:2px">reconnect every</span>'+[0,3,6,12].map(m=>'<button class="btn sm '+(((c.cadence||0)===m)?'primary':'ghost')+'" onclick="setCad(\''+id+'\','+m+')">'+(m?m+' mo':'off')+'</button>').join('')+'</div></div>';
 
   /* relationships */
   h+='<div class="card"><div class="kick" style="margin-top:0">The people &amp; pets around them</div>';
@@ -505,7 +522,7 @@ function viewSettings(){
   h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
   h+='<div class="kick">Your calendar · the important bit</div><div class="card"><div class="muted">Warmly turns every birthday, anniversary and reconnect into events on your Google Calendar, so your calendar nudges you even when this app is closed. Your time is your only currency, this protects it.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. On your phone or laptop, open it and add it to Google Calendar (or Google Calendar &rarr; Settings &rarr; Import). Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export. Your contacts themselves now sync across your devices, see &ldquo;Sync&rdquo; below.</div></div>';
   h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Warmly keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Warmly server ever touches your contacts.</div>'
-    +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Connect Google Drive</button>')+'</div>'
+    +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
     +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected · auto-syncs on changes':'Not connected')+'</div></div>';
   h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
     +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
@@ -604,11 +621,45 @@ window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   save(); closeModal(); route();
 };
+/* ---- Quick add: paste anything, we extract the details ---- */
+function quickParse(t){ t=t||'';
+  const email=(t.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)||[])[0]||'';
+  const linkedin=(t.match(/(https?:\/\/)?(www\.)?linkedin\.com\/[^\s,]+/i)||[])[0]||'';
+  const phone=(t.match(/\+?\d[\d ()\-]{7,}\d/)||[])[0]||'';
+  let location=''; const low=t.toLowerCase(); for(const k in GEO){ if(k.length>3 && low.indexOf(k)>=0){ location=k; break; } }
+  let name=''; const lines=t.split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
+  for(const ln of lines){ if(/@|linkedin|https?:|\d{4,}/i.test(ln)) continue; if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
+  return {name,email,linkedin,phone,location};
+}
+window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
+  h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Warmly pulls out the details. Refine later on their page.</div>';
+  h+='<textarea id="qa_blob" placeholder="Paste or type here" style="min-height:78px" oninput="qaParse()"></textarea>';
+  h+='<div class="two"><div><label class="fl">Name</label><input id="qa_name"></div><div><label class="fl">Phone</label><input id="qa_phone"></div></div>';
+  h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
+  h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden">';
+  h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="quickSave()">Add person</button></div>';
+  openModal(h); };
+window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
+  if(p.name&&!$('#qa_name').value) $('#qa_name').value=p.name;
+  if(p.phone&&!$('#qa_phone').value) $('#qa_phone').value=p.phone;
+  if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
+  if(p.email) $('#qa_email').value=p.email; if(p.linkedin) $('#qa_li').value=p.linkedin; };
+window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('Add a name first.'); return; }
+  const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name,phone:$('#qa_phone').value.trim(),location:$('#qa_loc').value.trim(),tier:+$('#qa_tier').value,email:$('#qa_email').value,linkedin:$('#qa_li').value};
+  DB.contacts.push(c); save(); closeModal(); go('person',c.id); };
 
 window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const tpl=DB.templates.find(t=>t.occasion===occasion)||DB.templates.find(t=>t.occasion==='reconnect')||{body:''};
   const draft=fillTemplate(tpl.body,c);
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>Message '+esc(firstName(c.name))+'</h3>';
+  const _last=(c.log||[]).slice(-1)[0]; const _bits=[];
+  if(c.jobTitle||c.company) _bits.push([c.jobTitle,c.company].filter(Boolean).join(' at '));
+  if(c.location) _bits.push(c.location);
+  if(c.howMet) _bits.push('met: '+c.howMet);
+  if(c.partner&&c.partner.name) _bits.push('partner '+c.partner.name);
+  if(c.children&&c.children.length) _bits.push('kids: '+c.children.map(k=>k.name).join(', '));
+  if(c.food) _bits.push('likes '+c.food);
+  if(_last||_bits.length){ h+='<div class="ctx">'+(_last?'<div class="sub">last contacted '+esc(_last.date)+(_last.note?' &mdash; &ldquo;'+esc(_last.note)+'&rdquo;':'')+'</div>':'')+(_bits.length?'<div class="sub">'+esc(_bits.join(' · '))+'</div>':'')+'</div>'; }
   h+='<div class="btn-row" style="margin:10px 0">'+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
   h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';
@@ -617,16 +668,18 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   openModal(h);
 };
 window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid); $('#msg').value=fillTemplate(t.body,c); };
-window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value; window.open(waLink(c.phone,txt),'_blank'); };
+window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value; window.open(waLink(c.phone,txt),'_blank','noopener'); };
 
 window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); const date=nextOccurrence(+m,+d);
   const title=esc(firstName(c.name))+"'s "+label; const details=(c.context?c.context+' · ':'')+(c.phone?('WhatsApp: '+waLink(c.phone,'')):'');
-  window.open(gcalLink(title,date,details,true),'_blank');
+  window.open(gcalLink(title,date,details,true),'_blank','noopener');
 };
 window.logToday=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const note=prompt('Quick note about this catch-up (optional):')||'';
   const t=new Date().toISOString().slice(0,10); c.log=c.log||[]; c.log.push({date:t,type:'contacted',note}); c.lastContacted=t; save(); closeModal(); route();
 };
+window.setTier=(id,t)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.tier=t; save(); route(); } };
+window.setCad=(id,m)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.cadence=m||null; save(); route(); } };
 
 /* ---------- render + boot ---------- */
 function render(h){ $('#app').innerHTML=h; }
