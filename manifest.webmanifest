@@ -1,0 +1,13 @@
+{
+  "name": "Kith — keep your people warm",
+  "short_name": "Kith",
+  "description": "A simple personal CRM: remember the people who matter, never miss a birthday, keep warm contacts from going cold.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F4EC",
+  "theme_color": "#0E3B2E",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

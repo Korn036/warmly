@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Kith · keep your people warm</title>
+<meta name="description" content="A simple personal CRM to remember the people who matter, never miss a birthday, and keep warm contacts from going cold.">
+<meta name="theme-color" content="#0E3B2E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%230E3B2E'/%3E%3Ccircle cx='24' cy='27' r='8' fill='%23F4C04A'/%3E%3Ccircle cx='42' cy='30' r='6.5' fill='%23F6E7C8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand" data-go="today">Kith<span class="dot">.</span></div>
+    <nav class="tabs" id="tabs">
+      <a data-go="today">Today</a>
+      <a data-go="people">People</a>
+      <a data-go="import">Import</a>
+      <a data-go="templates">Templates</a>
+      <a data-go="settings">Settings</a>
+    </nav>
+    <button class="icon-btn" id="themeBtn" aria-label="toggle theme">☾</button>
+    <button class="icon-btn menu" id="menuBtn" aria-label="menu">☰</button>
+  </div>
+</header>
+
+<main class="wrap" id="app"><!-- rendered by app.js --></main>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+
+<footer class="foot wrap">
+  <span>Kith keeps everything on this device. Nothing is sent to anyone until you tap send.</span><br>
+  <a href="privacy.html" style="color:var(--ink-soft)">Privacy</a> · <a href="terms.html" style="color:var(--ink-soft)">Terms</a> · © 2026 Karthik Onteddu
+</footer>
+
+<script src="app.js"></script>
+<script>
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# never commit your real exported contacts / backups
+*.kith
+kith-backup*.json
