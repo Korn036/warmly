@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.7.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.8.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -245,6 +245,7 @@ function viewToday(){
     h+='<div class="empty"><div class="big">No one here yet.</div>Import your contacts to begin, then mark the handful who matter.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
   }
+  h+='<div class="today-top">';
   /* hero: the single most pressing thing */
   let heroId=null, heroOcc=null;
   if(soon.length){ const x=soon[0]; heroId=x.c.id; heroOcc=x;
@@ -261,21 +262,23 @@ function viewToday(){
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
   const pct=tracked.length?Math.max(4,Math.min(100,Math.round(warm/tracked.length*100))):100;
   h+='<div class="card prog"><div class="row between"><div><div class="kick" style="margin:0">Your warmth</div><div class="pstat">'+(tracked.length?('Keeping '+warm+' of '+tracked.length+' people warm'):'Set a reconnect rhythm on a few people')+'</div></div><span class="floaty">'+occShape('reconnect',42)+'</span></div><div class="bar"><span style="width:'+pct+'%"></span></div></div>';
+  h+='</div>';
   /* reach out */
   h+='<div class="kick">Time to reach out ('+due.length+')</div>';
+  const dueList=due.filter(d=>d.c.id!==heroId).slice(0,12);
   if(!due.length) h+='<div class="card muted" style="text-align:center">Nobody is overdue. Nicely kept.</div>';
-  due.filter(d=>d.c.id!==heroId).slice(0,12).forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
-      '<button class="btn sm primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message</button> <button class="btn sm ghost" onclick="logToday(\''+c.id+'\')">Log call</button>'); });
+  else { h+='<div class="grid">'; dueList.forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
+      '<button class="btn sm primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message</button> <button class="btn sm ghost" onclick="logToday(\''+c.id+'\')">Log call</button>'); }); h+='</div>'; }
   /* coming up */
   h+='<div class="kick">Coming up</div>';
-  const upList=up.filter(x=>x!==heroOcc);
+  const upList=up.filter(x=>x!==heroOcc).slice(0,20);
   if(!up.length) h+='<div class="card muted" style="text-align:center">No birthdays or anniversaries in the next three weeks.</div>';
-  upList.slice(0,20).forEach(({c,o,n})=>{
+  else { h+='<div class="grid">'; upList.forEach(({c,o,n})=>{
     const pill='<span class="pill '+(o.type==='birthday'?'bday':o.type==='anniversary'?'anniv':'warm')+'">'+esc(o.label)+' '+whenLabel(n)+'</span>';
     h+=personRow(c, pill,
       '<button class="btn sm gold" onclick="compose(\''+c.id+'\',\''+(o.type==='anniversary'?'anniversary':o.type==='birthday'?'birthday':'reconnect')+'\')">Wish</button> '+
       '<button class="btn sm ghost" onclick="addCal(\''+c.id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+esc(o.label)+'\')">+ Calendar</button>');
-  });
+  }); h+='</div>'; }
   h+='</div>'; render(h);
 }
 function heroCard(c, label, whenText, actions){
@@ -298,7 +301,7 @@ function viewMap(){
     dots+='<circle class="map-dot'+(n>2?' big':'')+'" cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+r.toFixed(1)+'"><title>'+esc(k)+' · '+n+'</title></circle>'; });
   h+='<div class="map-wrap"><svg class="world" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet">'+WORLD_PATHS+dots+'</svg></div>';
   if(keys.length){ h+='<div class="kick">By location</div><div class="card" style="padding:2px 14px">';
-    keys.forEach(k=>{ h+='<div class="geo-row"><span class="geo-dot"></span><span style="text-transform:capitalize">'+esc(k)+'</span><span class="ct">'+groups[k].people.length+'</span></div>'; });
+    keys.forEach(k=>{ h+='<div class="geo-row" style="cursor:pointer" onclick="pLoc(\''+k+'\')"><span class="geo-dot"></span><span style="text-transform:capitalize">'+esc(k)+'</span><span class="ct">'+groups[k].people.length+' &rarr;</span></div>'; });
     h+='</div>'; }
   if(noloc.length){ h+='<div class="kick">Not placed yet ('+noloc.length+')</div><div class="card muted" style="line-height:1.7">Add a city to these people (open them &rarr; Edit details &rarr; Location): '+noloc.slice(0,40).map(c=>esc(firstName(c.name)||c.name)).join(', ')+(noloc.length>40?'…':'')+'</div>'; }
   h+='</div>'; render(h);
@@ -309,22 +312,46 @@ function personRow(c,pill,actions){
     +'<div class="btn-row" style="margin-top:12px">'+actions+'</div></div>';
 }
 
+function peopleTile(c){ const occ=contactOccasions(c)[0];
+  return '<div class="tile" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+    +'<div class="nm">'+esc(c.name)+'</div>'
+    +'<div class="sub">'+esc(c.location||c.company||c.context||'—')+'</div>'
+    +'<div class="sub" style="margin-top:2px">'+(occ?(esc(occ.label)+' '+fmtDate(occ.date)):(c.cadence?('reconnect every '+c.cadence+' mo'):'&nbsp;'))+'</div>'
+    +'<span class="pill t'+(c.tier||3)+'" style="margin-top:10px;align-self:flex-start">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span></div>';
+}
+function peopleRow(c){ const occ=contactOccasions(c)[0];
+  return '<div class="card row" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+    +'<div class="grow"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+esc(c.location||c.company||c.context||'no notes yet')+(occ?(' · '+esc(occ.label)+' '+fmtDate(occ.date)):'')+'</div></div>'
+    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span></div>';
+}
 function viewPeople(){
   const f=window._pfilter||{q:'',tier:0};
+  const mode=localStorage.getItem('warmly.pview')||'tiles';
   let list=DB.contacts.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(f.tier) list=list.filter(c=>c.tier===f.tier);
-  if(f.q){ const q=f.q.toLowerCase(); list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.context||'').toLowerCase().includes(q)); }
+  if(f.q){ const q=f.q.toLowerCase(); list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.context||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||(c.company||'').toLowerCase().includes(q)); }
   let h='<div class="view"><div class="row between"><h1 class="title">People</h1><button class="btn primary sm" onclick="editContact()">+ Add</button></div>';
-  h+='<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pq" placeholder="search '+DB.contacts.length+' people" value="'+esc(f.q)+'" oninput="pSearch(this.value)"></div>';
-  h+='<div class="chips">'+[[0,'all'],[1,'inner circle'],[2,'keep warm'],[3,'loose ties']].map(([t,l])=>'<span class="chip '+(f.tier===t?'on':'')+'" onclick="pTier('+t+')">'+l+'</span>').join('')+'</div>';
-  if(!list.length) h+='<div class="empty">No matches.</div>';
-  list.forEach(c=>{ const occ=contactOccasions(c)[0];
-    h+='<div class="card row" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
-      +'<div class="grow"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+(c.context?esc(c.context):'no notes yet')+(occ?(' · '+occ.label+' '+fmtDate(occ.date)):'')+'</div></div>'
-      +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span></div>';
-  });
+  h+='<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pq" placeholder="search '+DB.contacts.length+' people, cities, companies" value="'+esc(f.q)+'" oninput="pSearch(this.value)"></div>';
+  h+='<div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">';
+  h+='<div class="chips" style="margin:6px 0">'+[[0,'all'],[1,'inner circle'],[2,'keep warm'],[3,'loose ties']].map(([t,l])=>'<span class="chip '+(f.tier===t?'on':'')+'" onclick="pTier('+t+')">'+l+'</span>').join('')+'</div>';
+  h+='<div class="seg">'+[['tiles','tiles'],['list','list'],['area','area']].map(([m,l])=>'<button class="'+(mode===m?'on':'')+'" onclick="pView(\''+m+'\')">'+l+'</button>').join('')+'</div>';
+  h+='</div>';
+  if(!list.length){ h+='<div class="empty">No matches.</div></div>'; return render(h); }
+  if(mode==='area'){
+    const groups={}, none=[];
+    list.forEach(c=>{ const g=(c.location||c.address)?geocode(c.location||c.address):null; if(g){ (groups[g.key]=groups[g.key]||[]).push(c); } else none.push(c); });
+    Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length).forEach(k=>{
+      h+='<div class="gsec"><span style="text-transform:capitalize">'+esc(k)+'</span><span class="ct">'+groups[k].length+'</span></div><div class="grid">'+groups[k].map(peopleTile).join('')+'</div>'; });
+    if(none.length) h+='<div class="gsec">No location yet <span class="ct">'+none.length+'</span></div><div class="grid">'+none.map(peopleTile).join('')+'</div>';
+  } else if(mode==='list'){
+    h+=list.map(peopleRow).join('');
+  } else {
+    h+='<div class="grid">'+list.map(peopleTile).join('')+'</div>';
+  }
   h+='</div>'; render(h);
 }
+window.pView=m=>{ localStorage.setItem('warmly.pview',m); viewPeople(); };
+window.pLoc=k=>{ window._pfilter={q:k,tier:0}; localStorage.setItem('warmly.pview','area'); go('people'); };
 window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); const list=document.querySelectorAll('.view .card.row'); viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } };
 window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t}); viewPeople(); };
 

@@ -27,7 +27,7 @@
 html{ -webkit-text-size-adjust:100%; }
 body{ background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased; padding-bottom:50px; }
 a{ color:inherit; text-decoration:none; cursor:pointer; }
-.wrap{ max-width:760px; margin:0 auto; padding:0 18px; }
+.wrap{ max-width:1180px; margin:0 auto; padding:0 20px; }
 .serif{ font-family:var(--serif); }
 .mono{ font-family:var(--mono); }
 
@@ -147,6 +147,20 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .geo-row:last-child{ border-bottom:none; }
 .geo-row .ct{ margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--ink-soft); }
 .geo-dot{ width:11px; height:11px; border-radius:50%; background:var(--green); flex-shrink:0; }
+
+/* layout density on bigger screens */
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; align-items:start; }
+.today-top{ display:grid; gap:10px; }
+@media(min-width:820px){ .today-top{ grid-template-columns:1.7fr 1.3fr; align-items:start; } }
+.today-top .hero, .today-top .prog{ margin-bottom:0; }
+.seg{ display:inline-flex; background:color-mix(in srgb,var(--ink) 7%,transparent); border-radius:30px; padding:3px; }
+.seg button{ font-family:var(--mono); font-size:12px; text-transform:lowercase; letter-spacing:.04em; color:var(--ink-soft); background:none; border:none; padding:6px 14px; border-radius:30px; cursor:pointer; }
+.seg button.on{ background:var(--green); color:var(--on-accent); }
+.tile{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:16px; cursor:pointer; display:flex; flex-direction:column; transition:transform .12s; }
+.tile:hover{ transform:translateY(-2px); }
+.tile .avatar{ margin-bottom:10px; }
+.gsec{ display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--green-2); margin:22px 2px 10px; }
+.gsec .ct{ color:var(--ink-faint); }
 
 /* mobile */
 @media(max-width:680px){
