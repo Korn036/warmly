@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.14.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.15.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -235,11 +235,15 @@ const WORLD_PATHS='<g class="map-land">'
    =================================================================== */
 function go(view,arg){ location.hash = '#'+view+(arg?('/'+arg):''); }
 window.addEventListener('hashchange',route);
+let _lastView='', _shuffleId=null;
+window.shuffleToday=()=>{ _shuffleId='reroll'; route(); };
 function route(){
   const [view,arg]=location.hash.replace('#','').split('/');
   document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
   $('#tabs').classList.remove('open');
   const v=view||'today';
+  if(v==='today' && _lastView!=='today') _shuffleId='reroll';
+  _lastView=v;
   ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
   window.scrollTo(0,0);
 }
@@ -269,6 +273,12 @@ function viewToday(){
   const pct=tracked.length?Math.max(4,Math.min(100,Math.round(warm/tracked.length*100))):100;
   h+='<div class="card prog"><div class="row between"><div><div class="kick" style="margin:0">Your warmth</div><div class="pstat">'+(tracked.length?('Keeping '+warm+' of '+tracked.length+' people warm'):'Set a reconnect rhythm on a few people')+'</div></div><span class="floaty">'+occShape('reconnect',42)+'</span></div><div class="bar"><span style="width:'+pct+'%"></span></div></div>';
   h+='</div>';
+  /* serendipity shuffle: a different person each visit, so good names resurface */
+  { const pool=DB.contacts.filter(c=>c.id!==heroId && !c.review);
+    let shuf=null;
+    if(pool.length){ if(_shuffleId && _shuffleId!=='reroll') shuf=pool.find(c=>c.id===_shuffleId); if(!shuf) shuf=pool[Math.floor(Math.random()*pool.length)]; _shuffleId=shuf?shuf.id:null; }
+    if(shuf){ const seen=shuf.lastContacted?('last spoke '+shuf.lastContacted):'not spoken yet'; h+='<div class="kick">A nudge &middot; rekindle someone</div>'+personRow(shuf, '<span class="pill warm">'+esc(seen)+'</span>', '<button class="btn sm primary" onclick="compose(\''+shuf.id+'\',\'reconnect\')">Message '+esc(callName(shuf))+'</button> <button class="btn sm ghost" onclick="shuffleToday()">Shuffle</button>'); }
+  }
   /* coming up FIRST: upcoming celebrations on top */
   h+='<div class="kick">Coming up'+(up.length?' ('+up.length+')':'')+'</div>';
   const upList=up.filter(x=>x!==heroOcc).slice(0,20);
