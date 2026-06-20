@@ -35,6 +35,16 @@
 
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 
+<div class="fab-wrap">
+  <div class="fab-menu" id="fabMenu">
+    <button class="fab-opt" onclick="fabPick('camera')">Scan a card</button>
+    <button class="fab-opt" onclick="fabPick('voice')">Speak it</button>
+    <button class="fab-opt" onclick="fabPick('manual')">Type it</button>
+  </div>
+  <button class="fab" id="fabBtn" aria-label="Add a contact" onclick="fabToggle()">+</button>
+</div>
+<input type="file" id="cardCam" accept="image/*" capture="environment" style="display:none" onchange="cardCaptured(event)">
+
 <footer class="foot wrap">
   <span>Warmly keeps everything on this device. Nothing is sent to anyone until you tap send.</span><br>
   <a href="privacy.html" style="color:var(--ink-soft)">Privacy</a> · <a href="terms.html" style="color:var(--ink-soft)">Terms</a> · © 2026 Karthik Onteddu

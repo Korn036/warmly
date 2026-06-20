@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.12.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.13.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -82,6 +82,9 @@ function gBoot(){ if(localStorage.getItem('warmly.gsync')!=='1') return; const c
 const $=s=>document.querySelector(s);
 function uid(){ return 'c'+Math.random().toString(36).slice(2,9); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* esc() is for HTML text. For a value placed inside an inline handler's JS string (onclick="fn('X')"),
+   JS-escape FIRST then HTML-escape, so it can't break out of the string after the browser decodes the attribute. */
+function jsq(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 function firstName(n){ return (n||'').trim().split(/\s+/)[0]||''; }
 function callName(c){ return (c&&c.callName)?c.callName:firstName(c?c.name:''); }
 function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
@@ -90,7 +93,7 @@ const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','No
 function today(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
 function nextOccurrence(m,d){ const t=today(); let yr=t.getFullYear(); let occ=new Date(yr,m-1,d); if(occ<t) occ=new Date(yr+1,m-1,d); return occ; }
 function daysUntil(date){ return Math.round((date-today())/86400000); }
-function addMonths(iso,n){ const d=new Date(iso); d.setMonth(d.getMonth()+n); return d; }
+function addMonths(iso,n){ const p=String(iso).slice(0,10).split('-').map(Number); const d=new Date(p[0],(p[1]||1)-1,p[2]||1); d.setMonth(d.getMonth()+n); return d; }
 function fmtDate(date){ return MONTHS[date.getMonth()+1]+' '+date.getDate(); }
 function whenLabel(n){ return n===0?'today':n===1?'tomorrow':'in '+n+' days'; }
 function normalizePhone(raw,country){
@@ -255,7 +258,7 @@ function viewToday(){
   if(soon.length){ const x=soon[0]; heroId=x.c.id; heroOcc=x;
     h+=heroCard(x.c, x.o.label, whenLabel(x.n),
       '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button>'+
-      '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+esc(x.o.label)+'\')">+ Calendar</button>');
+      '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>');
   } else if(due.length){ const c=due[0].c; heroId=c.id;
     h+=heroCard(c, 'time to reconnect', (due[0].overdue<0?(-due[0].overdue)+' days overdue':'due now'),
       '<button class="btn primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message '+esc(callName(c))+'</button>'+
@@ -281,7 +284,7 @@ function viewToday(){
     const pill='<span class="pill '+(o.type==='birthday'?'bday':o.type==='anniversary'?'anniv':'warm')+'">'+esc(o.label)+' '+whenLabel(n)+'</span>';
     h+=personRow(c, pill,
       '<button class="btn sm gold" onclick="compose(\''+c.id+'\',\''+(o.type==='anniversary'?'anniversary':o.type==='birthday'?'birthday':'reconnect')+'\')">Wish</button> '+
-      '<button class="btn sm ghost" onclick="addCal(\''+c.id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+esc(o.label)+'\')">+ Calendar</button>');
+      '<button class="btn sm ghost" onclick="addCal(\''+c.id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+jsq(o.label)+'\')">+ Calendar</button>');
   }); h+='</div>'; }
   h+='</div>'; render(h);
 }
@@ -294,7 +297,7 @@ function heroCard(c, label, whenText, actions){
 }
 function viewMap(){
   const groups={}, noloc=[];
-  DB.contacts.forEach(c=>{ const raw=c.location||c.address||''; const g=raw?geocode(raw):null;
+  DB.contacts.forEach(c=>{ const raw=c.location||c.company||c.address||c.context||''; const g=raw?geocode(raw):null;
     if(g){ (groups[g.key]=groups[g.key]||{ll:g.ll,people:[]}).people.push(c); }
     else noloc.push(c); });
   const keys=Object.keys(groups).sort((a,b)=>groups[b].people.length-groups[a].people.length);
@@ -321,19 +324,21 @@ function peopleTile(c){ const occ=contactOccasions(c)[0];
     +'<div class="nm">'+esc(c.name)+'</div>'
     +'<div class="sub">'+esc(c.location||c.company||c.context||'—')+'</div>'
     +'<div class="sub" style="margin-top:2px">'+(occ?(esc(occ.label)+' '+fmtDate(occ.date)):(c.cadence?('reconnect every '+c.cadence+' mo'):'&nbsp;'))+'</div>'
-    +'<span class="pill t'+(c.tier||3)+'" style="margin-top:10px;align-self:flex-start">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span></div>';
+    +'<span class="pill t'+(c.tier||3)+'" style="margin-top:10px;align-self:flex-start">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span>'+(c.review?'<span class="review-badge" style="margin-top:8px;align-self:flex-start">review</span>':'')+'</div>';
 }
 function peopleRow(c){ const occ=contactOccasions(c)[0];
   return '<div class="card row" data-cid="'+c.id+'" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
     +'<div class="grow"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+esc(c.location||c.company||c.context||'no notes yet')+(occ?(' · '+esc(occ.label)+' '+fmtDate(occ.date)):'')+'</div></div>'
-    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span>'+kebab(c.id)+'</div>';
+    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span>'+(c.review?'<span class="review-badge">review</span>':'')+kebab(c.id)+'</div>';
 }
 function viewPeople(){
   const f=window._pfilter||{q:'',tier:0};
   const mode=localStorage.getItem('warmly.pview')||'tiles';
   const sort=localStorage.getItem('warmly.psort')||'name';
+  const reviewN=DB.contacts.filter(c=>c.review).length;
   let list=DB.contacts.slice();
   if(f.tier) list=list.filter(c=>c.tier===f.tier);
+  if(f.review) list=list.filter(c=>c.review);
   if(f.q){ const q=f.q.toLowerCase(); list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.context||'').toLowerCase().includes(q)||(c.location||'').toLowerCase().includes(q)||(c.company||'').toLowerCase().includes(q)); }
   const byName=(a,b)=>(a.name||'').localeCompare(b.name||'');
   if(sort==='overdue') list.sort((a,b)=>overdueScore(b)-overdueScore(a)||byName(a,b));
@@ -343,14 +348,14 @@ function viewPeople(){
   let h='<div class="view"><div class="row between"><h1 class="title">People</h1><button class="btn primary sm" onclick="quickAdd()">+ Add</button></div>';
   h+='<div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pq" placeholder="search '+DB.contacts.length+' people, cities, companies" value="'+esc(f.q)+'" oninput="pSearch(this.value)"></div>';
   h+='<div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">';
-  h+='<div class="chips" style="margin:6px 0">'+[[0,'all'],[1,'inner circle'],[2,'keep warm'],[3,'loose ties']].map(([t,l])=>'<span class="chip '+(f.tier===t?'on':'')+'" onclick="pTier('+t+')">'+l+'</span>').join('')+'</div>';
+  h+='<div class="chips" style="margin:6px 0">'+[[0,'all'],[1,'inner circle'],[2,'keep warm'],[3,'loose ties']].map(([t,l])=>'<span class="chip '+((!f.review&&f.tier===t)?'on':'')+'" onclick="pTier('+t+')">'+l+'</span>').join('')+(reviewN?'<span class="chip '+(f.review?'on':'')+'" onclick="pReview()">to review ('+reviewN+')</span>':'')+'</div>';
   h+='<div class="seg">'+[['tiles','tiles'],['list','list'],['area','area']].map(([m,l])=>'<button class="'+(mode===m?'on':'')+'" onclick="pView(\''+m+'\')">'+l+'</button>').join('')+'</div>';
   h+='<select class="sortsel" onchange="pSort(this.value)">'+[['name','A to Z'],['overdue','most overdue'],['recent','recently contacted'],['close','closeness']].map(([v,l])=>'<option value="'+v+'"'+(sort===v?' selected':'')+'>'+l+'</option>').join('')+'</select>';
   h+='</div>';
   if(!list.length){ h+='<div class="empty">No matches.</div></div>'; return render(h); }
   if(mode==='area'){
     const groups={}, none=[];
-    list.forEach(c=>{ const g=(c.location||c.address)?geocode(c.location||c.address):null; if(g){ (groups[g.key]=groups[g.key]||[]).push(c); } else none.push(c); });
+    list.forEach(c=>{ const raw=c.location||c.company||c.address||c.context||''; const g=raw?geocode(raw):null; if(g){ (groups[g.key]=groups[g.key]||[]).push(c); } else none.push(c); });
     Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length).forEach(k=>{
       h+='<div class="gsec"><span style="text-transform:capitalize">'+esc(k)+'</span><span class="ct">'+groups[k].length+'</span></div><div class="grid">'+groups[k].map(peopleTile).join('')+'</div>'; });
     if(none.length) h+='<div class="gsec">No location yet <span class="ct">'+none.length+'</span></div><div class="grid">'+none.map(peopleTile).join('')+'</div>';
@@ -363,6 +368,7 @@ function viewPeople(){
 }
 window.pView=m=>{ localStorage.setItem('warmly.pview',m); viewPeople(); };
 window.pSort=v=>{ localStorage.setItem('warmly.psort',v); viewPeople(); };
+window.pReview=()=>{ const f=window._pfilter||{}; window._pfilter={q:'',tier:0,review:!f.review}; viewPeople(); };
 window.pLoc=k=>{ window._pfilter={q:k,tier:0}; localStorage.setItem('warmly.pview','area'); go('people'); };
 function overdueScore(c){ if(!c.cadence) return -1e9; const nd=nextDue(c); if(!nd) return -1e9; return (today()-nd)/86400000; }
 function lastTs(c){ const l=(c.log||[]).slice(-1)[0]; if(l&&l.date) return Date.parse(l.date)||0; return c.lastContacted?(Date.parse(c.lastContacted)||0):0; }
@@ -382,8 +388,35 @@ window.actions=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   openModal(h); };
 window.delContact=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; if(!confirm('Delete '+(c.name||'this contact')+'? This removes them everywhere it syncs.')) return; DB.contacts=DB.contacts.filter(x=>x.id!==id); save(); closeModal(); route(); };
 window.toggleSwipe=()=>{ localStorage.setItem('warmly.swipe', (localStorage.getItem('warmly.swipe')==='off')?'on':'off'); route(); };
+/* ---- the + button: type / speak / scan ---- */
+window.fabToggle=()=>{ const m=document.getElementById('fabMenu'),b=document.getElementById('fabBtn'); if(!m) return; const o=m.classList.toggle('open'); b.classList.toggle('open',o); };
+function fabClose(){ const m=document.getElementById('fabMenu'),b=document.getElementById('fabBtn'); if(m){ m.classList.remove('open'); b.classList.remove('open'); } }
+window.fabPick=(mode)=>{ fabClose(); if(mode==='manual') quickAdd(); else if(mode==='voice') voiceAdd(); else if(mode==='camera'){ const el=document.getElementById('cardCam'); if(el) el.click(); } };
+window.voiceAdd=()=>{ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; quickAdd();
+  const blob=document.getElementById('qa_blob');
+  if(!SR){ if(blob) blob.placeholder='Voice isn’t supported here — tap the mic on your keyboard to dictate'; return; }
+  if(blob) blob.placeholder='Listening… say their name, city, where you met';
+  try{ const rec=new SR(); rec.lang='en-US'; rec.interimResults=false; rec.maxAlternatives=1;
+    rec.onresult=(e)=>{ const t=(e.results[0][0].transcript)||''; const b=document.getElementById('qa_blob'); if(b){ b.value=(b.value?b.value+' ':'')+t; qaParse(); } };
+    rec.onerror=()=>{ const b=document.getElementById('qa_blob'); if(b) b.placeholder='Didn’t catch that — type it instead'; };
+    rec.start();
+  }catch(e){}
+};
+window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ const img=new Image();
+    img.onload=()=>{ const max=720; let w=img.width,h=img.height; if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
+      let card=rd.result; try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); card=cv.toDataURL('image/jpeg',0.55); }catch(e){}
+      const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:'New card',callName:'',tier:2,card:card,review:true};
+      DB.contacts.push(c); save(); editContact(c.id);
+    };
+    img.onerror=()=>{ alert('Could not read that photo.'); };
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(f);
+};
 window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); const list=document.querySelectorAll('.view .card.row'); viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } };
-window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t}); viewPeople(); };
+window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t,review:false}); viewPeople(); };
 
 function viewPerson(id){
   const c=DB.contacts.find(x=>x.id===id); if(!c){ go('people'); return; }
@@ -397,7 +430,7 @@ function viewPerson(id){
     +'<div class="sub">'+esc(work||c.context||'')+'</div>'
     +'<div class="sub" style="margin-top:2px">'+(last?('last contacted '+esc(last.date)):'not contacted yet')+(c.activities&&c.activities.length?(' · last activity '+esc(c.activities.slice(-1)[0].date)):'')+'</div></div>'
     +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner circle',2:'keep warm',3:'loose tie'}[c.tier||3])+'</span></div>';
-  h+='<div class="chips" style="margin-top:10px">'+(c.tags||[]).map(t=>'<span class="chip on" onclick="delTag(\''+id+'\',\''+esc(t)+'\')">'+esc(t)+' ×</span>').join('')+'<span class="chip" onclick="addTag(\''+id+'\')">+ tag</span></div>';
+  h+='<div class="chips" style="margin-top:10px">'+(c.tags||[]).map((t,i)=>'<span class="chip on" onclick="delTag(\''+id+'\','+i+')">'+esc(t)+' ×</span>').join('')+'<span class="chip" onclick="addTag(\''+id+'\')">+ tag</span></div>';
   h+='<div class="btn-row" style="margin-top:6px">';
   if(c.phone) h+='<button class="btn wa sm" onclick="compose(\''+id+'\',\'reconnect\')">WhatsApp</button>';
   h+='<button class="btn ghost sm" onclick="logCall(\''+id+'\')">Log a call</button>';
@@ -427,7 +460,7 @@ function viewPerson(id){
   h+=detailRow('How we met', c.howMet?esc(c.howMet):'—');
   h+=detailRow('Work', work?esc(work):'—');
   h+=detailRow('Food / drink', c.food?esc(c.food):'—');
-  occ.forEach(o=>{ const age=o.raw.y?(' (turns '+(o.date.getFullYear()-o.raw.y)+')'):''; h+=detailRow(o.label[0].toUpperCase()+o.label.slice(1), fmtDate(o.date)+esc(age)+' · '+whenLabel(daysUntil(o.date))+' <a style="color:var(--green-2)" onclick="addCal(\''+id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+esc(o.label)+'\')">+ cal</a>'); });
+  occ.forEach(o=>{ const age=o.raw.y?(' (turns '+(o.date.getFullYear()-o.raw.y)+')'):''; h+=detailRow(o.label[0].toUpperCase()+o.label.slice(1), fmtDate(o.date)+esc(age)+' · '+whenLabel(daysUntil(o.date))+' <a style="color:var(--green-2)" onclick="addCal(\''+id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+jsq(o.label)+'\')">+ cal</a>'); });
   h+=detailRow('Keep in touch', c.cadence?('every '+c.cadence+' months'+(nd?(' · next '+(nd<=today()?'now':fmtDate(nd))):'')):'not set');
   h+='</div>';
 
@@ -470,7 +503,7 @@ window.saveCtx=(id,v)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.contex
 function patch(id,fn){ const c=DB.contacts.find(x=>x.id===id); if(c){ fn(c); save(); route(); } }
 const TODAYISO=()=>new Date().toISOString().slice(0,10);
 window.addTag=id=>{ const t=prompt('Tag (e.g. the office, uni, climbing):'); if(t&&t.trim()) patch(id,c=>{ c.tags=c.tags||[]; c.tags.push(t.trim()); }); };
-window.delTag=(id,t)=>patch(id,c=>{ c.tags=(c.tags||[]).filter(x=>x!==t); });
+window.delTag=(id,i)=>patch(id,c=>{ (c.tags||[]).splice(i,1); });
 window.setPartner=id=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const name=prompt('Significant other name (blank to remove):', c.partner?c.partner.name:''); if(name===null) return; if(!name.trim()){ patch(id,x=>x.partner=null); return; } const note=prompt('A note (optional, e.g. married 2021):', c.partner?(c.partner.note||''):'')||''; patch(id,x=>x.partner={name:name.trim(),note}); };
 window.addChild=id=>{ const name=prompt("Child's name:"); if(!name||!name.trim()) return; const age=prompt('Age (optional):')||''; patch(id,c=>{ c.children=c.children||[]; c.children.push({name:name.trim(),age}); }); };
 window.addPet=id=>{ const name=prompt("Pet's name:"); if(!name||!name.trim()) return; const kind=prompt('Type (dog, cat...):')||''; patch(id,c=>{ c.pets=c.pets||[]; c.pets.push({name:name.trim(),kind}); }); };
@@ -542,11 +575,20 @@ window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.
 
 /* ---------- templates ---------- */
 function viewTemplates(){
-  let h='<div class="view"><h1 class="title">Message templates</h1><p class="muted">Write these once, in your voice. {first} becomes their first name, {me} your name. You always edit before sending.</p>';
-  DB.templates.forEach(t=>{ h+='<div class="card"><div class="kick" style="margin-top:0">'+esc(t.name)+' · '+esc(t.occasion)+'</div><textarea oninput="tplSet(\''+t.id+'\',this.value)">'+esc(t.body)+'</textarea></div>'; });
+  let h='<div class="view"><div class="row between"><h1 class="title">Message templates</h1><button class="btn primary sm" onclick="addTemplate()">+ New</button></div><p class="muted">Write these once, in your voice. {first} becomes their calling name, {me} your name. You always edit before sending.</p>';
+  DB.templates.forEach(t=>{ const def=['t_b','t_a','t_r'].indexOf(t.id)>=0;
+    h+='<div class="card"><div class="row between"><div class="kick" style="margin-top:0">'+esc(t.name)+' · '+esc(t.occasion)+'</div>'+(def?'':'<a class="sub" style="color:var(--rose);cursor:pointer" onclick="delTemplate(\''+t.id+'\')">delete</a>')+'</div><textarea oninput="tplSet(\''+t.id+'\',this.value)">'+esc(t.body)+'</textarea></div>'; });
   h+='</div>'; render(h);
 }
 window.tplSet=(id,v)=>{ const t=DB.templates.find(x=>x.id===id); if(t){ t.body=v; save(); } };
+window.addTemplate=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>New template</h3>';
+  h+='<label class="fl">Name</label><input id="t_name" placeholder="e.g. Festival wishes">';
+  h+='<label class="fl">When it is for</label><select id="t_occ"><option value="reconnect">reconnect</option><option value="birthday">birthday</option><option value="anniversary">anniversary</option><option value="custom">custom</option></select>';
+  h+='<label class="fl">Message &middot; {first} = their name, {me} = you</label><textarea id="t_body" style="min-height:110px" placeholder="Hey {first}, ..."></textarea>';
+  h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="saveTemplate()">Save template</button></div>';
+  openModal(h); };
+window.saveTemplate=()=>{ const name=$('#t_name').value.trim()||'My template'; const occasion=$('#t_occ').value; const body=$('#t_body').value.trim(); if(!body){ alert('Write the message first.'); return; } DB.templates.push({id:uid(),name:name,occasion:occasion,body:body}); save(); closeModal(); go('templates'); };
+window.delTemplate=(id)=>{ if(['t_b','t_a','t_r'].indexOf(id)>=0) return; if(!confirm('Delete this template?')) return; DB.templates=DB.templates.filter(t=>t.id!==id); save(); route(); };
 
 /* ---------- settings + backup ---------- */
 function viewSettings(){
@@ -558,7 +600,7 @@ function viewSettings(){
   h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
   h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
   h+='<div class="kick">Your calendar · the important bit</div><div class="card"><div class="muted">Warmly turns every birthday, anniversary and reconnect into events on your Google Calendar, so your calendar nudges you even when this app is closed. Your time is your only currency, this protects it.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. On your phone or laptop, open it and add it to Google Calendar (or Google Calendar &rarr; Settings &rarr; Import). Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export. Your contacts themselves now sync across your devices, see &ldquo;Sync&rdquo; below.</div></div>';
-  h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Warmly keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Warmly server ever touches your contacts.</div>'
+  h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Warmly keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Warmly server ever touches your contacts. The synced copy isn&rsquo;t password-encrypted (your exported backup is), but it lives in a hidden app-only folder only your Google account can open.</div>'
     +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
     +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected · auto-syncs on changes':'Not connected')+'</div></div>';
   h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
@@ -638,6 +680,8 @@ $('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeMod
 window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,customDates:[]};
   const dv=o=>o&&o.m?(o.y?o.y+'-':'')+String(o.m).padStart(2,'0')+'-'+String(o.d).padStart(2,'0'):'';
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+(id?'Edit':'New')+' contact</h3>';
+  if(c.card) h+='<img class="card-img" src="'+c.card+'">';
+  if(c.review) h+='<div class="note">Quick-added &mdash; fill the details and Save to clear the review flag.</div>';
   h+='<label class="fl">Name &middot; how you find them, e.g. &ldquo;John from school&rdquo;</label><input id="e_name" value="'+esc(c.name||'')+'">';
   h+='<label class="fl">Calling name &middot; used in your messages (required)</label><input id="e_call" value="'+esc(c.callName||firstName(c.name)||'')+'" placeholder="John">';
   h+='<div class="two"><div><label class="fl">Phone (with country code)</label><input id="e_phone" value="'+esc(c.phone||'')+'" placeholder="+44 7..."></div><div><label class="fl">Closeness</label><select id="e_tier"><option value="1"'+(c.tier===1?' selected':'')+'>inner circle</option><option value="2"'+(c.tier===2?' selected':'')+'>keep warm</option><option value="3"'+(c.tier===3?' selected':'')+'>loose tie</option></select></div></div>';
@@ -656,7 +700,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
 window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   let c=id?DB.contacts.find(x=>x.id===id):null;
   if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; DB.contacts.push(c); }
-  c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.style=g('e_style'); c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li');
+  c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.style=g('e_style'); c.review=false; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li');
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   save(); closeModal(); route();
@@ -687,7 +731,7 @@ window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
   if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
   if(p.email) $('#qa_email').value=p.email; if(p.linkedin) $('#qa_li').value=p.linkedin; };
 window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('Add a name first.'); return; }
-  const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name,callName:($('#qa_call').value.trim()||firstName(name)),phone:$('#qa_phone').value.trim(),location:$('#qa_loc').value.trim(),tier:+$('#qa_tier').value,email:$('#qa_email').value,linkedin:$('#qa_li').value};
+  const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name,callName:($('#qa_call').value.trim()||firstName(name)),phone:$('#qa_phone').value.trim(),location:$('#qa_loc').value.trim(),tier:+$('#qa_tier').value,email:$('#qa_email').value,linkedin:$('#qa_li').value,review:true};
   DB.contacts.push(c); save(); closeModal(); go('person',c.id); };
 
 window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
@@ -714,8 +758,8 @@ window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates
 window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value; if(c){ c.lastMsg=txt; save(); } window.open(waLink(c.phone,txt),'_blank','noopener'); };
 window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg) $('#msg').value=c.lastMsg; };
 
-window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); const date=nextOccurrence(+m,+d);
-  const title=esc(firstName(c.name))+"'s "+label; const details=(c.context?c.context+' · ':'')+(c.phone?('WhatsApp: '+waLink(c.phone,'')):'');
+window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const date=nextOccurrence(+m,+d);
+  const title=callName(c)+"'s "+label; const details=(c.context?c.context+' · ':'')+(c.phone?('WhatsApp: '+waLink(c.phone,'')):'');
   window.open(gcalLink(title,date,details,true),'_blank','noopener');
 };
 window.logToday=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
