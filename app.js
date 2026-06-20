@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.9.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.10.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -310,22 +310,22 @@ function viewMap(){
   h+='</div>'; render(h);
 }
 function personRow(c,pill,actions){
-  return '<div class="card"><div class="row"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+  return '<div class="card" data-cid="'+c.id+'"><div class="row"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
     +'<div class="grow" onclick="go(\'person\',\''+c.id+'\')" style="cursor:pointer"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+(c.context?esc(c.context)+' · ':'')+pill+'</div></div></div>'
     +'<div class="btn-row" style="margin-top:12px">'+actions+'</div></div>';
 }
 
 function peopleTile(c){ const occ=contactOccasions(c)[0];
-  return '<div class="tile" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+  return '<div class="tile" data-cid="'+c.id+'" onclick="go(\'person\',\''+c.id+'\')">'+kebab(c.id)+'<div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
     +'<div class="nm">'+esc(c.name)+'</div>'
     +'<div class="sub">'+esc(c.location||c.company||c.context||'—')+'</div>'
     +'<div class="sub" style="margin-top:2px">'+(occ?(esc(occ.label)+' '+fmtDate(occ.date)):(c.cadence?('reconnect every '+c.cadence+' mo'):'&nbsp;'))+'</div>'
     +'<span class="pill t'+(c.tier||3)+'" style="margin-top:10px;align-self:flex-start">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span></div>';
 }
 function peopleRow(c){ const occ=contactOccasions(c)[0];
-  return '<div class="card row" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+  return '<div class="card row" data-cid="'+c.id+'" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
     +'<div class="grow"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+esc(c.location||c.company||c.context||'no notes yet')+(occ?(' · '+esc(occ.label)+' '+fmtDate(occ.date)):'')+'</div></div>'
-    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span></div>';
+    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span>'+kebab(c.id)+'</div>';
 }
 function viewPeople(){
   const f=window._pfilter||{q:'',tier:0};
@@ -365,6 +365,22 @@ window.pSort=v=>{ localStorage.setItem('warmly.psort',v); viewPeople(); };
 window.pLoc=k=>{ window._pfilter={q:k,tier:0}; localStorage.setItem('warmly.pview','area'); go('people'); };
 function overdueScore(c){ if(!c.cadence) return -1e9; const nd=nextDue(c); if(!nd) return -1e9; return (today()-nd)/86400000; }
 function lastTs(c){ const l=(c.log||[]).slice(-1)[0]; if(l&&l.date) return Date.parse(l.date)||0; return c.lastContacted?(Date.parse(c.lastContacted)||0):0; }
+/* ---- quick actions: 3-dot menu + swipe, act without opening the page ---- */
+function kebab(id){ return '<button class="kebab" onclick="event.stopPropagation();actions(\''+id+'\')" aria-label="more"><svg viewBox="0 0 4 16" width="4" height="16"><circle cx="2" cy="2" r="1.7"/><circle cx="2" cy="8" r="1.7"/><circle cx="2" cy="14" r="1.7"/></svg></button>'; }
+window.actions=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
+  let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+esc(c.name)+'</h3>';
+  const sub=c.location||c.company||c.context||''; if(sub) h+='<div class="sub" style="margin-bottom:12px">'+esc(sub)+'</div>';
+  h+='<div class="btn-row">';
+  if(c.phone) h+='<button class="btn wa sm" onclick="closeModal();compose(\''+id+'\',\'reconnect\')">Message</button>';
+  h+='<button class="btn ghost sm" onclick="logToday(\''+id+'\')">Log call today</button>';
+  h+='<button class="btn ghost sm" onclick="closeModal();go(\'person\',\''+id+'\')">Open page</button>';
+  h+='<button class="btn ghost sm" onclick="closeModal();editContact(\''+id+'\')">Edit</button></div>';
+  h+='<div class="kick" style="margin-top:14px">Closeness</div><div class="btn-row">'+[[1,'inner circle'],[2,'keep warm'],[3,'loose tie']].map(([t,l])=>'<button class="btn sm '+(c.tier===t?'primary':'ghost')+'" onclick="setTier(\''+id+'\','+t+');actions(\''+id+'\')">'+l+'</button>').join('')+'</div>';
+  h+='<div class="kick" style="margin-top:12px">Reconnect every</div><div class="btn-row">'+[0,3,6,12].map(m=>'<button class="btn sm '+(((c.cadence||0)===m)?'primary':'ghost')+'" onclick="setCad(\''+id+'\','+m+');actions(\''+id+'\')">'+(m?m+' mo':'off')+'</button>').join('')+'</div>';
+  h+='<div class="btn-row" style="margin-top:16px"><button class="btn sm" style="background:var(--rose);color:#fff" onclick="delContact(\''+id+'\')">Delete contact</button></div>';
+  openModal(h); };
+window.delContact=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; if(!confirm('Delete '+(c.name||'this contact')+'? This removes them everywhere it syncs.')) return; DB.contacts=DB.contacts.filter(x=>x.id!==id); save(); closeModal(); route(); };
+window.toggleSwipe=()=>{ localStorage.setItem('warmly.swipe', (localStorage.getItem('warmly.swipe')==='off')?'on':'off'); route(); };
 window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); const list=document.querySelectorAll('.view .card.row'); viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } };
 window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t}); viewPeople(); };
 
@@ -516,6 +532,7 @@ window.tplSet=(id,v)=>{ const t=DB.templates.find(x=>x.id===id); if(t){ t.body=v
 function viewSettings(){
   const s=DB.settings;
   const connected=localStorage.getItem('warmly.gsync')==='1';
+  const swon=localStorage.getItem('warmly.swipe')!=='off';
   let h='<div class="view"><h1 class="title">Settings</h1>';
   h+='<div class="card"><label class="fl">Your name (for {me} in templates)</label><input value="'+esc(s.myName)+'" oninput="setS(\'myName\',this.value)">';
   h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
@@ -527,6 +544,7 @@ function viewSettings(){
   h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
     +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
     +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".kith,.json" style="display:none" onchange="importFile(event)"></div></div>';
+  h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
   h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
   h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Warmly v'+VERSION+' · built '+BUILT+' · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
 }
@@ -692,3 +710,7 @@ if(!location.hash) location.hash='#today';
 snapInit();
 route();
 gBoot();
+/* swipe-left on a person opens their quick-action sheet */
+let _swS=null;
+document.addEventListener('touchstart',e=>{ if(localStorage.getItem('warmly.swipe')==='off') return; if(e.target.closest('.kebab')) return; const t=e.target.closest('[data-cid]'); if(!t) return; _swS={x:e.touches[0].clientX,y:e.touches[0].clientY,id:t.getAttribute('data-cid')}; },{passive:true});
+document.addEventListener('touchend',e=>{ if(!_swS) return; const dx=e.changedTouches[0].clientX-_swS.x, dy=e.changedTouches[0].clientY-_swS.y, id=_swS.id; _swS=null; if(dx<-55 && Math.abs(dy)<35 && id && window.actions) actions(id); },{passive:true});
