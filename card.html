@@ -12,30 +12,45 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{ --bg:#F4EBDB; --card:#FFFCF6; --ink:#241C14; --soft:#867A66; --line:rgba(36,28,20,.13); --accent:#E2613C; --mono:'IBM Plex Mono',monospace; }
+:root{ --bg:#FBF8F3; --card:#FFFFFF; --ink:#2B2622; --soft:#6F675F; --line:#E7DFD4; --accent:#946145; --green:#5E7264; --mono:'IBM Plex Mono',monospace; }
 *{ margin:0; padding:0; box-sizing:border-box; }
-body{ font-family:'Space Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:34px 18px 60px; -webkit-text-size-adjust:100%; }
+body{ font-family:'Space Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:30px 18px 60px; -webkit-text-size-adjust:100%; }
 .wrap{ width:100%; max-width:440px; }
-.brand{ font-weight:700; font-size:22px; letter-spacing:-.01em; } .brand span{ color:var(--accent); }
-h1{ font-size:27px; font-weight:600; letter-spacing:-.02em; margin:14px 0 8px; line-height:1.12; }
+.top{ display:flex; align-items:center; gap:10px; }
+.top img{ width:40px; height:40px; border-radius:11px; box-shadow:0 4px 12px rgba(40,20,40,.22); }
+.brand{ font-weight:700; font-size:21px; letter-spacing:-.01em; }
+.pbadge{ display:inline-flex; align-items:center; gap:6px; margin-top:14px; font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--green); background:color-mix(in srgb,var(--green) 12%,transparent); border:1px solid color-mix(in srgb,var(--green) 26%,transparent); padding:6px 11px; border-radius:30px; }
+.pbadge svg{ width:13px; height:13px; fill:none; stroke:var(--green); stroke-width:2; }
+h1{ font-size:27px; font-weight:600; letter-spacing:-.02em; margin:12px 0 8px; line-height:1.14; }
 .lede{ color:var(--soft); font-size:15px; line-height:1.5; }
-form{ background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px 16px; margin-top:18px; box-shadow:0 12px 30px rgba(36,28,20,.07); }
+form{ background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px 16px; margin-top:18px; box-shadow:0 12px 30px rgba(40,30,20,.07); }
 label{ display:block; font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--soft); margin:12px 0 5px; }
 label:first-child{ margin-top:0; }
 input{ width:100%; font-family:inherit; font-size:16px; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:12px 13px; }
 input:focus{ outline:none; border-color:var(--accent); }
-.send{ width:100%; margin-top:18px; background:#25D366; color:#053; border:none; font-family:inherit; font-weight:600; font-size:16px; padding:14px; border-radius:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+.send{ width:100%; margin-top:18px; background:#25D366; color:#053; border:none; font-family:inherit; font-weight:700; font-size:16px; padding:14px; border-radius:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px rgba(37,211,102,.3); }
 .send:active{ transform:scale(.99); }
-.privacy{ font-family:var(--mono); font-size:11.5px; color:var(--soft); text-align:center; margin-top:16px; line-height:1.6; }
-.privacy b{ color:var(--ink); }
 .wa{ width:18px; height:18px; fill:#053; }
+.privacy{ font-family:var(--mono); font-size:11.5px; color:var(--soft); text-align:center; margin-top:14px; line-height:1.65; }
+.privacy b{ color:var(--ink); }
+.getapp{ background:var(--card); border:1px solid var(--line); border-radius:20px; padding:20px 18px; margin-top:22px; text-align:center; box-shadow:0 12px 30px rgba(40,30,20,.07); }
+.getapp .sent{ display:none; font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--green); margin-bottom:10px; }
+.getapp h2{ font-size:19px; font-weight:600; letter-spacing:-.01em; margin-bottom:6px; }
+.getapp p{ color:var(--soft); font-size:14px; line-height:1.55; margin-bottom:16px; }
+.getbtn{ display:inline-flex; align-items:center; justify-content:center; gap:9px; width:100%; background:linear-gradient(135deg,#A8744F,#7E5436); color:#FBF4EA; border:none; font-family:inherit; font-weight:700; font-size:16px; padding:14px; border-radius:13px; cursor:pointer; text-decoration:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 7px 18px rgba(120,84,54,.32); }
+.getbtn:active{ transform:scale(.99); }
+.getbtn img{ width:22px; height:22px; border-radius:6px; }
+.tiny{ font-family:var(--mono); font-size:10.5px; color:var(--soft); margin-top:11px; line-height:1.6; }
+.foot{ text-align:center; margin-top:22px; font-family:var(--mono); font-size:10.5px; color:var(--soft); }
+.foot a{ color:var(--soft); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="brand">Warmly<span>.</span></div>
+  <div class="top"><img src="icon.svg" alt="Warmly"><span class="brand">Warmly<span style="color:var(--accent)">.</span></span></div>
+  <div class="pbadge"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Private by design</div>
   <h1><span data-from>A friend</span> wants to keep in touch</h1>
-  <p class="lede">Share a few details so <span data-from>they</span> never miss your birthday and can stay in touch properly. Takes 20 seconds.</p>
+  <p class="lede">Share a few details so <span data-from>they</span> never miss your birthday and can stay in touch properly. Takes 20 seconds, and nothing is stored anywhere.</p>
   <form id="f" onsubmit="return false">
     <label>Your name</label><input id="name" autocomplete="name" placeholder="Your name">
     <label>Phone / WhatsApp</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+44 7...">
@@ -49,7 +64,17 @@ input:focus{ outline:none; border-color:var(--accent); }
     <label>Website (optional)</label><input id="web" placeholder="yoursite.com">
     <button type="button" class="send" id="send"><svg class="wa" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg>Send to <span data-from>them</span> on WhatsApp</button>
   </form>
-  <p class="privacy"><b>Private by design.</b> Warmly stores nothing. Your details go straight to <span data-from>your friend</span> over WhatsApp, and nowhere else.</p>
+  <p class="privacy"><b>Truly private.</b> Warmly has no account, no servers, and no tracking. Your details go straight to <span data-from>your friend</span> over WhatsApp, and the app keeps everything on each person's own phone. Nothing is ever uploaded.</p>
+
+  <div class="getapp" id="getapp">
+    <div class="sent" id="sent">Sent. Your details are on their way to <span data-from>your friend</span>.</div>
+    <h2>Keep your own people warm</h2>
+    <p>Warmly is a gentle, private way to remember the people who matter and never let a friendship go cold. Free, no account, lives on your phone.</p>
+    <a class="getbtn" href="/"><img src="icon.svg" alt="">Get Warmly, it's free</a>
+    <div class="tiny">The most private keep-in-touch app: your contacts never leave your device.</div>
+  </div>
+
+  <div class="foot"><a href="/privacy.html">Privacy</a> &middot; <a href="/">About Warmly</a></div>
 </div>
 <script>
 (function(){
@@ -60,7 +85,7 @@ input:focus{ outline:none; border-color:var(--accent); }
   function v(id){ return document.getElementById(id).value.trim(); }
   document.getElementById('send').onclick = function(){
     var name=v('name'); if(!name){ alert('Please add your name.'); return; }
-    if(!to){ alert('This link is missing the recipient. Ask them to resend it.'); return; }
+    if(!to){ alert('This link is missing the recipient. Ask them to resend it, or share Warmly with them instead.'); return; }
     var L=[name];
     var ph=v('phone'); if(ph) L.push(ph);
     var b=v('bday'); if(b) L.push('Birthday: '+b);
@@ -72,7 +97,11 @@ input:focus{ outline:none; border-color:var(--accent); }
     var tg=v('tg'); if(tg) L.push('t.me/'+tg.replace(/^@/,''));
     var web=v('web'); if(web) L.push(web);
     L.push('· shared via Warmly');
-    location.href = 'https://wa.me/' + to + '?text=' + encodeURIComponent(L.join('\n'));
+    var url = 'https://wa.me/' + to + '?text=' + encodeURIComponent(L.join('\n'));
+    var w = window.open(url, '_blank');
+    if(!w){ location.href = url; }
+    var s=document.getElementById('sent'); if(s) s.style.display='block';
+    var ga=document.getElementById('getapp'); if(ga) ga.scrollIntoView({behavior:'smooth', block:'center'});
   };
 })();
 </script>
