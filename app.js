@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.30.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.31.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -797,10 +797,14 @@ function myVCardFull(){ const me=DB.me||{}; let v=myVCard();
   return v;
 }
 function renderQR(text, el){ if(!el) return; const q=window.QR&&QR.matrix(text);
-  if(!q){ el.innerHTML='<div class="muted" style="text-align:center;padding:20px">Your card has a lot of links. Remove one or two so it fits a QR (Share and .vcf still include everything).</div>'; return; }
-  const n=q.size, quiet=4, total=n+quiet*2, scale=Math.max(3,Math.floor(264/total));
-  const cv=document.createElement('canvas'); cv.width=cv.height=total*scale; const ctx=cv.getContext('2d');
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.fillStyle='#000';
+  if(!q){ el.innerHTML='<div class="muted" style="text-align:center;padding:20px">Could not make a QR for this card. Share or Download .vcf still include everything.</div>'; return; }
+  const n=q.size, quiet=4, total=n+quiet*2;
+  const scale=Math.max(4, Math.round(320/total));           /* CSS px per module, min 4 so cameras can resolve it */
+  const dpr=Math.min(3, window.devicePixelRatio||1);          /* render crisp on retina screens */
+  const cssSize=total*scale;
+  const cv=document.createElement('canvas'); cv.width=cv.height=cssSize*dpr; cv.style.width=cv.style.height=cssSize+'px';
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.imageSmoothingEnabled=false;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,cssSize,cssSize); ctx.fillStyle='#000';
   for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(q.modules[r][c]) ctx.fillRect((c+quiet)*scale,(r+quiet)*scale,scale,scale); }
   cv.className='qrcanvas'; el.innerHTML=''; el.appendChild(cv);
 }
