@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.29.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.30.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -817,7 +817,7 @@ window.shareCard=async()=>{ const full=myVCardFull();
 };
 window.downloadCard=()=>download('warmly-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
 let _editCard=false;
-const CARDSTYLES=['lava','oil','marble','ember','aurora','royal'];
+const CARDSTYLES=['candlelit','hearthglow','mocha','garden','dusk','honey'];
 window.setCardStyle=(s)=>{ DB.me=DB.me||{}; DB.me.cardStyle=s; save(); route(); };
 window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
 window.saveCard=()=>{ _editCard=false; route(); };
@@ -844,9 +844,9 @@ function bizTags(me){ if(!me||!me.interests) return ''; const items=String(me.in
   if(!items.length) return '';
   return '<div class="biz-tags">'+items.map(function(w){ return '<span class="biz-tag">'+interestIcon(w)+esc(w)+'</span>'; }).join('')+'</div>';
 }
-function viewMyCard(){ const me=DB.me=DB.me||{}; const style=me.cardStyle||'ember';
+function viewMyCard(){ const me=DB.me=DB.me||{}; let style=me.cardStyle||'candlelit'; if(CARDSTYLES.indexOf(style)<0) style='candlelit';
   const pseudo={id:'me',name:me.name,phone:me.phone,email:me.email,linkedin:me.linkedin,instagram:me.instagram,x:me.x,website:me.website};
-  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your funky, shareable card. Anyone can scan the QR to save you. Nothing leaves your phone.</p>';
+  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your warm, shareable card. Anyone can scan the QR to save you. Nothing leaves your phone.</p>';
   h+='<div class="biz mc-'+style+'"><button class="biz-edit" onclick="toggleEditCard()" aria-label="edit card"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>'
     +'<div class="biz-photo" onclick="document.getElementById(\'mephoto\').click()">'+(me.photo?('<img src="'+me.photo+'">'):esc(initials(me.name||'You')))+'</div>'
     +'<div class="biz-name">'+esc(me.name||'Your name')+'</div>'
