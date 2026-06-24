@@ -17,7 +17,7 @@
 <body>
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="#today" aria-label="Warmly home">Warmly<span class="dot">.</span></a>
+    <a class="brand" href="#today" aria-label="Warmly home"><span class="brandname">Warmly<span class="dot">.</span></span><span class="ver" id="brandVer"></span></a>
     <nav class="tabs" id="tabs">
       <a data-go="today">Today</a>
       <a data-go="people">People</a>
@@ -36,6 +36,8 @@
 
 <div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
 
+<div class="lockscreen" id="lockScreen"></div>
+
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs>
   <filter id="liquid" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
     <feTurbulence type="fractalNoise" baseFrequency="0.008 0.013" numOctaves="3" seed="7" result="n">
@@ -46,12 +48,7 @@
 </defs></svg>
 
 <div class="fab-wrap">
-  <div class="fab-menu" id="fabMenu">
-    <button class="fab-opt" onclick="fabPick('camera')">Scan a card</button>
-    <button class="fab-opt" onclick="fabPick('voice')">Speak it</button>
-    <button class="fab-opt" onclick="fabPick('manual')">Type it</button>
-  </div>
-  <button class="fab" id="fabBtn" aria-label="Add a contact" onclick="fabToggle()">+</button>
+  <button class="fab" id="fabBtn" aria-label="Add a contact" onclick="captureHub()">+</button>
 </div>
 <input type="file" id="cardCam" accept="image/*" capture="environment" style="display:none" onchange="cardCaptured(event)">
 

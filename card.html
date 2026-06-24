@@ -35,11 +35,15 @@ input:focus{ outline:none; border-color:var(--accent); }
   <p class="lede">Share a few details so <span data-from>they</span> never miss your birthday and can stay in touch properly. Takes 20 seconds.</p>
   <form id="f" onsubmit="return false">
     <label>Your name</label><input id="name" autocomplete="name" placeholder="Your name">
+    <label>Phone / WhatsApp</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+44 7...">
     <label>Birthday</label><input id="bday" type="date">
     <label>City</label><input id="city" placeholder="where you're based">
     <label>Email (optional)</label><input id="email" type="email" inputmode="email" placeholder="you@email.com">
     <label>LinkedIn (optional)</label><input id="li" placeholder="linkedin.com/in/you">
     <label>Instagram (optional)</label><input id="ig" placeholder="@you">
+    <label>X / Twitter (optional)</label><input id="x" placeholder="@you">
+    <label>Telegram (optional)</label><input id="tg" placeholder="@you">
+    <label>Website (optional)</label><input id="web" placeholder="yoursite.com">
     <button type="button" class="send" id="send"><svg class="wa" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg>Send to <span data-from>them</span> on WhatsApp</button>
   </form>
   <p class="privacy"><b>Private by design.</b> Warmly stores nothing. Your details go straight to <span data-from>your friend</span> over WhatsApp, and nowhere else.</p>
@@ -55,12 +59,16 @@ input:focus{ outline:none; border-color:var(--accent); }
     var name=v('name'); if(!name){ alert('Please add your name.'); return; }
     if(!to){ alert('This link is missing the recipient. Ask them to resend it.'); return; }
     var L=[name];
+    var ph=v('phone'); if(ph) L.push(ph);
     var b=v('bday'); if(b) L.push('Birthday: '+b);
     var city=v('city'); if(city) L.push(city);
     var email=v('email'); if(email) L.push(email);
     var li=v('li'); if(li) L.push(/linkedin\.com/i.test(li)?li:('linkedin.com/in/'+li.replace(/^@/,'')));
     var ig=v('ig'); if(ig) L.push('instagram.com/'+ig.replace(/^@/,''));
-    L.push('— shared via Warmly');
+    var xx=v('x'); if(xx) L.push('x.com/'+xx.replace(/^@/,''));
+    var tg=v('tg'); if(tg) L.push('t.me/'+tg.replace(/^@/,''));
+    var web=v('web'); if(web) L.push(web);
+    L.push('· shared via Warmly');
     location.href = 'https://wa.me/' + to + '?text=' + encodeURIComponent(L.join('\n'));
   };
 })();

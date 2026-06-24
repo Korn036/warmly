@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.21.0', BUILT='2026-06-20';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.24.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -31,6 +31,10 @@ function save(){ stampChanges(); DB.savedAt=Date.now(); localStorage.setItem(KEY
 /* ===== Google Drive sync — to a hidden folder in YOUR OWN Drive, no Warmly server ===== */
 const GCLIENT_ID='331804388562-k4qajob707mft6f5vrvvtsq2cvjbukoa.apps.googleusercontent.com';
 const GSCOPE='https://www.googleapis.com/auth/drive.appdata';
+/* Permanent "Sign in with Google": after you deploy worker/, set this to its base URL
+   (predicted: https://warmly-auth.karthikonteddu306.workers.dev). Empty = the in-browser
+   login below, which re-prompts ~hourly. Flipping this on needs no other change. */
+const AUTH_WORKER='';
 let _gtok=null,_gclient=null,_gfile=null,_gsyncing=false,_gpush=null,_gpending=null;
 function _gstatus(t){ const e=document.getElementById('gstat'); if(e) e.textContent=t; }
 function gisReady(cb){ if(window.google&&google.accounts&&google.accounts.oauth2) return cb();
@@ -40,10 +44,22 @@ function gCachedTok(){ try{ const o=JSON.parse(localStorage.getItem('warmly.gtok
 function gInitClient(){ if(_gclient) return; _gclient=google.accounts.oauth2.initTokenClient({ client_id:GCLIENT_ID, scope:GSCOPE,
   callback:(r)=>{ gCacheTok(r);
     if(_gpending){ const p=_gpending; _gpending=null; p(r); } else { syncNow(); } } }); }
+/* ---- Permanent login via the auth Worker (used only when AUTH_WORKER is set; otherwise every branch below falls through to the original in-browser flow unchanged) ---- */
+function gSession(){ try{ return localStorage.getItem('warmly.session')||''; }catch(e){ return ''; } }
+function gReturn(){ if(!AUTH_WORKER||location.hash.indexOf('warmly_session')<0) return false;
+  const p=new URLSearchParams(location.hash.slice(1)); const s=p.get('warmly_session'), at=p.get('access_token');
+  if(s){ try{ localStorage.setItem('warmly.session',s); }catch(e){} }
+  if(at) gCacheTok({access_token:at, expires_in:parseInt(p.get('expires_in')||'3600',10)});
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}  /* strip the tokens out of the address bar */
+  return !!s; }
+async function gWorkerToken(){ const s=gSession(); if(!s) return null;
+  try{ const r=await fetch(AUTH_WORKER+'/auth/token?session='+encodeURIComponent(s)); if(!r.ok) return null;
+    const j=await r.json(); if(j.access_token){ gCacheTok(j); return j; } }catch(e){} return null; }
 function gToken(interactive){ if(!interactive){ const c=gCachedTok(); if(c){ _gtok=c; return Promise.resolve({access_token:c}); } }
+  if(AUTH_WORKER){ if(interactive){ window.location.href=AUTH_WORKER+'/auth/start?app='+encodeURIComponent(location.origin+location.pathname); return new Promise(()=>{}); } return gWorkerToken(); }
   return new Promise(res=>{ gInitClient(); _gpending=res; try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ _gpending=null; res(null); } }); }
-window.gConnect=()=>{ gisReady(async()=>{ _gstatus('Opening Google…'); const r=await gToken(true); if(r&&r.access_token) syncNow(); else _gstatus('Sign-in cancelled'); }); };
-window.gDisconnect=()=>{ _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); localStorage.removeItem('warmly.gtok'); route(); };
+window.gConnect=()=>{ if(AUTH_WORKER){ _gstatus('Opening Google…'); gToken(true); return; } gisReady(async()=>{ _gstatus('Opening Google…'); const r=await gToken(true); if(r&&r.access_token) syncNow(); else _gstatus('Sign-in cancelled'); }); };
+window.gDisconnect=()=>{ if(AUTH_WORKER&&gSession()){ try{ fetch(AUTH_WORKER+'/auth/logout?session='+encodeURIComponent(gSession())); }catch(e){} } _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); localStorage.removeItem('warmly.gtok'); localStorage.removeItem('warmly.session'); route(); };
 async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'Authorization':'Bearer '+_gtok},opts.headers||{});
   let r=await fetch(url,opts);
   if(r.status===401){ try{ localStorage.removeItem('warmly.gtok'); }catch(e){} const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }
@@ -76,7 +92,9 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
   finally{ _gsyncing=false; } }
 window.syncNow=syncNow;
 function schedulePush(){ if(localStorage.getItem('warmly.gsync')!=='1'||!_gtok) return; clearTimeout(_gpush); _gpush=setTimeout(syncNow,2500); }
-function gBoot(){ if(localStorage.getItem('warmly.gsync')!=='1') return; const c=gCachedTok(); if(c){ _gtok=c; syncNow(); return; } gisReady(async()=>{ const r=await gToken(false); if(r&&r.access_token) syncNow(); else _gstatus('Tap Sign in to resume sync'); }); }
+function gBoot(){ if(localStorage.getItem('warmly.gsync')!=='1') return; const c=gCachedTok(); if(c){ _gtok=c; syncNow(); return; }
+  if(AUTH_WORKER){ gToken(false).then(r=>{ if(r&&r.access_token) syncNow(); else _gstatus('Tap Sign in to resume sync'); }); return; }
+  gisReady(async()=>{ const r=await gToken(false); if(r&&r.access_token) syncNow(); else _gstatus('Tap Sign in to resume sync'); }); }
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -105,6 +123,7 @@ function socialLinks(c){ const o=[];
 function socIcon(k){ const I={
   wa:'<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 13.9c-.2.6-1.2 1.1-1.7 1.2-.5 0-1 .2-3.1-.9-2.6-1.3-4.2-4-4.3-4.2-.1-.2-1-1.3-1-2.6s.7-1.8.9-2 .4-.3.6-.3h.5c.2 0 .4 0 .6.4l.8 2c.1.1.1.3 0 .5l-.4.5c-.1.2-.3.3-.1.6.2.3.9 1.4 1.9 2 .8.5 1.3.6 1.5.6.2-.1.5-.6.7-.9.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.5.3.1.2.1.7-.1 1.3z"/>',
   call:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.2 11 11 0 0 0 3.5.6 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.4a1 1 0 0 1 1 1 11 11 0 0 0 .6 3.5 1 1 0 0 1-.3 1z"/>',
+  text:'<path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-4 3.4V16H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>',
   mail:'<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 7L4 6.5V18h16V6.5z"/>',
   in:'<path d="M5 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.5h4V21H3zm6 0h3.8v1.6h.1c.5-.9 1.8-1.8 3.6-1.8 3.9 0 4.5 2.5 4.5 5.7V21h-4v-4.9c0-1.2 0-2.7-1.7-2.7s-2 1.3-2 2.6V21H9z"/>',
   ig:'<path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3zm5 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm5-1a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>',
@@ -112,10 +131,27 @@ function socIcon(k){ const I={
   tg:'<path d="M21.9 4.3 18.7 19c-.2 1-.9 1.2-1.8.8l-4.9-3.6-2.3 2.3c-.3.3-.5.5-1 .5l.3-5 9.1-8.2c.4-.3-.1-.5-.6-.2L4.6 13l-3.9-1.2c-.8-.3-.9-.9.2-1.3L20.6 3c.7-.3 1.4.2 1.3 1.3z"/>',
   web:'<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 6h-2.6a15 15 0 0 0-1.3-3.3A8 8 0 0 1 18.9 8zM12 4c.8 1 1.5 2.4 1.9 4h-3.8C10.5 6.4 11.2 5 12 4zM4.3 14a8 8 0 0 1 0-4h3a18 18 0 0 0 0 4zm.8 2h2.6c.3 1.2.8 2.3 1.3 3.3A8 8 0 0 1 5.1 16zM7.7 8H5.1a8 8 0 0 1 3.9-3.3C8.5 5.7 8 6.8 7.7 8zM12 20c-.8-1-1.5-2.4-1.9-4h3.8c-.4 1.6-1.1 3-1.9 4zm2.3-6H9.7a16 16 0 0 1 0-4h4.6a16 16 0 0 1 0 4zm.4 5.3c.5-1 1-2.1 1.3-3.3h2.6a8 8 0 0 1-3.9 3.3zM16.7 14a18 18 0 0 0 0-4h3a8 8 0 0 1 0 4z"/>'
 }; return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(I[k]||I.web)+'</svg>'; }
-function socialRow(c, withAdd){ const links=socialLinks(c); if(!links.length && !withAdd) return '';
+function socialRow(c, withAdd, skip){ let links=socialLinks(c); if(skip) links=links.filter(l=>!['wa','call','mail'].includes(l[0])); if(!links.length && !withAdd) return '';
   let h='<div class="socrow">';
   links.forEach(([k,label,url])=>{ h+='<a class="soc soc-'+k+'" href="'+esc(url)+'" target="_blank" rel="noopener" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</a>'; });
   if(withAdd) h+='<button class="soc socadd" onclick="event.stopPropagation();editContact(\''+c.id+'\')" title="add a link" aria-label="add a link">+</button>';
+  return h+'</div>';
+}
+/* ---- the Reach hub: every channel, one tap, the hero of a contact's page ---- */
+function reachBar(c){ const id=c.id; const ph=c.phone? String(c.phone).replace(/[^\d+]/g,''):''; const wmsg=c.lastMsg||'';
+  const items=[
+    ['call','Call', ph?('tel:'+ph):'', ph],
+    ['text','Text', ph?('sms:'+ph+(wmsg?('?body='+encodeURIComponent(wmsg)):'')):'', ph],
+    ['wa','WhatsApp','', ph],
+    ['mail','Email', c.email?('mailto:'+c.email):'', c.email]
+  ];
+  let h='<div class="reach-label">Reach '+esc(callName(c))+' &middot; one tap, any way</div><div class="reach">';
+  items.forEach(([k,label,href,on])=>{
+    const ic='<span class="ic">'+socIcon(k)+'</span><span class="lb">'+label+'</span>';
+    if(!on) h+='<button class="act '+k+' off" title="Add their '+(k==='mail'?'email':'number')+'" onclick="editContact(\''+id+'\')">'+ic+'</button>';
+    else if(k==='wa') h+='<button class="act wa" onclick="compose(\''+id+'\',\'reconnect\')">'+ic+'</button>';
+    else h+='<a class="act '+k+'" href="'+esc(href)+'">'+ic+'</a>';
+  });
   return h+'</div>';
 }
 /* ---- peer-to-peer "ask for their details": they fill a static page, the reply comes back to you on WhatsApp, no server ---- */
@@ -486,11 +522,11 @@ function viewPerson(id){
     +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner circle',2:'keep warm',3:'loose tie'}[c.tier||3])+'</span></div>';
   h+='<div class="chips" style="margin-top:10px">'+(c.tags||[]).map((t,i)=>'<span class="chip on" onclick="delTag(\''+id+'\','+i+')">'+esc(t)+' ×</span>').join('')+'<span class="chip" onclick="addTag(\''+id+'\')">+ tag</span></div>';
   h+='<div class="btn-row" style="margin-top:6px">';
-  if(c.phone) h+='<button class="btn wa sm" onclick="compose(\''+id+'\',\'reconnect\')">WhatsApp</button>';
   if(c.phone) h+='<button class="btn ghost sm" onclick="askDetails(\''+id+'\')">Ask for details</button>';
   h+='<button class="btn ghost sm" onclick="logCall(\''+id+'\')">Log a call</button>';
   h+='<button class="btn ghost sm" onclick="editContact(\''+id+'\')">Edit details</button></div></div>';
-  h+=socialRow(c,true);
+  h+=reachBar(c);
+  h+=socialRow(c,true,true);
 
   /* quick triage */
   h+='<div class="card"><div class="kick" style="margin-top:0">Quick triage</div><div class="btn-row">'+[[1,'inner circle'],[2,'keep warm'],[3,'loose tie']].map(([t,l])=>'<button class="btn sm '+(c.tier===t?'primary':'ghost')+'" onclick="setTier(\''+id+'\','+t+')">'+l+'</button>').join('')+'</div>'
@@ -748,6 +784,7 @@ function viewSettings(){
     +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
     +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".kith,.json" style="display:none" onchange="importFile(event)"></div></div>';
   h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
+  h+=lockSection();
   h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
   h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Warmly v'+VERSION+' · built '+BUILT+' · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
 }
@@ -849,29 +886,73 @@ window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   save(); closeModal(); route();
 };
 /* ---- Quick add: paste anything, we extract the details ---- */
+const _MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+/* normalise any one date fragment into YYYY-MM-DD (year known) or --MM-DD (no year) */
+function normBday(s){ if(!s) return ''; s=String(s).trim(); const pad=n=>String(n).padStart(2,'0');
+  /* numeric slash/dot/dash date, locale-aware: DD/MM by default, MM/DD only if country code is 1 (US/Canada) */
+  let sm=s.match(/^([0-9]{1,2})[\/.\-]([0-9]{1,2})(?:[\/.\-]([0-9]{2,4}))?$/);
+  if(sm){ let a=+sm[1], b=+sm[2], y=sm[3]?+sm[3]:null, d, mo;
+    const usOrder=/^1$/.test((DB.settings&&DB.settings.country)||'');
+    if(a>12){ d=a; mo=b; } else if(b>12){ mo=a; d=b; } else if(usOrder){ mo=a; d=b; } else { d=a; mo=b; }
+    if(y&&y<100) y=(y>40?1900:2000)+y;
+    if(mo>=1&&mo<=12&&d>=1&&d<=31) return (y?y+'-':'--')+pad(mo)+'-'+pad(d);
+    return '';
+  }
+  /* "14 March 1992" / "14 Mar" */
+  let mm=s.match(/^([0-9]{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})(?:,?\s+([0-9]{4}))?$/);
+  if(mm && _MON[mm[2].slice(0,3).toLowerCase()]) return ((mm[3]?mm[3]+'-':'--'))+pad(_MON[mm[2].slice(0,3).toLowerCase()])+'-'+pad(+mm[1]);
+  /* "March 14, 1992" / "Mar 14" */
+  let mn=s.match(/^([A-Za-z]{3,9})\s+([0-9]{1,2})(?:st|nd|rd|th)?(?:,?\s+([0-9]{4}))?$/);
+  if(mn && _MON[mn[1].slice(0,3).toLowerCase()]) return ((mn[3]?mn[3]+'-':'--'))+pad(_MON[mn[1].slice(0,3).toLowerCase()])+'-'+pad(+mn[2]);
+  /* fall back to the strict parser (ISO, etc.) */
+  const p=parseDateStr(s); if(p&&p.m&&p.d) return (p.y?p.y+'-':'--')+pad(p.m)+'-'+pad(p.d);
+  return '';
+}
+/* find a birthday anywhere in free text; returns {str (matched text to strip), val (normalised)} */
+function findBirthday(t){
+  const DATE='([0-9]{4}-[0-9]{1,2}-[0-9]{1,2}|[0-9]{1,2}[\\/.\\-][0-9]{1,2}(?:[\\/.\\-][0-9]{2,4})?|[0-9]{1,2}(?:st|nd|rd|th)?\\s+[A-Za-z]{3,9}(?:,?\\s+[0-9]{4})?|[A-Za-z]{3,9}\\s+[0-9]{1,2}(?:st|nd|rd|th)?(?:,?\\s+[0-9]{4})?)';
+  let m=t.match(new RegExp('(?:birthday|bday|b-day|dob|d\\.o\\.b|born)[:\\s]*'+DATE,'i'));
+  if(m){ const v=normBday(m[1]); if(v) return {str:m[0], val:v}; }
+  m=t.match(/\b[0-9]{4}-[0-9]{2}-[0-9]{2}\b/); if(m){ const v=normBday(m[0]); if(v) return {str:m[0], val:v}; }
+  m=t.match(/\b[0-9]{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:,?\s+[0-9]{4})?\b/);
+  if(m && _MON[m[0].replace(/^[0-9]{1,2}(?:st|nd|rd|th)?\s+/,'').slice(0,3).toLowerCase()]){ const v=normBday(m[0]); if(v) return {str:m[0], val:v}; }
+  m=t.match(/\b[A-Za-z]{3,9}\s+[0-9]{1,2}(?:st|nd|rd|th)?(?:,?\s+[0-9]{4})?\b/);
+  if(m && _MON[m[0].slice(0,3).toLowerCase()]){ const v=normBday(m[0]); if(v) return {str:m[0], val:v}; }
+  m=t.match(/\b[0-9]{1,2}[\/.][0-9]{1,2}[\/.][0-9]{2,4}\b/); if(m){ const v=normBday(m[0]); if(v) return {str:m[0], val:v}; }
+  return {str:'', val:''};
+}
 function quickParse(t){ t=t||'';
   const email=(t.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)||[])[0]||'';
   const linkedin=(t.match(/(https?:\/\/)?(www\.)?linkedin\.com\/[^\s,]+/i)||[])[0]||'';
   const instagram=(t.match(/instagram\.com\/([A-Za-z0-9_.]+)/i)||[])[1]||'';
   const x=(t.match(/(?:x|twitter)\.com\/([A-Za-z0-9_]+)/i)||[])[1]||'';
   const telegram=(t.match(/t\.me\/([A-Za-z0-9_]+)/i)||[])[1]||'';
-  const bdayM=t.match(/(?:birthday|bday|dob|born)[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}[\/.\- ][0-9]{1,2}(?:[\/.\- ][0-9]{2,4})?)/i);
-  const bday=bdayM?bdayM[1]:'';
-  const phone=((bdayM?t.replace(bdayM[0],' '):t).match(/\+?\d[\d ()\-]{7,}\d/)||[])[0]||'';
+  const bj=findBirthday(t); const bday=bj.val;
+  const phone=((bj.str?t.replace(bj.str,' '):t).match(/\+?\d[\d ()\-]{7,}\d/)||[])[0]||'';
+  /* website: a generic URL that is not one of the socials or an email domain */
+  let clean=t.replace(email,' ')
+    .replace(/(https?:\/\/)?(www\.)?linkedin\.com\/[^\s,]+/ig,' ')
+    .replace(/(https?:\/\/)?(www\.)?instagram\.com\/[^\s,]+/ig,' ')
+    .replace(/(https?:\/\/)?(www\.)?(x|twitter)\.com\/[^\s,]+/ig,' ')
+    .replace(/(https?:\/\/)?(www\.)?t\.me\/[^\s,]+/ig,' ')
+    .replace(/(https?:\/\/)?(www\.)?facebook\.com\/[^\s,]+/ig,' ');
+  const um=clean.match(/\b(?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*\.[a-z]{2,}(?:\/[^\s,]*)?/i);
+  let website=um?um[0]:''; if(/^(jpg|png|gif|e\.g|i\.e)/i.test(website)) website='';
   let location=''; const low=t.toLowerCase(); for(const k in GEO){ if(k.length>3 && low.indexOf(k)>=0){ location=k; break; } }
   let name=''; const lines=t.split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
-  for(const ln of lines){ if(/@|linkedin|https?:|\d{4,}/i.test(ln)) continue; if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
-  return {name,email,linkedin,instagram,x,telegram,bday,phone,location};
+  for(const ln of lines){ if(/@|linkedin|instagram|https?:|t\.me|\d{4,}/i.test(ln)) continue; if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
+  return {name,email,linkedin,instagram,x,telegram,bday,phone,location,website};
 }
 window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
   h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Warmly pulls out the details. Refine later on their page.</div>';
   h+='<div id="qaVoice" class="voicebar" style="display:none"><span class="vbars"><i></i><i></i><i></i><i></i><i></i></span><span class="vtext">Listening, speak now</span><button class="btn sm" style="background:var(--hero-ink);color:var(--accent)" onclick="voiceStop()">Done</button></div>';
   h+='<textarea id="qa_blob" placeholder="Paste, type, or tap Speak it: name, city, where you met" style="min-height:78px" oninput="qaParse()"></textarea>';
+  h+='<div class="qa-chips" id="qaChips"></div>';
   h+='<div class="two"><div><label class="fl">Name</label><input id="qa_name"></div><div><label class="fl">Phone</label><input id="qa_phone"></div></div>';
   h+='<label class="fl">Calling name &middot; used in messages</label><input id="qa_call" placeholder="John">';
   h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
   h+='<label class="fl">Birthday (optional)</label><input id="qa_bday" type="date">';
-  h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden">';
+  h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden"><input id="qa_web" type="hidden"><input id="qa_bdayraw" type="hidden">';
   h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="quickSave()">Add person</button></div>';
   openModal(h); };
 window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
@@ -881,10 +962,16 @@ window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
   if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
   if(p.email) $('#qa_email').value=p.email; if(p.linkedin) $('#qa_li').value=p.linkedin;
   if(p.instagram) $('#qa_ig').value=p.instagram; if(p.x) $('#qa_x').value=p.x; if(p.telegram) $('#qa_tg').value=p.telegram;
-  if(p.bday && $('#qa_bday')) $('#qa_bday').value=p.bday; };
+  if(p.website) $('#qa_web').value=p.website;
+  if(p.bday){ $('#qa_bdayraw').value=p.bday; if(/^\d{4}-\d{2}-\d{2}$/.test(p.bday)&&$('#qa_bday')) $('#qa_bday').value=p.bday; }
+  renderQaChips(p); };
+function renderQaChips(p){ const el=document.getElementById('qaChips'); if(!el) return;
+  const defs=[['name','Name'],['phone','Phone'],['email','Email'],['bday','Birthday'],['location','City'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X'],['telegram','Telegram'],['website','Website']];
+  let n=0; const chips=defs.map(([k,lb])=>{ const on=!!p[k]; if(on)n++; return '<span class="qchip'+(on?' on':'')+'">'+(on?'&#10003; ':'')+lb+'</span>'; }).join('');
+  el.innerHTML = chips + (n?'<div class="qa-found">Found '+n+' detail'+(n>1?'s':'')+' automatically. Check them, then Add.</div>':''); }
 window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('Add a name first.'); return; }
   const g=i=>{ const el=$('#'+i); return el?el.value.trim():''; };
-  const phone=g('qa_phone'), norm=phone?normalizePhone(phone):'', bd=parseDateStr(g('qa_bday'));
+  const phone=g('qa_phone'), norm=phone?normalizePhone(phone):'', bd=parseDateStr(g('qa_bday')||g('qa_bdayraw'));
   let c=norm? DB.contacts.find(x=>x.id!=='me' && x.phone && normalizePhone(x.phone)===norm) : null;
   if(c){ /* a returned card: merge into the existing contact, fill blanks, never clobber */
     if(!c.name||c.name==='Unnamed') c.name=name;
@@ -895,11 +982,42 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
     if(g('qa_ig')&&!c.instagram) c.instagram=g('qa_ig');
     if(g('qa_x')&&!c.x) c.x=g('qa_x');
     if(g('qa_tg')&&!c.telegram) c.telegram=g('qa_tg');
+    if(g('qa_web')&&!c.website) c.website=g('qa_web');
     if(bd&&!c.bday) c.bday=bd;
     c.review=false; save(); closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); return;
   }
-  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),bday:bd,review:true};
+  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),bday:bd,review:true};
   DB.contacts.push(nc); save(); closeModal(); go('person',nc.id); };
+
+/* ===== Capture hub: every effortless way to add someone, in one place ===== */
+function capIcon(k){ const I={
+  share:'<circle cx="6" cy="12" r="2.4"/><circle cx="17.5" cy="6" r="2.4"/><circle cx="17.5" cy="18" r="2.4"/><path d="M8.1 11l7.3-4M8.1 13l7.3 4"/>',
+  paste:'<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>',
+  scan:'<rect x="3.5" y="6" width="17" height="12" rx="2.2"/><circle cx="9" cy="12" r="2.2"/><path d="M14 10.5h3.5M14 13.5h3.5"/>',
+  voice:'<rect x="9.5" y="3.5" width="5" height="10" rx="2.5"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3"/>',
+  import:'<rect x="3.5" y="5" width="17" height="14" rx="2.2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16.5c.8-1.9 2.4-3 3.5-3s2.7 1.1 3.5 3M15 10h3M15 13h3"/>',
+  type:'<path d="M12 20h8"/><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L7.5 18.3l-3.6 1 1-3.5z"/>'
+}; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(I[k]||I.type)+'</svg>'; }
+window.captureHub=()=>{
+  let h='<button class="x" onclick="closeModal()">&times;</button><h3>Add someone</h3>';
+  h+='<div class="sub" style="margin:-6px 0 14px">Three effortless ways. You almost never type.</div>';
+  const row=(cls,k,ti,ds,act)=>'<button class="cap '+cls+'" onclick="closeModal();'+act+'"><span class="capic">'+capIcon(k)+'</span><span class="capt"><span class="ti">'+ti+'</span><span class="ds">'+ds+'</span></span></button>';
+  h+=row('hero','share','Let them share their card','Send a warm link. They fill it in, it comes back to you. Zero typing.','shareRequest()');
+  h+=row('','paste','Paste anything','A signature, a bio, a line. Warmly pulls out every detail.','quickAdd()');
+  h+=row('','scan','Scan a card','Snap a business card and start from the photo.','fabPick(\'camera\')');
+  h+=row('','voice','Speak it','Just say who they are.','voiceAdd()');
+  h+=row('','import','Import from your phone','Bring in contacts you already have.','go(\'import\')');
+  h+=row('dim','type','Add by hand','Old-fashioned. Always here if you want it.','editContact(\'\')');
+  openModal(h);
+};
+window.shareRequest=()=>{ const me=DB.me||{}; const phone=me.phone||'';
+  if(!phone){ alert('Add your own WhatsApp number in My Card first, so their details can come back to you.'); go('mycard'); return; }
+  const base=location.origin + location.pathname.replace(/[^\/]*$/, '');
+  const link=base+'card.html?to='+encodeURIComponent(normalizePhone(phone))+'&from='+encodeURIComponent(me.name||DB.settings.myName||'a friend');
+  const msg='Hey! I keep the people I care about close on Warmly. Mind sharing a few details so we stay in touch and I never miss your birthday? Takes 20 seconds: '+link;
+  if(navigator.share){ navigator.share({text:msg}).catch(()=>{}); }
+  else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank','noopener'); }
+};
 
 window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const tpl=DB.templates.find(t=>t.occasion===occasion)||DB.templates.find(t=>t.occasion==='reconnect')||{body:''};
@@ -936,8 +1054,103 @@ window.logToday=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
 window.setTier=(id,t)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.tier=t; save(); route(); } };
 window.setCad=(id,m)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.cadence=m||null; save(); route(); } };
 
+/* ===================================================================
+   APP LOCK — local passcode + optional Face ID / fingerprint (WebAuthn).
+   Device-local only (key 'warmly.lock'), never synced. The PIN is stored
+   as a PBKDF2 hash; biometric is a local WebAuthn platform assertion.
+   =================================================================== */
+const LOCK_KEY='warmly.lock';
+let _unlocked=true, _entered='', _bgAt=0, _bioOK=false;
+function lockCfg(){ try{ return JSON.parse(localStorage.getItem(LOCK_KEY))||null; }catch(e){ return null; } }
+function lockSave(c){ localStorage.setItem(LOCK_KEY, JSON.stringify(c)); }
+function lockEnabled(){ const c=lockCfg(); return !!(c&&c.enabled&&c.hash); }
+function _b64e(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))); }
+function _b64d(s){ return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+async function _lockDerive(pin, salt){ const base=await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2', salt:salt, iterations:150000, hash:'SHA-256'}, base, 256); return _b64e(bits); }
+async function lockSetPin(pin){ const salt=crypto.getRandomValues(new Uint8Array(16)); const hash=await _lockDerive(pin, salt);
+  const c=lockCfg()||{}; c.enabled=true; c.salt=_b64e(salt); c.hash=hash; c.len=pin.length; if(!c.autolock) c.autolock='now'; lockSave(c); }
+async function lockVerifyPin(pin){ const c=lockCfg(); if(!c||!c.hash) return false; try{ const h=await _lockDerive(pin, _b64d(c.salt)); return h===c.hash; }catch(e){ return false; } }
+async function lockBioAvail(){ try{ return !!(window.PublicKeyCredential) && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }catch(e){ return false; } }
+async function lockBioRegister(){ try{
+    if(!(await lockBioAvail())) return false;
+    const cred=await navigator.credentials.create({publicKey:{
+      challenge:crypto.getRandomValues(new Uint8Array(32)), rp:{name:'Warmly'},
+      user:{id:crypto.getRandomValues(new Uint8Array(16)), name:'warmly', displayName:'Warmly'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform', userVerification:'required'}, timeout:60000, attestation:'none'
+    }});
+    if(!cred) return false; const c=lockCfg()||{}; c.bio={credId:_b64e(cred.rawId)}; lockSave(c); return true;
+  }catch(e){ return false; } }
+async function lockBioVerify(){ const c=lockCfg(); if(!c||!c.bio) return false; try{
+    await navigator.credentials.get({publicKey:{ challenge:crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials:[{type:'public-key', id:_b64d(c.bio.credId)}], userVerification:'required', timeout:60000 }});
+    return true;
+  }catch(e){ return false; } }
+const LOCKI={
+  shut:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.4"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.3" r="1.2" fill="currentColor" stroke="none"/></svg>',
+  open:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.4"/><path d="M8 10.5V7.5a4 4 0 0 1 7.7-1.6"/><circle cx="12" cy="15.3" r="1.2" fill="currentColor" stroke="none"/></svg>',
+  face:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6.5A2.5 2.5 0 0 1 6.5 4H8M16 4h1.5A2.5 2.5 0 0 1 20 6.5V8M20 16v1.5a2.5 2.5 0 0 1-2.5 2.5H16M8 20H6.5A2.5 2.5 0 0 1 4 17.5V16"/><circle cx="9" cy="10.5" r=".6" fill="currentColor"/><circle cx="15" cy="10.5" r=".6" fill="currentColor"/><path d="M12 10v3M10 15.6s.8.8 2 .8 2-.8 2-.8"/></svg>',
+  del:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9L4 12l5 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z"/><path d="M13 9.5l4 5M17 9.5l-4 5"/></svg>'
+};
+function lockMarkup(){ const c=lockCfg()||{}; const len=c.len||4;
+  let dots='<div class="lk-dots" id="lkDots">'; for(let i=0;i<len;i++) dots+='<i></i>'; dots+='</div>';
+  const keys=['1','2','3','4','5','6','7','8','9','bio','0','del']; let pad='<div class="lk-pad">';
+  keys.forEach(k=>{
+    if(k==='bio') pad+= (c.bio? '<button class="lk-key fn bio" aria-label="unlock with biometrics" onclick="lockTapBio()">'+LOCKI.face+'</button>' : '<span class="lk-key fn ghost"></span>');
+    else if(k==='del') pad+='<button class="lk-key fn" aria-label="delete" onclick="lockDel()">'+LOCKI.del+'</button>';
+    else pad+='<button class="lk-key" onclick="lockTap(\''+k+'\')">'+k+'</button>';
+  }); pad+='</div>';
+  return '<div class="lk-inner"><div class="lk-brand">Warmly<span class="dot">.</span></div><div class="lk-icon" id="lkIcon">'+LOCKI.shut+'</div><div class="lk-msg" id="lkMsg">Enter your passcode</div>'+dots+pad+'</div>';
+}
+function lockPaint(){ const d=document.getElementById('lkDots'); if(!d) return; const n=_entered.length;
+  Array.prototype.forEach.call(d.children,(el,i)=>el.classList.toggle('full', i<n)); }
+function lockShow(){ _unlocked=false; _entered=''; const el=document.getElementById('lockScreen'); if(!el) return;
+  el.innerHTML=lockMarkup(); el.style.display='flex'; el.classList.remove('unlocked'); lockPaint();
+  const c=lockCfg(); if(c&&c.bio) setTimeout(()=>{ if(!_unlocked) lockTapBio(); }, 350); }
+function lockHide(){ _unlocked=true; _entered=''; const el=document.getElementById('lockScreen'); if(!el) return;
+  const ic=document.getElementById('lkIcon'); if(ic) ic.innerHTML=LOCKI.open; const m=document.getElementById('lkMsg'); if(m){ m.textContent='Welcome back'; m.classList.remove('err'); }
+  el.classList.add('unlocked'); setTimeout(()=>{ el.style.display='none'; el.classList.remove('unlocked'); }, 480); }
+window.lockTap=(n)=>{ const c=lockCfg(); const len=(c&&c.len)||4; if(_entered.length>=len) return;
+  _entered+=n; lockPaint(); const m=document.getElementById('lkMsg'); if(m){ m.textContent='Enter your passcode'; m.classList.remove('err'); }
+  if(_entered.length>=len) setTimeout(lockTry, 130); };
+window.lockDel=()=>{ _entered=_entered.slice(0,-1); lockPaint(); };
+async function lockTry(){ const ok=await lockVerifyPin(_entered);
+  if(ok){ lockHide(); return; }
+  const m=document.getElementById('lkMsg'); if(m){ m.textContent='Wrong passcode, try again'; m.classList.add('err'); }
+  const d=document.getElementById('lkDots'); if(d){ d.classList.add('shake'); setTimeout(()=>d.classList.remove('shake'),420); }
+  _entered=''; setTimeout(lockPaint, 60); }
+window.lockTapBio=async()=>{ const m=document.getElementById('lkMsg'); if(m){ m.textContent='Verifying…'; m.classList.remove('err'); }
+  const ok=await lockBioVerify(); if(ok){ lockHide(); } else if(m && !_unlocked){ m.textContent='Enter your passcode'; } };
+function lockShouldRelock(){ const c=lockCfg(); if(!c) return true; const mode=c.autolock||'now'; if(mode==='now') return true;
+  const mins=mode==='5'?5:1; return (Date.now()-_bgAt) > mins*60000; }
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ _bgAt=Date.now(); }
+  else if(lockEnabled() && _unlocked && lockShouldRelock()){ lockShow(); } });
+function lockSection(){ const c=lockCfg()||{}; const on=lockEnabled();
+  let h='<div class="kick">App lock</div><div class="card">';
+  h+='<div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Lock Warmly</div><div class="sub">Ask for a passcode every time the app opens, so your people stay private on this device. Stored only here, never synced.</div></div><button class="btn sm '+(on?'primary':'ghost')+'" onclick="lockToggle()">'+(on?'On':'Off')+'</button></div>';
+  if(on){
+    h+='<div class="lk-divider"></div><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Face ID / fingerprint</div><div class="sub">'+(_bioOK?'Unlock with your phone’s own biometrics. The passcode always works as a backup.':'Not available in this browser, so the passcode protects the app on its own.')+'</div></div>'+(_bioOK?('<button class="btn sm '+(c.bio?'primary':'ghost')+'" onclick="lockBioToggle()">'+(c.bio?'On':'Off')+'</button>'):'<span class="sub">—</span>')+'</div>';
+    h+='<div class="lk-divider"></div><div class="nm" style="font-size:15px">Auto-lock</div><div class="sub" style="margin-bottom:8px">When to ask again after you leave the app.</div><div class="seg" id="lkAuto">'+[['now','Immediately'],['1','After 1 min'],['5','After 5 min']].map(([k,l])=>'<button class="'+(((c.autolock||'now')===k)?'on':'')+'" onclick="lockAuto(\''+k+'\')">'+l+'</button>').join('')+'</div>';
+    h+='<div class="lk-divider"></div><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Passcode</div><div class="sub">'+(c.len||4)+'-digit PIN on this device.</div></div><button class="btn sm ghost" onclick="lockChangePin()">Change</button></div>';
+  }
+  return h+'</div>';
+}
+window.lockToggle=async()=>{ if(lockEnabled()){ const pin=prompt('Enter your current passcode to turn the lock OFF:'); if(pin===null) return; if(!(await lockVerifyPin((pin||'').trim()))){ alert('That passcode is not right.'); return; } localStorage.removeItem(LOCK_KEY); route(); return; }
+  const a=prompt('Set a passcode (4 to 6 digits):'); if(a===null) return; const pin=(a||'').trim(); if(!/^\d{4,6}$/.test(pin)){ alert('Use 4 to 6 digits.'); return; }
+  const b=prompt('Confirm your passcode:'); if(b===null) return; if((b||'').trim()!==pin){ alert('The two passcodes did not match.'); return; }
+  await lockSetPin(pin); alert('App lock is on. You will need this passcode the next time Warmly opens.'); route(); };
+window.lockChangePin=async()=>{ const cur=prompt('Enter your current passcode:'); if(cur===null) return; if(!(await lockVerifyPin((cur||'').trim()))){ alert('That passcode is not right.'); return; }
+  const a=prompt('New passcode (4 to 6 digits):'); if(a===null) return; const pin=(a||'').trim(); if(!/^\d{4,6}$/.test(pin)){ alert('Use 4 to 6 digits.'); return; }
+  const b=prompt('Confirm new passcode:'); if(b===null) return; if((b||'').trim()!==pin){ alert('The two passcodes did not match.'); return; }
+  await lockSetPin(pin); alert('Passcode updated.'); route(); };
+window.lockBioToggle=async()=>{ const c=lockCfg(); if(!c) return; if(c.bio){ delete c.bio; lockSave(c); route(); return; }
+  const ok=await lockBioRegister(); alert(ok?'Face ID / fingerprint unlock is on.':'Could not set up biometric unlock on this device. Your passcode still works.'); route(); };
+window.lockAuto=(k)=>{ const c=lockCfg(); if(!c) return; c.autolock=k; lockSave(c); route(); };
+
 /* ---------- render + boot ---------- */
 function render(h){ $('#app').innerHTML=h; }
+(function(){ const bv=document.getElementById('brandVer'); if(bv) bv.textContent='v'+VERSION; })();
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',()=>$('#tabs').classList.toggle('open'));
 const tb=$('#themeBtn');
@@ -945,10 +1158,14 @@ if(localStorage.getItem('warmly.skin')==='brutal') document.documentElement.data
 tb.textContent = (document.documentElement.dataset.theme==='brutal')?'A':'D';
 tb.title='Switch skin: Warm Ember (A) / Brutalist (D)';
 tb.addEventListener('click',()=>{ const isB=document.documentElement.dataset.theme==='brutal'; document.documentElement.dataset.theme=isB?'':'brutal'; tb.textContent=isB?'D':'A'; localStorage.setItem('warmly.skin', isB?'ember':'brutal'); });
+gReturn();
 if(!location.hash) location.hash='#today';
 snapInit();
 route();
 gBoot();
+/* app lock: detect biometric support, and gate the app if a passcode is set */
+lockBioAvail().then(v=>{ _bioOK=v; });
+if(lockEnabled()) lockShow();
 /* swipe-left on a person opens their quick-action sheet */
 let _swS=null;
 document.addEventListener('touchstart',e=>{ if(localStorage.getItem('warmly.swipe')==='off') return; if(e.target.closest('.kebab')) return; const t=e.target.closest('[data-cid]'); if(!t) return; _swS={x:e.touches[0].clientX,y:e.touches[0].clientY,id:t.getAttribute('data-cid')}; },{passive:true});
