@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.25.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.26.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -31,10 +31,44 @@ const RECONNECT_OPENERS=[
   {id:'o13',body:"Hey {first}, just checking in because you matter to me. How have things been lately?"},
   {id:'o14',body:"Hi {first}, hope this finds you well. Any chance you're free for a catch up soon?"}
 ];
+/* Optional subtle local-language touch (Hinglish, German, Dutch), chosen by the contact's phone
+   country code or the device locale. Toggle in Settings (DB.settings.localTouch, default on). ASCII-safe. */
+const REGION_OPENERS={
+  IN:[
+    {id:'in1',body:"Arre {first}, kaise ho? It's been way too long, let's catch up."},
+    {id:'in2',body:"Hey {first}, bahut din ho gaye! How have you been?"},
+    {id:'in3',body:"{first}, sab theek? You crossed my mind today, let's talk soon."},
+    {id:'in4',body:"Arre {first}, kahan ho aajkal? Missing our chats, yaar."},
+    {id:'in5',body:"Hey {first}, kya chal raha hai? Hope you're doing well."},
+    {id:'in6',body:"{first}, aaj teri yaad aayi. How is everything going?"},
+    {id:'in7',body:"Hi {first}, aur sunao, kya chal raha hai? Long overdue a catch up."},
+    {id:'in8',body:"Arre {first}, itne din se baat nahi hui! How are you, really?"}
+  ],
+  DE:[
+    {id:'de1',body:"Hallo {first}! Wie geht's? It's been far too long, let's catch up."},
+    {id:'de2',body:"Servus {first}, you came to mind today. How have you been?"},
+    {id:'de3',body:"Na {first}, alles gut bei dir? We're overdue a proper chat."},
+    {id:'de4',body:"Hallo {first}, schon lange her! How are things going?"},
+    {id:'de5',body:"Hey {first}, wie geht's so? Thinking of you, let's talk soon."},
+    {id:'de6',body:"{first}, alles klar? It's been ages, hope you're doing well."},
+    {id:'de7',body:"Hallo {first}, ich musste an dich denken. How are you, really?"},
+    {id:'de8',body:"Servus {first}, melde dich mal bei mir! How's life?"}
+  ],
+  NL:[
+    {id:'nl1',body:"Hoi {first}! Hoe gaat het? It's been way too long, let's catch up."},
+    {id:'nl2',body:"Hey {first}, lang niet gesproken! How have you been?"},
+    {id:'nl3',body:"Hoi {first}, ik moest aan je denken. How are things going?"},
+    {id:'nl4',body:"{first}, alles goed? Thinking of you, let's talk soon."},
+    {id:'nl5',body:"Hoi {first}, hoe is het met je? We're overdue a proper chat."},
+    {id:'nl6',body:"Hey {first}, alles kits? It's been ages, hope you're well."},
+    {id:'nl7',body:"Hoi {first}, even hallo zeggen! How are you, really?"},
+    {id:'nl8',body:"{first}, lang geleden! How's life on your side?"}
+  ]
+};
 let DB = load();
 function load(){
   try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.contacts) return d; }catch(e){}
-  return { v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:{ myName:'', country:'44', leadDays:1 } };
+  return { v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:{ myName:'', country:'44', leadDays:1, localTouch:true } };
 }
 /* change-tracking so devices merge cleanly (newest edit per contact wins) */
 let _snap={};
@@ -246,9 +280,22 @@ function fillTemplate(body,c){
 }
 /* ---- fresh-message engine: never suggest the same reconnect opener twice in a row (on-device only) ---- */
 function warmFill(body,c){ const fn=callName(c)||'there'; return (body||'').replace(/\{first\}/g,fn).replace(/\{me\}/g,DB.settings.myName||''); }
+function detectRegion(c){
+  var p=(c&&c.phone?String(c.phone):'').replace(/[^\d+]/g,''); if(p.indexOf('00')===0) p='+'+p.slice(2);
+  if(/^\+91/.test(p)) return 'IN'; if(/^\+49/.test(p)) return 'DE'; if(/^\+31/.test(p)) return 'NL';
+  var L=(((navigator.languages&&navigator.languages[0])||navigator.language||'')+'').toLowerCase();
+  if(L.indexOf('hi')===0 || /(^|[-_])in\b/.test(L)) return 'IN';
+  if(L.indexOf('de')===0) return 'DE'; if(L.indexOf('nl')===0) return 'NL';
+  return null;
+}
+function openersFor(c){
+  if(DB.settings && DB.settings.localTouch!==false){ var r=detectRegion(c); if(r && REGION_OPENERS[r]) return REGION_OPENERS[r]; }
+  return RECONNECT_OPENERS;
+}
 function pickOpener(c, avoidId){
+  var src=openersFor(c);
   const hist=(c&&c.msgHistory)||[]; const usedIds=hist.map(m=>m&&m.openerId).filter(Boolean);
-  let pool=RECONNECT_OPENERS.filter(o=>o.id!==avoidId); if(!pool.length) pool=RECONNECT_OPENERS.slice();
+  let pool=src.filter(o=>o.id!==avoidId); if(!pool.length) pool=src.slice();
   const unused=pool.filter(o=>usedIds.indexOf(o.id)<0); const choose=unused.length?unused:pool;
   return choose[Math.floor(Math.random()*choose.length)];
 }
@@ -814,12 +861,14 @@ function viewSettings(){
   h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
     +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
     +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".kith,.json" style="display:none" onchange="importFile(event)"></div></div>';
+  h+='<div class="kick">Reminders</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Add a warm local greeting (Hinglish, German, Dutch) to reconnect messages, based on the contact&rsquo;s number or your region. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
   h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
   h+=lockSection();
   h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
   h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Warmly v'+VERSION+' · built '+BUILT+' · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
 }
 window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
+window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
 window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings }; save(); go('today'); } };
 function download(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
 window.exportJSON=()=>download('warmly-backup.json', new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));
@@ -1063,7 +1112,7 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   if(c.food) _bits.push('likes '+c.food);
   if(c.style) _bits.push('tone: '+c.style);
   if(_last||_bits.length){ h+='<div class="ctx">'+(_last?'<div class="sub">last contacted '+esc(_last.date)+(_last.note?' &mdash; &ldquo;'+esc(_last.note)+'&rdquo;':'')+'</div>':'')+(_bits.length?'<div class="sub">'+esc(_bits.join(' · '))+'</div>':'')+'</div>'; }
-  h+='<div class="btn-row" style="margin:10px 0">'+(occasion==='reconnect'?'<button class="btn ghost sm" onclick="freshMsg(\''+id+'\')">&#8635; fresh idea</button>':'')+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
+  h+='<div class="btn-row" style="margin:10px 0">'+(occasion==='reconnect'?'<button class="btn fresh sm" onclick="freshMsg(\''+id+'\')">&#8635; fresh idea</button>':'')+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
   if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
   h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';

@@ -1,7 +1,7 @@
 /* Warmly service worker - NETWORK-FIRST.
    Always fetch the latest files when online (so code updates reach you on a normal
    refresh); the cache is only an offline fallback. Cache name is bumped each release. */
-const CACHE = 'warmly-0.25.0';
+const CACHE = 'warmly-0.26.0';
 const SHELL = ['./','index.html','app.js','qr.js','styles.css','manifest.webmanifest','icon.svg'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting()));
