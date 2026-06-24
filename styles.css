@@ -1,36 +1,64 @@
 /* Warmly - bold & warm.  Light = "Warm Ember" (B) · Dark = "Ink Editorial" (C).
    Same components, two skins, toggled via [data-theme="dark"]. */
 :root{
-  --bg:#F4EBDB; --bg-2:#FBF6EC; --card:#FFFFFF;
-  --ink:#241C14; --ink-soft:#867A66; --ink-faint:#B0A48F;
-  --line:rgba(36,28,20,0.10);
-  --green:#E2613C;          /* EMBER  - primary action + active tab */
-  --green-2:#14463A;        /* FOREST - section labels, focus, warm pill */
-  --gold:#C9871F; --gold-soft:#E9A23B; --rose:#C0492F;
-  --accent:#E2613C; --on-accent:#FFFFFF; --hero-ink:#FBF1E6;
-  --r:18px; --shadow:0 1px 2px rgba(36,28,20,.04),0 12px 30px rgba(36,28,20,.07);
-  --serif:'Space Grotesk',system-ui,sans-serif;     /* display */
+  --bg:#FBF8F3; --bg-2:#F2EDE5; --card:#FFFFFF;
+  --ink:#2B2622; --ink-soft:#6F675F; --ink-faint:#6F675F;
+  --line:#E7DFD4;
+  --green:#946145; --green-2:#5E7264; --gold:#5E7264; --gold-soft:#5E7264; --rose:#946145;
+  --accent:#946145; --on-accent:#FBF8F3; --hero:#F0E6DA; --hero-ink:#3A332D;
+  --r:20px; --shadow:0 1px 2px rgba(40,30,20,.05),0 12px 30px rgba(40,30,20,.09);
+  --serif:'Space Grotesk',system-ui,sans-serif;
   --sans:'Space Grotesk',system-ui,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',monospace;
 }
 [data-theme="dark"]{
-  --bg:#14151B; --bg-2:#1B1D25; --card:#1E2029;
-  --ink:#ECE7DA; --ink-soft:#9A9FB5; --ink-faint:#6F7488;
-  --line:rgba(236,231,218,0.12);
-  --green:#C7E66B;          /* LIME  - primary action + active tab */
-  --green-2:#F6C7B8;        /* BLUSH - section labels, focus */
-  --gold:#E9A23B; --gold-soft:#E9A23B; --rose:#F6A08C;
-  --accent:#3D6BFF; --on-accent:#14151B; --hero-ink:#ECE7DA;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px rgba(0,0,0,.5);
+  --bg:#14100C; --bg-2:#1E1812; --card:#1B150F;
+  --ink:#F2E6D2; --ink-soft:#B7A892; --ink-faint:#B7A892;
+  --line:#322820;
+  --green:#F5A623; --green-2:#E8806B; --gold:#E8806B; --gold-soft:#E8806B; --rose:#F5A623;
+  --accent:#F5A623; --on-accent:#2A1B07; --hero:#2A1B0C; --hero-ink:#FBEBCB;
+  --r:22px; --shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.55);
 }
 /* ===== D · Brutalist Mono skin (toggled via [data-theme="brutal"]) ===== */
-[data-theme="brutal"]{
-  --bg:#F2F1EA; --bg-2:#FFFFFF; --card:#FFFFFF;
-  --ink:#111111; --ink-soft:#555555; --ink-faint:#8a8a8a;
-  --line:#111111;
-  --green:#0B5FFF; --green-2:#111111; --gold:#C99700; --gold-soft:#FFD400; --rose:#E5484D;
-  --accent:#0B5FFF; --on-accent:#FFFFFF; --hero-ink:#FFFFFF;
-  --shadow:4px 4px 0 #111111; --r:12px;
+:root.skin-hearthstone{
+  --bg:#E6E0D7; --bg-2:#DED7CC; --card:#EDE7DE;
+  --ink:#352F28; --ink-soft:#675D50; --ink-faint:#675D50;
+  --line:#CFC6B8;
+  --green:#9A623B; --green-2:#5F7355; --gold:#5F7355; --gold-soft:#5F7355; --rose:#9A623B;
+  --accent:#9A623B; --on-accent:#FBF4EA; --hero:#E0D8CC; --hero-ink:#352F28;
+  --r:26px; --shadow:0 1px 2px rgba(40,30,20,.05),0 12px 30px rgba(40,30,20,.09);
+}
+:root.skin-letterpress{
+  --bg:#F4EDE0; --bg-2:#EBE2D2; --card:#FBF7EF;
+  --ink:#2E2620; --ink-soft:#6B5D4D; --ink-faint:#6B5D4D;
+  --line:#DAD0BF;
+  --green:#9B3A2E; --green-2:#B5732A; --gold:#B5732A; --gold-soft:#B5732A; --rose:#9B3A2E;
+  --accent:#9B3A2E; --on-accent:#FBF7EF; --hero:#3C4A3A; --hero-ink:#F6ECDA;
+  --r:14px; --shadow:0 1px 2px rgba(40,30,20,.05),0 12px 30px rgba(40,30,20,.09);
+}
+:root.skin-pressedgarden{
+  --bg:#EDE7DA; --bg-2:#E2DBC9; --card:#F6F1E7;
+  --ink:#2E3A2C; --ink-soft:#5E6B55; --ink-faint:#5E6B55;
+  --line:#D2C9B3;
+  --green:#5B7355; --green-2:#C0714B; --gold:#C0714B; --gold-soft:#C0714B; --rose:#5B7355;
+  --accent:#5B7355; --on-accent:#F7F4EB; --hero:#3D5440; --hero-ink:#F2EEDF;
+  --r:20px; --shadow:0 1px 2px rgba(40,30,20,.05),0 12px 30px rgba(40,30,20,.09);
+}
+[data-theme="dark"].skin-hearthglow{
+  --bg:#1A120E; --bg-2:#2E201A; --card:#241814;
+  --ink:#F6E7D6; --ink-soft:#C9A98F; --ink-faint:#C9A98F;
+  --line:#3D2A20;
+  --green:#FF8A3D; --green-2:#FFC061; --gold:#FFC061; --gold-soft:#FFC061; --rose:#FF8A3D;
+  --accent:#FF8A3D; --on-accent:#2A1206; --hero:#3A1A0C; --hero-ink:#FFF1E2;
+  --r:22px; --shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.55);
+}
+[data-theme="dark"].skin-candlelit{
+  --bg:#1C1422; --bg-2:#251A2E; --card:#2A1E34;
+  --ink:#EFE2D2; --ink-soft:#B9A0B4; --ink-faint:#B9A0B4;
+  --line:rgba(239,226,210,0.12);
+  --green:#F2A65A; --green-2:#FF8FA3; --gold:#FF8FA3; --gold-soft:#FF8FA3; --rose:#F2A65A;
+  --accent:#F2A65A; --on-accent:#2A1206; --hero:#F0A24E; --hero-ink:#3A1F0C;
+  --r:22px; --shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.55);
 }
 [data-theme="brutal"] .card{ border-width:2px; }
 [data-theme="brutal"] .hero{ background:var(--accent); border:2px solid #111; box-shadow:5px 5px 0 #111; }
@@ -102,7 +130,7 @@ h1.title{ font-family:var(--serif); font-weight:600; font-size:31px; letter-spac
 .pill.t3{ background:var(--bg); color:var(--ink-faint); border:1px solid var(--line); }
 
 /* hero - bold colour-block (used for the headline item) */
-.hero{ position:relative; overflow:hidden; background:var(--accent); color:var(--hero-ink); border-radius:var(--r); padding:18px 18px 16px; margin-bottom:12px; }
+.hero{ position:relative; overflow:hidden; background:var(--hero); color:var(--hero-ink); border-radius:var(--r); padding:18px 18px 16px; margin-bottom:12px; }
 .hero .nm{ color:var(--hero-ink); font-size:21px; }
 .hero .sub{ color:var(--hero-ink); opacity:.85; }
 .hero .blob{ position:absolute; right:-24px; top:-24px; width:118px; height:118px; opacity:.9; animation:float 7s ease-in-out infinite; }

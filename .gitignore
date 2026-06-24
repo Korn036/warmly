@@ -6,11 +6,16 @@ Thumbs.db
 *.kith
 kith-backup*.json
 
-# internal strategy / branding reports (keep out of the public repo)
+# internal strategy / branding / design reports (keep out of the public repo)
+# broad catch-all: no app source file uses the "Warmly-" prefix, only these docs do
+Warmly-*.pdf
+Warmly-*.md
 Warmly-*-Report-*.md
 Warmly-*-Report-*.pdf
 Warmly-Naming-Branding-*.md
 Warmly-Naming-Branding-*.pdf
+Warmly-Brand-Book-*.md
+Warmly-Brand-Book-*.pdf
 Warmly-*Strategy*.md
 Warmly-*Strategy*.pdf
 

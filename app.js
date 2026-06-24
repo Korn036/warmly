@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.26.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.27.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -65,6 +65,25 @@ const REGION_OPENERS={
     {id:'nl8',body:"{first}, lang geleden! How's life on your side?"}
   ]
 };
+/* ---- themes / skins (Still Morning default, Lamplight dark, plus demo skins) ---- */
+const SKINS=[
+  {k:'stillmorning',n:'Still Morning',c:'#946145',dark:false},
+  {k:'lamplight',n:'Lamplight',c:'#F5A623',dark:true},
+  {k:'hearthglow',n:'Hearthglow',c:'#FF8A3D',dark:true},
+  {k:'hearthstone',n:'Hearthstone',c:'#9A623B',dark:false},
+  {k:'letterpress',n:'Letterpress',c:'#9B3A2E',dark:false},
+  {k:'pressedgarden',n:'Pressed Garden',c:'#5B7355',dark:false},
+  {k:'candlelit',n:'Candlelit Hour',c:'#F2A65A',dark:true}
+];
+const _MOON='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const _SUN='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.5 1.5M16.9 16.9l1.5 1.5M18.4 5.6l-1.5 1.5M7.1 16.9l-1.5 1.5"/></svg>';
+function isDarkSkin(k){ var s=SKINS.find(function(x){return x.k===k;}); return !!(s&&s.dark); }
+function applySkin(k){ var el=document.documentElement;
+  el.classList.remove('skin-hearthstone','skin-letterpress','skin-pressedgarden','skin-hearthglow','skin-candlelit');
+  if(isDarkSkin(k)) el.setAttribute('data-theme','dark'); else el.removeAttribute('data-theme');
+  if(k && k!=='stillmorning' && k!=='lamplight') el.classList.add('skin-'+k); }
+function updateThemeBtn(){ var tb=document.getElementById('themeBtn'); if(!tb) return; var cur=localStorage.getItem('warmly.skin')||'stillmorning'; var d=isDarkSkin(cur); tb.innerHTML=d?_SUN:_MOON; tb.title=d?'Light (Still Morning)':'Dark (Lamplight)'; tb.setAttribute('aria-label', tb.title); }
+window.setSkin=function(k){ applySkin(k); localStorage.setItem('warmly.skin',k); updateThemeBtn(); if(window.route) route(); };
 let DB = load();
 function load(){
   try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.contacts) return d; }catch(e){}
@@ -850,11 +869,13 @@ function viewSettings(){
   const s=DB.settings;
   const connected=localStorage.getItem('warmly.gsync')==='1';
   const swon=localStorage.getItem('warmly.swipe')!=='off';
+  const sk=localStorage.getItem('warmly.skin')||'stillmorning';
   let h='<div class="view"><h1 class="title">Settings</h1>';
   h+='<div class="card"><label class="fl">Your name (for {me} in templates)</label><input value="'+esc(s.myName)+'" oninput="setS(\'myName\',this.value)">';
   h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
   h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
   h+='<div class="kick">Your calendar · the important bit</div><div class="card"><div class="muted">Warmly turns every birthday, anniversary and reconnect into events on your Google Calendar, so your calendar nudges you even when this app is closed. Your time is your only currency, this protects it.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. On your phone or laptop, open it and add it to Google Calendar (or Google Calendar &rarr; Settings &rarr; Import). Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export. Your contacts themselves now sync across your devices, see &ldquo;Sync&rdquo; below.</div></div>';
+  h+='<div class="kick">Themes</div><div class="card"><div class="muted" style="margin-bottom:9px">Still Morning is the default, Lamplight is the dark mode. Try any look, it switches instantly and stays on this device.</div><div class="btn-row">'+SKINS.map(t=>'<button class="btn sm '+(sk===t.k?'primary':'ghost')+'" onclick="setSkin(\''+t.k+'\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+t.c+';box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>'+t.n+'</button>').join('')+'</div></div>';
   h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Warmly keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Warmly server ever touches your contacts. The synced copy isn&rsquo;t password-encrypted (your exported backup is), but it lives in a hidden app-only folder only your Google account can open.</div>'
     +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
     +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected · auto-syncs on changes':'Not connected')+'</div></div>';
@@ -1242,10 +1263,9 @@ function render(h){ $('#app').innerHTML=h; }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',()=>$('#tabs').classList.toggle('open'));
 const tb=$('#themeBtn');
-if(localStorage.getItem('warmly.skin')==='brutal') document.documentElement.dataset.theme='brutal';
-tb.textContent = (document.documentElement.dataset.theme==='brutal')?'A':'D';
-tb.title='Switch skin: Warm Ember (A) / Brutalist (D)';
-tb.addEventListener('click',()=>{ const isB=document.documentElement.dataset.theme==='brutal'; document.documentElement.dataset.theme=isB?'':'brutal'; tb.textContent=isB?'D':'A'; localStorage.setItem('warmly.skin', isB?'ember':'brutal'); });
+applySkin(localStorage.getItem('warmly.skin')||'stillmorning');
+updateThemeBtn();
+tb.addEventListener('click',()=>{ const cur=localStorage.getItem('warmly.skin')||'stillmorning'; setSkin(isDarkSkin(cur)?'stillmorning':'lamplight'); });
 gReturn();
 if(!location.hash) location.hash='#today';
 snapInit();
