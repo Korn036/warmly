@@ -5,3 +5,15 @@ Thumbs.db
 # never commit your real exported contacts / backups
 *.kith
 kith-backup*.json
+
+# internal strategy / branding reports (keep out of the public repo)
+Warmly-*-Report-*.md
+Warmly-*-Report-*.pdf
+Warmly-Naming-Branding-*.md
+Warmly-Naming-Branding-*.pdf
+Warmly-*Strategy*.md
+Warmly-*Strategy*.pdf
+
+# throwaway design previews and smoke-test scaffolding
+favicon-*.html
+_smoke*.html

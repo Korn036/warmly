@@ -6,11 +6,30 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.24.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.25.0', BUILT='2026-06-24';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
   {id:'t_r',occasion:'reconnect',name:'Reconnect',body:"Hey {first}, you crossed my mind today, it's been too long! How have you been? Would genuinely love to catch up, free for a quick call sometime?"}
+];
+/* Warm, varied reconnect openers, rotated per contact so the same nudge is never sent twice in a row.
+   100% on-device, no AI, nothing leaves the phone. {first} becomes the calling name, {me} your name.
+   You always edit before sending. The rotation walks through every opener before any repeats. */
+const RECONNECT_OPENERS=[
+  {id:'o1',body:"Hey {first}, you popped into my head today and I realized it's been a while. How have you been, really?"},
+  {id:'o2',body:"Hi {first}! We're long overdue a proper catch up. How is everything with you lately?"},
+  {id:'o3',body:"Hey {first}, no reason at all, just thinking of you and hoping life is treating you well. What have you been up to?"},
+  {id:'o4',body:"{first}! It's been too long. Tell me something good that has happened with you recently."},
+  {id:'o5',body:"Hey {first}, I keep meaning to reach out. How are things on your side these days?"},
+  {id:'o6',body:"Hi {first}, hope you're doing well. We're overdue a chat, are you free for a quick call sometime this week?"},
+  {id:'o7',body:"Hey {first}, a bit of a random message, but you came to mind and I wanted to say hi. How's life?"},
+  {id:'o8',body:"{first}, it's been a minute! How have you been keeping? Would love to properly catch up soon."},
+  {id:'o9',body:"Hi {first}, hope all is good with you. What's new in your world lately?"},
+  {id:'o10',body:"Hey {first}, thinking of you today and hoping you're well. How are things going?"},
+  {id:'o11',body:"Hey {first}, it struck me that we haven't spoken in too long. How are you, honestly?"},
+  {id:'o12',body:"{first}, I miss our chats. How is everything going with you right now?"},
+  {id:'o13',body:"Hey {first}, just checking in because you matter to me. How have things been lately?"},
+  {id:'o14',body:"Hi {first}, hope this finds you well. Any chance you're free for a catch up soon?"}
 ];
 let DB = load();
 function load(){
@@ -224,6 +243,18 @@ function gcalLink(title,date,details,yearly){
 }
 function fillTemplate(body,c){
   return (body||'').replace(/\{first\}/g,callName(c)).replace(/\{name\}/g,c.callName||c.name||'').replace(/\{me\}/g,DB.settings.myName||'');
+}
+/* ---- fresh-message engine: never suggest the same reconnect opener twice in a row (on-device only) ---- */
+function warmFill(body,c){ const fn=callName(c)||'there'; return (body||'').replace(/\{first\}/g,fn).replace(/\{me\}/g,DB.settings.myName||''); }
+function pickOpener(c, avoidId){
+  const hist=(c&&c.msgHistory)||[]; const usedIds=hist.map(m=>m&&m.openerId).filter(Boolean);
+  let pool=RECONNECT_OPENERS.filter(o=>o.id!==avoidId); if(!pool.length) pool=RECONNECT_OPENERS.slice();
+  const unused=pool.filter(o=>usedIds.indexOf(o.id)<0); const choose=unused.length?unused:pool;
+  return choose[Math.floor(Math.random()*choose.length)];
+}
+function freshDraft(c, occasion, avoidId){
+  if(occasion!=='reconnect'){ const tpl=DB.templates.find(t=>t.occasion===occasion)||DB.templates.find(t=>t.occasion==='reconnect')||{body:''}; return { text: fillTemplate(tpl.body,c), openerId:null }; }
+  const o=pickOpener(c, avoidId); return { text: warmFill(o.body,c), openerId:o.id };
 }
 
 /* ---------- parsers ---------- */
@@ -1019,9 +1050,9 @@ window.shareRequest=()=>{ const me=DB.me||{}; const phone=me.phone||'';
   else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank','noopener'); }
 };
 
+let _curMsgMeta={id:null,openerId:null,occasion:null};
 window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
-  const tpl=DB.templates.find(t=>t.occasion===occasion)||DB.templates.find(t=>t.occasion==='reconnect')||{body:''};
-  let draft=fillTemplate(tpl.body,c); if(occasion==='reconnect' && c.lastMsg) draft=c.lastMsg;
+  const fr=freshDraft(c,occasion); let draft=fr.text; _curMsgMeta={id:id,openerId:fr.openerId,occasion:occasion};
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>Message '+esc(callName(c))+'</h3>';
   const _last=(c.log||[]).slice(-1)[0]; const _bits=[];
   if(c.jobTitle||c.company) _bits.push([c.jobTitle,c.company].filter(Boolean).join(' at '));
@@ -1032,7 +1063,8 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   if(c.food) _bits.push('likes '+c.food);
   if(c.style) _bits.push('tone: '+c.style);
   if(_last||_bits.length){ h+='<div class="ctx">'+(_last?'<div class="sub">last contacted '+esc(_last.date)+(_last.note?' &mdash; &ldquo;'+esc(_last.note)+'&rdquo;':'')+'</div>':'')+(_bits.length?'<div class="sub">'+esc(_bits.join(' · '))+'</div>':'')+'</div>'; }
-  h+='<div class="btn-row" style="margin:10px 0">'+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">&#8635; last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
+  h+='<div class="btn-row" style="margin:10px 0">'+(occasion==='reconnect'?'<button class="btn ghost sm" onclick="freshMsg(\''+id+'\')">&#8635; fresh idea</button>':'')+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
+  if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
   h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';
   h+='<div class="btn-row">'+(c.phone?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No phone number on file. Add one to message on WhatsApp.</div>')+'</div>';
@@ -1040,8 +1072,15 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   openModal(h);
 };
 window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid); $('#msg').value=fillTemplate(t.body,c); };
-window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value; if(c){ c.lastMsg=txt; save(); } window.open(waLink(c.phone,txt),'_blank','noopener'); };
-window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg) $('#msg').value=c.lastMsg; };
+window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value;
+  if(c&&txt){ c.lastMsg=txt; c.msgHistory=c.msgHistory||[]; const meta=(_curMsgMeta.id===id)?_curMsgMeta:{};
+    c.msgHistory.push({text:txt, at:Date.now(), occasion:meta.occasion||'reconnect', openerId:meta.openerId||null});
+    if(c.msgHistory.length>20) c.msgHistory=c.msgHistory.slice(-20); save(); }
+  window.open(waLink(c.phone,txt),'_blank','noopener'); };
+window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg && $('#msg')) $('#msg').value=c.lastMsg; };
+window.freshMsg=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
+  const fr=freshDraft(c,'reconnect',(_curMsgMeta.id===id?_curMsgMeta.openerId:null));
+  if($('#msg')) $('#msg').value=fr.text; _curMsgMeta={id:id,openerId:fr.openerId,occasion:'reconnect'}; };
 
 window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const date=nextOccurrence(+m,+d);
   const title=callName(c)+"'s "+label; const details=(c.context?c.context+' · ':'')+(c.phone?('WhatsApp: '+waLink(c.phone,'')):'');
