@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Warmly · share your details</title>
+<title>Sovenn · share your details</title>
 <meta name="theme-color" content="#FBF8F3">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -47,7 +47,7 @@ input:focus{ outline:none; border-color:var(--accent); }
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><img src="icon.svg" alt="Warmly"><span class="brand">Warmly<span style="color:var(--accent)">.</span></span></div>
+  <div class="top"><img src="icon.svg" alt="Sovenn"><span class="brand">Sovenn<span style="color:#E0552E">.</span></span></div>
   <div class="pbadge"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Private by design</div>
   <h1><span data-from>A friend</span> wants to keep in touch</h1>
   <p class="lede">Share a few details so <span data-from>they</span> never miss your birthday and can stay in touch properly. Takes 20 seconds, and nothing is stored anywhere.</p>
@@ -64,17 +64,17 @@ input:focus{ outline:none; border-color:var(--accent); }
     <label>Website (optional)</label><input id="web" placeholder="yoursite.com">
     <button type="button" class="send" id="send"><svg class="wa" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg>Send to <span data-from>them</span> on WhatsApp</button>
   </form>
-  <p class="privacy"><b>Truly private.</b> Warmly has no account, no servers, and no tracking. Your details go straight to <span data-from>your friend</span> over WhatsApp, and the app keeps everything on each person's own phone. Nothing is ever uploaded.</p>
+  <p class="privacy"><b>Truly private.</b> Sovenn has no account, no servers, and no tracking. Your details go straight to <span data-from>your friend</span> over WhatsApp, and the app keeps everything on each person's own phone. Nothing is ever uploaded.</p>
 
   <div class="getapp" id="getapp">
     <div class="sent" id="sent">Sent. Your details are on their way to <span data-from>your friend</span>.</div>
     <h2>Keep your own people warm</h2>
-    <p>Warmly is a gentle, private way to remember the people who matter and never let a friendship go cold. Free, no account, lives on your phone.</p>
-    <a class="getbtn" href="/"><img src="icon.svg" alt="">Get Warmly, it's free</a>
+    <p>Sovenn is a gentle, private way to remember the people who matter and never let a friendship go cold. Free, no account, lives on your phone.</p>
+    <a class="getbtn" href="/"><img src="icon.svg" alt="">Get Sovenn, it's free</a>
     <div class="tiny">The most private keep-in-touch app: your contacts never leave your device.</div>
   </div>
 
-  <div class="foot"><a href="/privacy.html">Privacy</a> &middot; <a href="/">About Warmly</a></div>
+  <div class="foot"><a href="/privacy.html">Privacy</a> &middot; <a href="/">About Sovenn</a></div>
 </div>
 <script>
 (function(){
@@ -85,7 +85,7 @@ input:focus{ outline:none; border-color:var(--accent); }
   function v(id){ return document.getElementById(id).value.trim(); }
   document.getElementById('send').onclick = function(){
     var name=v('name'); if(!name){ alert('Please add your name.'); return; }
-    if(!to){ alert('This link is missing the recipient. Ask them to resend it, or share Warmly with them instead.'); return; }
+    if(!to){ alert('This link is missing the recipient. Ask them to resend it, or share Sovenn with them instead.'); return; }
     var L=[name];
     var ph=v('phone'); if(ph) L.push(ph);
     var b=v('bday'); if(b) L.push('Birthday: '+b);
@@ -96,7 +96,7 @@ input:focus{ outline:none; border-color:var(--accent); }
     var xx=v('x'); if(xx) L.push('x.com/'+xx.replace(/^@/,''));
     var tg=v('tg'); if(tg) L.push('t.me/'+tg.replace(/^@/,''));
     var web=v('web'); if(web) L.push(web);
-    L.push('· shared via Warmly');
+    L.push('· shared via Sovenn');
     var url = 'https://wa.me/' + to + '?text=' + encodeURIComponent(L.join('\n'));
     var w = window.open(url, '_blank');
     if(!w){ location.href = url; }

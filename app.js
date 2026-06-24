@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.31.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.32.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -100,7 +100,7 @@ function stampChanges(){ const now=Date.now(), cur={};
 }
 function save(){ stampChanges(); DB.savedAt=Date.now(); localStorage.setItem(KEY, JSON.stringify(DB)); schedulePush(); }
 
-/* ===== Google Drive sync — to a hidden folder in YOUR OWN Drive, no Warmly server ===== */
+/* ===== Google Drive sync — to a hidden folder in YOUR OWN Drive, no Sovenn server ===== */
 const GCLIENT_ID='331804388562-k4qajob707mft6f5vrvvtsq2cvjbukoa.apps.googleusercontent.com';
 const GSCOPE='https://www.googleapis.com/auth/drive.appdata';
 /* Permanent "Sign in with Google": after you deploy worker/, set this to its base URL
@@ -232,7 +232,7 @@ window.askDetails=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   if(!c.phone){ alert('Add their phone number first so you can message them.'); editContact(id); return; }
   const base=location.origin + location.pathname.replace(/[^\/]*$/, '');
   const link=base+'card.html?to='+encodeURIComponent(normalizePhone(me.phone))+'&from='+encodeURIComponent(me.name||DB.settings.myName||'a friend');
-  const msg='Hey '+callName(c)+'! I keep the people I care about close on Warmly. Mind sharing a few details so I never miss your birthday? Takes 20 seconds: '+link;
+  const msg='Hey '+callName(c)+'! I keep the people I care about close on Sovenn. Mind sharing a few details so I never miss your birthday? Takes 20 seconds: '+link;
   window.open(waLink(c.phone,msg),'_blank','noopener');
 };
 function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
@@ -878,9 +878,9 @@ function viewSettings(){
   h+='<div class="card"><label class="fl">Your name (for {me} in templates)</label><input value="'+esc(s.myName)+'" oninput="setS(\'myName\',this.value)">';
   h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
   h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
-  h+='<div class="kick">Your calendar · the important bit</div><div class="card"><div class="muted">Warmly turns every birthday, anniversary and reconnect into events on your Google Calendar, so your calendar nudges you even when this app is closed. Your time is your only currency, this protects it.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. On your phone or laptop, open it and add it to Google Calendar (or Google Calendar &rarr; Settings &rarr; Import). Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export. Your contacts themselves now sync across your devices, see &ldquo;Sync&rdquo; below.</div></div>';
+  h+='<div class="kick">Your calendar · the important bit</div><div class="card"><div class="muted">Sovenn turns every birthday, anniversary and reconnect into events on your Google Calendar, so your calendar nudges you even when this app is closed. Your time is your only currency, this protects it.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. On your phone or laptop, open it and add it to Google Calendar (or Google Calendar &rarr; Settings &rarr; Import). Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export. Your contacts themselves now sync across your devices, see &ldquo;Sync&rdquo; below.</div></div>';
   h+='<div class="kick">Themes</div><div class="card"><div class="muted" style="margin-bottom:9px">Still Morning is the default, Lamplight is the dark mode. Try any look, it switches instantly and stays on this device.</div><div class="btn-row">'+SKINS.map(t=>'<button class="btn sm '+(sk===t.k?'primary':'ghost')+'" onclick="setSkin(\''+t.k+'\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+t.c+';box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>'+t.n+'</button>').join('')+'</div></div>';
-  h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Warmly keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Warmly server ever touches your contacts. The synced copy isn&rsquo;t password-encrypted (your exported backup is), but it lives in a hidden app-only folder only your Google account can open.</div>'
+  h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Sovenn keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Sovenn server ever touches your contacts. The synced copy isn&rsquo;t password-encrypted (your exported backup is), but it lives in a hidden app-only folder only your Google account can open.</div>'
     +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
     +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected · auto-syncs on changes':'Not connected')+'</div></div>';
   h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
@@ -890,7 +890,7 @@ function viewSettings(){
   h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
   h+=lockSection();
   h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
-  h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Warmly v'+VERSION+' · built '+BUILT+' · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
+  h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Sovenn v'+VERSION+' · built '+BUILT+' · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
 }
 window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
 window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
@@ -911,7 +911,7 @@ function icsEvent(uid,date,rrule,summary,desc,trigger){
 }
 window.exportICS=()=>{
   const tb=occ=>{ const t=DB.templates.find(x=>x.occasion===occ); return t?t.body:''; };
-  const out=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Warmly//Keep in touch//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH']; let n=0;
+  const out=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Sovenn//Keep in touch//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH']; let n=0;
   DB.contacts.forEach(c=>{
     const fn=callName(c)||c.name||'someone';
     contactOccasions(c).forEach(o=>{
@@ -1049,7 +1049,7 @@ function quickParse(t){ t=t||'';
   return {name,email,linkedin,instagram,x,telegram,bday,phone,location,website};
 }
 window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
-  h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Warmly pulls out the details. Refine later on their page.</div>';
+  h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Sovenn pulls out the details. Refine later on their page.</div>';
   h+='<div id="qaVoice" class="voicebar" style="display:none"><span class="vbars"><i></i><i></i><i></i><i></i><i></i></span><span class="vtext">Listening, speak now</span><button class="btn sm" style="background:var(--hero-ink);color:var(--accent)" onclick="voiceStop()">Done</button></div>';
   h+='<textarea id="qa_blob" placeholder="Paste, type, or tap Speak it: name, city, where you met" style="min-height:78px" oninput="qaParse()"></textarea>';
   h+='<div class="qa-chips" id="qaChips"></div>';
@@ -1108,7 +1108,7 @@ window.captureHub=()=>{
   h+='<div class="sub" style="margin:-6px 0 14px">Three effortless ways. You almost never type.</div>';
   const row=(cls,k,ti,ds,act)=>'<button class="cap '+cls+'" onclick="closeModal();'+act+'"><span class="capic">'+capIcon(k)+'</span><span class="capt"><span class="ti">'+ti+'</span><span class="ds">'+ds+'</span></span></button>';
   h+=row('hero','share','Let them share their card','Send a warm link. They fill it in, it comes back to you. Zero typing.','shareRequest()');
-  h+=row('','paste','Paste anything','A signature, a bio, a line. Warmly pulls out every detail.','quickAdd()');
+  h+=row('','paste','Paste anything','A signature, a bio, a line. Sovenn pulls out every detail.','quickAdd()');
   h+=row('','scan','Scan a card','Snap a business card and start from the photo.','fabPick(\'camera\')');
   h+=row('','voice','Speak it','Just say who they are.','voiceAdd()');
   h+=row('','import','Import from your phone','Bring in contacts you already have.','go(\'import\')');
@@ -1119,7 +1119,7 @@ window.shareRequest=()=>{ const me=DB.me||{}; const phone=me.phone||'';
   if(!phone){ alert('Add your own WhatsApp number in My Card first, so their details can come back to you.'); go('mycard'); return; }
   const base=location.origin + location.pathname.replace(/[^\/]*$/, '');
   const link=base+'card.html?to='+encodeURIComponent(normalizePhone(phone))+'&from='+encodeURIComponent(me.name||DB.settings.myName||'a friend');
-  const msg='Hey! I keep the people I care about close on Warmly. Mind sharing a few details so we stay in touch and I never miss your birthday? Takes 20 seconds: '+link;
+  const msg='Hey! I keep the people I care about close on Sovenn. Mind sharing a few details so we stay in touch and I never miss your birthday? Takes 20 seconds: '+link;
   if(navigator.share){ navigator.share({text:msg}).catch(()=>{}); }
   else { window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank','noopener'); }
 };
@@ -1188,8 +1188,8 @@ async function lockBioAvail(){ try{ return !!(window.PublicKeyCredential) && awa
 async function lockBioRegister(){ try{
     if(!(await lockBioAvail())) return false;
     const cred=await navigator.credentials.create({publicKey:{
-      challenge:crypto.getRandomValues(new Uint8Array(32)), rp:{name:'Warmly'},
-      user:{id:crypto.getRandomValues(new Uint8Array(16)), name:'warmly', displayName:'Warmly'},
+      challenge:crypto.getRandomValues(new Uint8Array(32)), rp:{name:'Sovenn'},
+      user:{id:crypto.getRandomValues(new Uint8Array(16)), name:'warmly', displayName:'Sovenn'},
       pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
       authenticatorSelection:{authenticatorAttachment:'platform', userVerification:'required'}, timeout:60000, attestation:'none'
     }});
@@ -1214,7 +1214,7 @@ function lockMarkup(){ const c=lockCfg()||{}; const len=c.len||4;
     else if(k==='del') pad+='<button class="lk-key fn" aria-label="delete" onclick="lockDel()">'+LOCKI.del+'</button>';
     else pad+='<button class="lk-key" onclick="lockTap(\''+k+'\')">'+k+'</button>';
   }); pad+='</div>';
-  return '<div class="lk-inner"><div class="lk-brand">Warmly<span class="dot">.</span></div><div class="lk-icon" id="lkIcon">'+LOCKI.shut+'</div><div class="lk-msg" id="lkMsg">Enter your passcode</div>'+dots+pad+'</div>';
+  return '<div class="lk-inner"><div class="lk-brand">Sovenn<span class="dot">.</span></div><div class="lk-icon" id="lkIcon">'+LOCKI.shut+'</div><div class="lk-msg" id="lkMsg">Enter your passcode</div>'+dots+pad+'</div>';
 }
 function lockPaint(){ const d=document.getElementById('lkDots'); if(!d) return; const n=_entered.length;
   Array.prototype.forEach.call(d.children,(el,i)=>el.classList.toggle('full', i<n)); }
@@ -1241,7 +1241,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ _bgAt=Da
   else if(lockEnabled() && _unlocked && lockShouldRelock()){ lockShow(); } });
 function lockSection(){ const c=lockCfg()||{}; const on=lockEnabled();
   let h='<div class="kick">App lock</div><div class="card">';
-  h+='<div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Lock Warmly</div><div class="sub">Ask for a passcode every time the app opens, so your people stay private on this device. Stored only here, never synced.</div></div><button class="btn sm '+(on?'primary':'ghost')+'" onclick="lockToggle()">'+(on?'On':'Off')+'</button></div>';
+  h+='<div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Lock Sovenn</div><div class="sub">Ask for a passcode every time the app opens, so your people stay private on this device. Stored only here, never synced.</div></div><button class="btn sm '+(on?'primary':'ghost')+'" onclick="lockToggle()">'+(on?'On':'Off')+'</button></div>';
   if(on){
     h+='<div class="lk-divider"></div><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Face ID / fingerprint</div><div class="sub">'+(_bioOK?'Unlock with your phone’s own biometrics. The passcode always works as a backup.':'Not available in this browser, so the passcode protects the app on its own.')+'</div></div>'+(_bioOK?('<button class="btn sm '+(c.bio?'primary':'ghost')+'" onclick="lockBioToggle()">'+(c.bio?'On':'Off')+'</button>'):'<span class="sub">—</span>')+'</div>';
     h+='<div class="lk-divider"></div><div class="nm" style="font-size:15px">Auto-lock</div><div class="sub" style="margin-bottom:8px">When to ask again after you leave the app.</div><div class="seg" id="lkAuto">'+[['now','Immediately'],['1','After 1 min'],['5','After 5 min']].map(([k,l])=>'<button class="'+(((c.autolock||'now')===k)?'on':'')+'" onclick="lockAuto(\''+k+'\')">'+l+'</button>').join('')+'</div>';
@@ -1252,7 +1252,7 @@ function lockSection(){ const c=lockCfg()||{}; const on=lockEnabled();
 window.lockToggle=async()=>{ if(lockEnabled()){ const pin=prompt('Enter your current passcode to turn the lock OFF:'); if(pin===null) return; if(!(await lockVerifyPin((pin||'').trim()))){ alert('That passcode is not right.'); return; } localStorage.removeItem(LOCK_KEY); route(); return; }
   const a=prompt('Set a passcode (4 to 6 digits):'); if(a===null) return; const pin=(a||'').trim(); if(!/^\d{4,6}$/.test(pin)){ alert('Use 4 to 6 digits.'); return; }
   const b=prompt('Confirm your passcode:'); if(b===null) return; if((b||'').trim()!==pin){ alert('The two passcodes did not match.'); return; }
-  await lockSetPin(pin); alert('App lock is on. You will need this passcode the next time Warmly opens.'); route(); };
+  await lockSetPin(pin); alert('App lock is on. You will need this passcode the next time Sovenn opens.'); route(); };
 window.lockChangePin=async()=>{ const cur=prompt('Enter your current passcode:'); if(cur===null) return; if(!(await lockVerifyPin((cur||'').trim()))){ alert('That passcode is not right.'); return; }
   const a=prompt('New passcode (4 to 6 digits):'); if(a===null) return; const pin=(a||'').trim(); if(!/^\d{4,6}$/.test(pin)){ alert('Use 4 to 6 digits.'); return; }
   const b=prompt('Confirm new passcode:'); if(b===null) return; if((b||'').trim()!==pin){ alert('The two passcodes did not match.'); return; }
