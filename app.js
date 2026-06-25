@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.37.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.38.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -757,7 +757,7 @@ window.delRemind=(id,i)=>patch(id,c=>{ (c.customDates||[]).splice(i,1); });
 
 /* ---------- import ---------- */
 function viewImport(){
-  let h='<div class="view"><h1 class="title">Import contacts</h1><p class="muted">Bring people in from your phone, a Google CSV, or a vCard. Everything stays on this device, and you pick exactly who to keep.</p>';
+  let h='<div class="view"><a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a><h1 class="title">Import contacts</h1><p class="muted">Bring people in from your phone, a Google CSV, or a vCard. Everything stays on this device, and you pick exactly who to keep.</p>';
   const hasPicker = !!(navigator.contacts && navigator.contacts.select);
   if(hasPicker){
     h+='<div class="card" style="text-align:center;padding:24px"><button class="btn primary block" onclick="pickContacts()">Import from this phone&rsquo;s contacts</button><div class="muted" style="margin-top:10px;font-size:12.5px">Opens your address book (including SIM contacts saved to the phone) so you can pick who to add. Nothing is read until you choose.</div></div>';
@@ -808,7 +808,7 @@ window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.
 
 /* ---------- templates ---------- */
 function viewTemplates(){
-  let h='<div class="view"><div class="row between"><h1 class="title">Message templates</h1><button class="btn primary sm" onclick="addTemplate()">+ New</button></div><p class="muted">Write these once, in your voice. {first} becomes their calling name, {me} your name. You always edit before sending.</p>';
+  let h='<div class="view"><a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a><div class="row between"><h1 class="title">Message templates</h1><button class="btn primary sm" onclick="addTemplate()">+ New</button></div><p class="muted">Write these once, in your voice. {first} becomes their calling name, {me} your name. You always edit before sending.</p>';
   DB.templates.forEach(t=>{ const def=['t_b','t_a','t_r'].indexOf(t.id)>=0;
     h+='<div class="card"><div class="row between"><div class="kick" style="margin-top:0">'+esc(t.name)+' · '+esc(t.occasion)+'</div>'+(def?'':'<a class="sub" style="color:var(--rose);cursor:pointer" onclick="delTemplate(\''+t.id+'\')">delete</a>')+'</div><textarea oninput="tplSet(\''+t.id+'\',this.value)">'+esc(t.body)+'</textarea></div>'; });
   h+='</div>'; render(h);
@@ -915,32 +915,79 @@ function viewMyCard(){ const me=DB.me=DB.me||{}; let style=me.cardStyle||'candle
   h+='</div>'; render(h);
   renderQR(myVCard(), document.getElementById('qrbox'));
 }
-function viewSettings(){
+function viewSettings(section){
   const s=DB.settings;
   const connected=localStorage.getItem('warmly.gsync')==='1';
   const swon=localStorage.getItem('warmly.swipe')!=='off';
   const sk=localStorage.getItem('warmly.skin')||'stillmorning';
+  const back='<a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a>';
+  if(section==='general'){
+    let h='<div class="view">'+back+'<h1 class="title">General</h1>';
+    h+='<div class="card"><label class="fl">Your name (for {me} in templates)</label><input value="'+esc(s.myName)+'" oninput="setS(\'myName\',this.value)">';
+    h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
+    h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
+    h+='<div class="kick">Your daily moment</div><div class="card"><div class="sub" style="margin-bottom:9px">Pick the moment you already pause, your chai, your commute, your evening wind-down. Sovenn ties its one gentle nudge to that moment, so staying close rides on a habit you already have.</div><div class="btn-row">'+[['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']].map(function(o){return '<button class="btn sm '+((s.dailyMoment===o[0])?'primary':'ghost')+'" onclick="setMoment(\''+o[0]+'\')">'+o[1]+'</button>';}).join('')+'</div></div>';
+    h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
+    return render(h+'</div>');
+  }
+  if(section==='messages'){
+    let h='<div class="view">'+back+'<h1 class="title">Messages</h1>';
+    h+='<div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Add a warm local greeting (Hinglish, German, Dutch) to reconnect messages, based on the contact&rsquo;s number or your region. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
+    h+='<div class="kick">Templates</div><div class="card"><div class="muted">The messages Sovenn pre-fills for birthdays, anniversaries and reconnects. Write them once, in your own voice.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="go(\'templates\')">Edit templates</button></div></div>';
+    return render(h+'</div>');
+  }
+  if(section==='calendar'){
+    let h='<div class="view">'+back+'<h1 class="title">Calendar</h1>';
+    h+='<div class="card"><div class="muted">Sovenn turns every birthday, anniversary and reconnect into events on your Google Calendar, so it nudges you even when this app is closed.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. Open it and add it to Google Calendar. Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export.</div></div>';
+    return render(h+'</div>');
+  }
+  if(section==='appearance'){
+    let h='<div class="view">'+back+'<h1 class="title">Appearance</h1>';
+    h+='<div class="card"><div class="muted" style="margin-bottom:9px">Still Morning is the default, Lamplight is the dark mode. Try any look, it switches instantly and stays on this device.</div><div class="btn-row">'+SKINS.map(t=>'<button class="btn sm '+(sk===t.k?'primary':'ghost')+'" onclick="setSkin(\''+t.k+'\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+t.c+';box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>'+t.n+'</button>').join('')+'</div></div>';
+    return render(h+'</div>');
+  }
+  if(section==='data'){
+    let h='<div class="view">'+back+'<h1 class="title">Sync &amp; backup</h1>';
+    h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Sovenn keeps a private copy in a hidden folder of <b>your own</b> Google Drive (app-only) and syncs automatically. No Sovenn server ever touches your contacts.</div>'
+      +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
+      +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected, auto-syncs on changes':'Not connected')+'</div></div>';
+    h+='<div class="kick">Backup &amp; move device</div><div class="card"><div class="muted">Your data lives only in this browser. Export a backup to keep it safe or move it.</div>'
+      +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
+      +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".enc,.kith,.json" style="display:none" onchange="importFile(event)"></div>'
+      +(localStorage.getItem(UNDO_KEY)?'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="undoRestore()">Undo last restore</button></div>':'')+'</div>';
+    return render(h+'</div>');
+  }
+  if(section==='lock'){ return render('<div class="view">'+back+'<h1 class="title">App lock</h1>'+lockSection()+'</div>'); }
+  if(section==='about'){
+    let h='<div class="view">'+back+'<h1 class="title">About &amp; data</h1>';
+    h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
+    h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
+    h+='<div class="muted" style="margin-top:18px;font-size:12.5px">Sovenn v'+VERSION+', built '+BUILT+', '+DB.contacts.length+' contacts, all local, no tracking.</div>';
+    return render(h+'</div>');
+  }
+  /* MAIN: phone-style grouped list + a search that finds any feature */
+  const cats=[
+    ['general','General','Name, country, reminders, daily moment','name country reminder daily moment lead days general me','#946145','&#9685;',false],
+    ['import','Add people','Import and merge your contacts','import contacts csv vcard duplicates phone add people merge','#2E8C6A','+',true],
+    ['messages','Messages','Templates and local-language touch','templates message local language hinglish reconnect tone','#3C6E91','&#9998;',false],
+    ['calendar','Calendar','Add your dates to Google Calendar','calendar google ics birthday anniversary export reminder','#D99A2B','&#9635;',false],
+    ['appearance','Appearance','Themes, light and dark','theme dark light still morning lamplight appearance skin','#8A5A99','&#9680;',false],
+    ['data','Sync and backup','Google Drive sync, export, restore','sync backup google drive export restore json encrypted','#0E3B2E','&#8645;',false],
+    ['lock','App lock','A passcode for this device','lock passcode pin security face id biometric','#C9756B','&#9632;',false],
+    ['about','About and data','Diagnostics, version, erase','about version diagnostics error log erase wipe danger','#6A655B','i',false]
+  ];
   let h='<div class="view"><h1 class="title">Settings</h1>';
-  h+='<div class="card"><label class="fl">Your name (for {me} in templates)</label><input value="'+esc(s.myName)+'" oninput="setS(\'myName\',this.value)">';
-  h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
-  h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
-  h+='<div class="kick">Your calendar · the important bit</div><div class="card"><div class="muted">Sovenn turns every birthday, anniversary and reconnect into events on your Google Calendar, so your calendar nudges you even when this app is closed. Your time is your only currency, this protects it.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="exportICS()">Add all my dates to Google Calendar</button></div><div class="muted" style="margin-top:10px;font-size:12.5px">Downloads one calendar file. On your phone or laptop, open it and add it to Google Calendar (or Google Calendar &rarr; Settings &rarr; Import). Each event has a reminder and a tap-to-WhatsApp link. New people you add later: tap "+ cal" on their page, or re-export. Your contacts themselves now sync across your devices, see &ldquo;Sync&rdquo; below.</div></div>';
-  h+='<div class="kick">Themes</div><div class="card"><div class="muted" style="margin-bottom:9px">Still Morning is the default, Lamplight is the dark mode. Try any look, it switches instantly and stays on this device.</div><div class="btn-row">'+SKINS.map(t=>'<button class="btn sm '+(sk===t.k?'primary':'ghost')+'" onclick="setSkin(\''+t.k+'\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+t.c+';box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>'+t.n+'</button>').join('')+'</div></div>';
-  h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Sovenn keeps a private copy in a hidden folder of <b>your own</b> Google Drive (invisible in your Drive, app-only) and syncs automatically. No Sovenn server ever touches your contacts. The synced copy isn&rsquo;t password-encrypted (your exported backup is), but it lives in a hidden app-only folder only your Google account can open.</div>'
-    +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
-    +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected · auto-syncs on changes':'Not connected')+'</div></div>';
-  h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
-    +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
-    +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".enc,.kith,.json" style="display:none" onchange="importFile(event)"></div>'
-    +(localStorage.getItem(UNDO_KEY)?'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="undoRestore()">Undo last restore</button></div>':'')+'</div>';
-  h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches during the beta, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
-  h+='<div class="kick">Your daily moment</div><div class="card"><div class="sub" style="margin-bottom:9px">Pick the moment you already pause, your chai, your commute, your evening wind-down. Sovenn ties its one gentle nudge to that moment, so staying close rides on a habit you already have.</div><div class="btn-row">'+[['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']].map(function(o){return '<button class="btn sm '+((s.dailyMoment===o[0])?'primary':'ghost')+'" onclick="setMoment(\''+o[0]+'\')">'+o[1]+'</button>';}).join('')+'</div></div>';
-  h+='<div class="kick">Reminders</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Add a warm local greeting (Hinglish, German, Dutch) to reconnect messages, based on the contact&rsquo;s number or your region. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
-  h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
-  h+=lockSection();
-  h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
-  h+='<div class="muted" style="margin-top:24px;font-size:12.5px">Sovenn v'+VERSION+' · built '+BUILT+' · '+DB.contacts.length+' contacts · all local, no tracking.</div></div>'; render(h);
+  h+='<input id="setSearch" placeholder="Search settings" oninput="settingsFilter()" autocomplete="off" style="margin-bottom:12px">';
+  h+='<div class="card" id="setList" style="padding:0">';
+  cats.forEach(function(c,i){
+    var tap = c[6] ? ("go('"+c[0]+"')") : ("go('settings','"+c[0]+"')");
+    h+='<a class="row between" data-kw="'+c[3]+'" onclick="'+tap+'" style="padding:13px 14px;'+(i?'border-top:.5px solid var(--line);':'')+'cursor:pointer;text-decoration:none;color:inherit">'
+      +'<span class="row" style="gap:11px;align-items:center"><span style="width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:15px;background:'+c[4]+'">'+c[5]+'</span><span><span class="nm" style="font-size:15px;display:block">'+c[1]+'</span><span class="sub">'+c[2]+'</span></span></span>'
+      +'<span style="color:var(--soft);font-size:20px;line-height:1">&rsaquo;</span></a>';
+  });
+  render(h+'</div></div>');
 }
+window.settingsFilter=function(){ var el=document.getElementById('setSearch'); if(!el) return; var q=(el.value||'').toLowerCase().trim(); var rows=document.querySelectorAll('#setList [data-kw]'); for(var i=0;i<rows.length;i++){ var r=rows[i]; var hay=((r.getAttribute('data-kw')||'')+' '+(r.textContent||'')).toLowerCase(); r.style.display=(!q||hay.indexOf(q)>=0)?'':'none'; } };
 window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
 window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
 window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings }; save(); go('today'); } };
