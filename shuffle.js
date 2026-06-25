@@ -201,6 +201,18 @@
     var todayISO = str(opts.today);
     var f = { tier: 0, overdue: 0, event: 0, recency: 0, rotation: 0, timeOfDay: 0, avoid: 0 };
 
+    if(opts.mode === 'serendipity'){
+      /* VARIETY-first: rotation dominates so the WHOLE list (incl. loose ties) cycles
+         day to day, with only a gentle pull toward people gone quiet. This is the
+         "rekindle someone you'd forget" slot, deliberately NOT the priority ranking. */
+      f.rotation = rotationUnit(opts.seed, c.id) * 100;
+      if(c.lastContacted){ var qs = daysBetween(c.lastContacted, todayISO); if(qs != null && qs > 0) f.recency = clampN(qs, 0, W.recencyCap) * 0.15; }
+      else { f.recency = 8; }
+      if(opts.avoidId != null && str(c.id) === str(opts.avoidId)) f.avoid = -1000;
+      var stot = f.rotation + f.recency + f.avoid;
+      return { score: Math.round(stot * 100) / 100, reason: reasonFor(c, todayISO), factors: f };
+    }
+
     var tier = Math.round(num(c.tier));        /* closer ties get a standing baseline */
     if(tier < 1 || tier > 3) tier = 3;
     f.tier = W.tier[tier] || 0;

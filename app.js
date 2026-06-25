@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.36.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.37.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -476,13 +476,15 @@ function viewToday(){
   if(window.SovennStreak&&SovennStreak.compute){ try{ const _st=SovennStreak.compute(DB.contacts,{today:todayISO()}); const _sm=_st&&(_st.message||(SovennStreak.encouragement?SovennStreak.encouragement(_st):'')); if(_sm){ const _id=(_st.keptWarmThisWeek>0)?'<div class="sub" style="margin-top:4px;opacity:.75">You are becoming someone who keeps people close.</div>':''; h+='<div class="card" style="padding:11px 14px"><div class="row between"><div class="kick" style="margin:0">This week</div><div class="pstat" style="margin:0">'+esc(_sm)+'</div></div>'+_id+'</div>'; } }catch(e){ if(window.logErr) logErr('streak',e); } }
   h+='</div>';
   /* serendipity shuffle: a different person each visit, so good names resurface */
-  { const pool=DB.contacts.filter(c=>c.id!==heroId && !c.review);
+  { const _shown={}; if(heroId) _shown[heroId]=1; due.forEach(function(d){ _shown[d.c.id]=1; }); up.forEach(function(x){ _shown[x.c.id]=1; });
+    let pool=DB.contacts.filter(c=>!c.review && !_shown[c.id]);
+    if(!pool.length) pool=DB.contacts.filter(c=>c.id!==heroId && !c.review);
     let shuf=null;
     if(pool.length){
       if(_shuffleId && _shuffleId!=='reroll') shuf=pool.find(c=>c.id===_shuffleId);
       if(!shuf && window.SovennShuffle && SovennShuffle.pick){
         try{ const _seed=(parseInt(todayISO().replace(/-/g,''),10)||0)+_rerollN;
-             const _opts={today:todayISO(), seed:_seed, limit:1}; const _mh=momentHour(); if(_mh!=null) _opts.now=_mh;
+             const _opts={today:todayISO(), seed:_seed, limit:1, mode:'serendipity'}; const _mh=momentHour(); if(_mh!=null) _opts.now=_mh;
              const _pk=SovennShuffle.pick(pool,_opts);
              if(_pk&&_pk[0]&&_pk[0].contact) shuf=_pk[0].contact; }catch(e){ if(window.logErr) logErr('shuffle',e); }
       }
