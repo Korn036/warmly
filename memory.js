@@ -187,7 +187,9 @@
 
   function collectThreadText(c){
     var blobs = [];
-    if(c.notes != null) blobs.push(str(c.notes));
+    /* Sovenn stores notes as an array of {id,date,text,fav}; tolerate a legacy free-text string too */
+    if(Array.isArray(c.notes)){ for(var i = 0; i < c.notes.length; i++){ var n = c.notes[i]; if(isObj(n) && n.text != null) blobs.push(str(n.text)); else if(typeof n === 'string') blobs.push(n); } }
+    else if(c.notes != null) blobs.push(str(c.notes));
     arr(c.log).forEach(function(e){ if(isObj(e) && e.note != null) blobs.push(str(e.note)); });
     arr(c.msgHistory).forEach(function(m){ if(isObj(m) && m.text != null) blobs.push(str(m.text)); });
     return blobs;
@@ -272,7 +274,7 @@
     var threads = openThreads(c);                             /* one open thread, depunctuated */
     if(threads.length) bits.push(softLower(trimDot(threads[0]).replace(/[.!?…]+$/, '')));
     if(!bits.length) return '';
-    var lead = name ? name + ' — ' : '';
+    var lead = name ? name + ': ' : '';
     return cap(stripLead(lead + joinHuman(bits))) + '.';
   }
 

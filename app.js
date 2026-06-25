@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.34.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.35.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -260,6 +260,7 @@ function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[
 function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','#6A655B','#3C6E91','#8A5A99']; let h=0; for(const c of (n||'x')) h=(h*31+c.charCodeAt(0))%colors.length; return colors[h]; }
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function today(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
+function todayISO(){ const t=today(),p=n=>String(n).padStart(2,'0'); return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate()); }
 function nextOccurrence(m,d){ const t=today(); const mk=y=>{ const o=new Date(y,m-1,d); if(o.getMonth()!==(m-1)) o.setDate(0); return o; }; let occ=mk(t.getFullYear()); if(occ<t) occ=mk(t.getFullYear()+1); return occ; }
 function daysUntil(date){ return Math.round((date-today())/86400000); }
 function addMonths(iso,n){ const p=String(iso).slice(0,10).split('-').map(Number); const day=p[2]||1; const d=new Date(p[0],(p[1]||1)-1,1); d.setMonth(d.getMonth()+n); const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); d.setDate(Math.min(day,last)); return d; }
@@ -431,8 +432,8 @@ const WORLD_PATHS='<g class="map-land">'
    =================================================================== */
 function go(view,arg){ location.hash = '#'+view+(arg?('/'+arg):''); }
 window.addEventListener('hashchange',route);
-let _lastView='', _shuffleId=null;
-window.shuffleToday=()=>{ _shuffleId='reroll'; route(); };
+let _lastView='', _shuffleId=null, _rerollN=0;
+window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
   const [view,arg]=location.hash.replace('#','').split('/');
   document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
@@ -468,12 +469,24 @@ function viewToday(){
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
   const pct=tracked.length?Math.max(4,Math.min(100,Math.round(warm/tracked.length*100))):100;
   h+='<div class="card prog"><div class="row between"><div><div class="kick" style="margin:0">Your warmth</div><div class="pstat">'+(tracked.length?('Keeping '+warm+' of '+tracked.length+' people warm'):'Set a reconnect rhythm on a few people')+'</div></div><span class="floaty">'+occShape('reconnect',42)+'</span></div><div class="bar"><span style="width:'+pct+'%"></span></div></div>';
+  if(window.SovennStreak&&SovennStreak.compute){ try{ const _st=SovennStreak.compute(DB.contacts,{today:todayISO()}); const _sm=_st&&(_st.message||(SovennStreak.encouragement?SovennStreak.encouragement(_st):'')); if(_sm) h+='<div class="card" style="padding:11px 14px"><div class="row between"><div class="kick" style="margin:0">This week</div><div class="pstat" style="margin:0">'+esc(_sm)+'</div></div></div>'; }catch(e){ if(window.logErr) logErr('streak',e); } }
   h+='</div>';
   /* serendipity shuffle: a different person each visit, so good names resurface */
   { const pool=DB.contacts.filter(c=>c.id!==heroId && !c.review);
     let shuf=null;
-    if(pool.length){ if(_shuffleId && _shuffleId!=='reroll') shuf=pool.find(c=>c.id===_shuffleId); if(!shuf) shuf=pool[Math.floor(Math.random()*pool.length)]; _shuffleId=shuf?shuf.id:null; }
-    if(shuf){ const seen=shuf.lastContacted?('last spoke '+shuf.lastContacted):'not spoken yet'; h+='<div class="kick">A nudge &middot; rekindle someone</div>'+personRow(shuf, '<span class="pill warm">'+esc(seen)+'</span>', '<button class="btn sm primary" onclick="compose(\''+shuf.id+'\',\'reconnect\')">Message '+esc(callName(shuf))+'</button> <button class="btn sm ghost" onclick="shuffleToday()">Shuffle</button>'); }
+    if(pool.length){
+      if(_shuffleId && _shuffleId!=='reroll') shuf=pool.find(c=>c.id===_shuffleId);
+      if(!shuf && window.SovennShuffle && SovennShuffle.pick){
+        try{ const _seed=(parseInt(todayISO().replace(/-/g,''),10)||0)+_rerollN;
+             const _pk=SovennShuffle.pick(pool,{today:todayISO(), seed:_seed, limit:1});
+             if(_pk&&_pk[0]&&_pk[0].contact) shuf=_pk[0].contact; }catch(e){ if(window.logErr) logErr('shuffle',e); }
+      }
+      if(!shuf) shuf=pool[Math.floor(Math.random()*pool.length)];
+      _shuffleId=shuf?shuf.id:null;
+    }
+    if(shuf){ let _why=''; if(window.SovennShuffle&&SovennShuffle.reasonFor){ try{ _why=SovennShuffle.reasonFor(shuf, todayISO()); }catch(e){} }
+      const seen=_why||(shuf.lastContacted?('last spoke '+shuf.lastContacted):'not spoken yet');
+      h+='<div class="kick">A nudge &middot; rekindle someone</div>'+personRow(shuf, '<span class="pill warm">'+esc(seen)+'</span>', '<button class="btn sm primary" onclick="compose(\''+shuf.id+'\',\'reconnect\')">Message '+esc(callName(shuf))+'</button> <button class="btn sm ghost" onclick="shuffleToday()">Shuffle</button>'); }
   }
   /* coming up FIRST: upcoming celebrations on top */
   h+='<div class="kick">Coming up'+(up.length?' ('+up.length+')':'')+'</div>';
@@ -647,6 +660,7 @@ function viewPerson(id){
   h+='<button class="btn ghost sm" onclick="editContact(\''+id+'\')">Edit details</button></div></div>';
   h+=reachBar(c);
   h+=socialRow(c,true,true);
+  if(window.SovennMemory&&SovennMemory.surface){ try{ const _ml=SovennMemory.surface(c,{today:todayISO()}); if(_ml&&_ml.length) h+='<div class="card"><div class="kick" style="margin-top:0">Remember</div>'+_ml.map(function(s){return '<div class="sub" style="padding:3px 0;font-size:13.5px">'+esc(s)+'</div>';}).join('')+'</div>'; }catch(e){ if(window.logErr) logErr('memory',e); } }
 
   /* quick triage */
   h+='<div class="card"><div class="kick" style="margin-top:0">Quick triage</div><div class="btn-row">'+[[1,'inner circle'],[2,'keep warm'],[3,'loose tie']].map(([t,l])=>'<button class="btn sm '+(c.tier===t?'primary':'ghost')+'" onclick="setTier(\''+id+'\','+t+')">'+l+'</button>').join('')+'</div>'
@@ -1104,12 +1118,15 @@ window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</b
   h+='<label class="fl">Calling name &middot; used in messages</label><input id="qa_call" placeholder="John">';
   h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
   h+='<label class="fl">Birthday (optional)</label><input id="qa_bday" type="date">';
-  h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden"><input id="qa_web" type="hidden"><input id="qa_bdayraw" type="hidden">';
+  h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden"><input id="qa_web" type="hidden"><input id="qa_bdayraw" type="hidden"><input id="qa_company" type="hidden"><input id="qa_job" type="hidden"><input id="qa_ctx" type="hidden">';
   h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="quickSave()">Add person</button></div>';
   openModal(h); };
-window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
+window.qaParse=()=>{ const p=(window.SovennCapture&&SovennCapture.parse)?SovennCapture.parse($('#qa_blob').value):quickParse($('#qa_blob').value);
   if(p.name&&!$('#qa_name').value) $('#qa_name').value=p.name;
-  if(p.name&&!$('#qa_call').value) $('#qa_call').value=firstName(p.name);
+  if(!$('#qa_call').value) $('#qa_call').value=(p.callName||firstName(p.name||''));
+  if(p.company&&$('#qa_company')&&!$('#qa_company').value) $('#qa_company').value=p.company;
+  if(p.jobTitle&&$('#qa_job')&&!$('#qa_job').value) $('#qa_job').value=p.jobTitle;
+  if(p.context&&$('#qa_ctx')&&!$('#qa_ctx').value) $('#qa_ctx').value=p.context;
   if(p.phone&&!$('#qa_phone').value) $('#qa_phone').value=p.phone;
   if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
   if(p.email&&!$('#qa_email').value) $('#qa_email').value=p.email; if(p.linkedin&&!$('#qa_li').value) $('#qa_li').value=p.linkedin;
@@ -1118,7 +1135,7 @@ window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
   if(p.bday){ $('#qa_bdayraw').value=p.bday; if(/^\d{4}-\d{2}-\d{2}$/.test(p.bday)&&$('#qa_bday')) $('#qa_bday').value=p.bday; }
   renderQaChips(p); };
 function renderQaChips(p){ const el=document.getElementById('qaChips'); if(!el) return;
-  const defs=[['name','Name'],['phone','Phone'],['email','Email'],['bday','Birthday'],['location','City'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X'],['telegram','Telegram'],['website','Website']];
+  const defs=[['name','Name'],['phone','Phone'],['email','Email'],['bday','Birthday'],['location','City'],['company','Company'],['jobTitle','Title'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X'],['telegram','Telegram'],['website','Website']];
   let n=0; const chips=defs.map(([k,lb])=>{ const on=!!p[k]; if(on)n++; return '<span class="qchip'+(on?' on':'')+'">'+(on?'&#10003; ':'')+lb+'</span>'; }).join('');
   el.innerHTML = chips + (n?'<div class="qa-found">Found '+n+' detail'+(n>1?'s':'')+' automatically. Check them, then Add.</div>':''); }
 window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('Add a name first.'); return; }
@@ -1135,10 +1152,13 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
     if(g('qa_x')&&!c.x) c.x=g('qa_x');
     if(g('qa_tg')&&!c.telegram) c.telegram=g('qa_tg');
     if(g('qa_web')&&!c.website) c.website=g('qa_web');
+    if(g('qa_company')&&!c.company) c.company=g('qa_company');
+    if(g('qa_job')&&!c.jobTitle) c.jobTitle=g('qa_job');
+    if(g('qa_ctx')&&!c.context) c.context=g('qa_ctx');
     if(bd&&!c.bday) c.bday=bd;
     c.review=false; save(); closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); return;
   }
-  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),bday:bd,review:true};
+  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),company:g('qa_company'),jobTitle:g('qa_job'),context:g('qa_ctx'),bday:bd,review:true};
   DB.contacts.push(nc); save(); closeModal(); go('person',nc.id); };
 
 /* ===== Capture hub: every effortless way to add someone, in one place ===== */

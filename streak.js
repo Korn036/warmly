@@ -196,19 +196,19 @@
     function people(n){ return n === 1 ? 'person' : 'people'; }
 
     /* a healthy streak is the proudest signal */
-    if(streak >= 2) return word(streak) + '-day streak — you keep showing up.';
+    if(streak >= 2) return word(streak) + '-day streak. You keep showing up.';
 
     /* met or beat the gentle weekly goal */
     if(kept >= goal && kept > 0){
       if(kept === goal) return 'Nice, ' + word(kept) + ' kept warm this week.';
-      return word(kept) + ' kept warm this week — lovely week.';
+      return word(kept) + ' kept warm this week, a lovely week.';
     }
 
     /* some progress, framed as momentum (no "you missed" language) */
-    if(kept > 0) return word(kept) + ' ' + people(kept) + ' kept warm this week — keep it going.';
+    if(kept > 0) return word(kept) + ' ' + people(kept) + ' kept warm this week. Keep it going.';
 
     /* a quiet week: encouraging, never scolding, no broken-streak shame */
-    return 'A quiet week — one hello goes a long way.';
+    return 'A quiet week. One hello goes a long way.';
   }
 
   /* ---- helper: a clean log entry the app can push onto contact.log ---- */
