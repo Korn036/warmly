@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.35.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.36.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -261,6 +261,9 @@ function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function today(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
 function todayISO(){ const t=today(),p=n=>String(n).padStart(2,'0'); return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate()); }
+/* Hook: anchor the daily nudge to an existing routine (the toothbrush move) */
+function momentHour(){ const m=DB.settings&&DB.settings.dailyMoment; return m==='morning'?8:m==='afternoon'?14:m==='evening'?19:null; }
+window.setMoment=(v)=>{ DB.settings=DB.settings||{}; DB.settings.dailyMoment=v; save(); route(); };
 function nextOccurrence(m,d){ const t=today(); const mk=y=>{ const o=new Date(y,m-1,d); if(o.getMonth()!==(m-1)) o.setDate(0); return o; }; let occ=mk(t.getFullYear()); if(occ<t) occ=mk(t.getFullYear()+1); return occ; }
 function daysUntil(date){ return Math.round((date-today())/86400000); }
 function addMonths(iso,n){ const p=String(iso).slice(0,10).split('-').map(Number); const day=p[2]||1; const d=new Date(p[0],(p[1]||1)-1,1); d.setMonth(d.getMonth()+n); const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); d.setDate(Math.min(day,last)); return d; }
@@ -447,7 +450,8 @@ function route(){
 
 function viewToday(){
   const due=dueToReach(), up=upcoming(21);
-  let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+'Keep your people warm.</p>';
+  const _mp={morning:'Your morning minute. Keep your people warm.',afternoon:'A quiet minute to keep your people warm.',evening:'Your evening minute. Keep your people warm.'}[DB.settings.dailyMoment]||'Keep your people warm.';
+  let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+_mp+'</p>';
   if(!DB.contacts.length){
     h+='<div class="empty"><div class="big">No one here yet.</div>Import your contacts to begin, then mark the handful who matter.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
@@ -469,7 +473,7 @@ function viewToday(){
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
   const pct=tracked.length?Math.max(4,Math.min(100,Math.round(warm/tracked.length*100))):100;
   h+='<div class="card prog"><div class="row between"><div><div class="kick" style="margin:0">Your warmth</div><div class="pstat">'+(tracked.length?('Keeping '+warm+' of '+tracked.length+' people warm'):'Set a reconnect rhythm on a few people')+'</div></div><span class="floaty">'+occShape('reconnect',42)+'</span></div><div class="bar"><span style="width:'+pct+'%"></span></div></div>';
-  if(window.SovennStreak&&SovennStreak.compute){ try{ const _st=SovennStreak.compute(DB.contacts,{today:todayISO()}); const _sm=_st&&(_st.message||(SovennStreak.encouragement?SovennStreak.encouragement(_st):'')); if(_sm) h+='<div class="card" style="padding:11px 14px"><div class="row between"><div class="kick" style="margin:0">This week</div><div class="pstat" style="margin:0">'+esc(_sm)+'</div></div></div>'; }catch(e){ if(window.logErr) logErr('streak',e); } }
+  if(window.SovennStreak&&SovennStreak.compute){ try{ const _st=SovennStreak.compute(DB.contacts,{today:todayISO()}); const _sm=_st&&(_st.message||(SovennStreak.encouragement?SovennStreak.encouragement(_st):'')); if(_sm){ const _id=(_st.keptWarmThisWeek>0)?'<div class="sub" style="margin-top:4px;opacity:.75">You are becoming someone who keeps people close.</div>':''; h+='<div class="card" style="padding:11px 14px"><div class="row between"><div class="kick" style="margin:0">This week</div><div class="pstat" style="margin:0">'+esc(_sm)+'</div></div>'+_id+'</div>'; } }catch(e){ if(window.logErr) logErr('streak',e); } }
   h+='</div>';
   /* serendipity shuffle: a different person each visit, so good names resurface */
   { const pool=DB.contacts.filter(c=>c.id!==heroId && !c.review);
@@ -478,7 +482,8 @@ function viewToday(){
       if(_shuffleId && _shuffleId!=='reroll') shuf=pool.find(c=>c.id===_shuffleId);
       if(!shuf && window.SovennShuffle && SovennShuffle.pick){
         try{ const _seed=(parseInt(todayISO().replace(/-/g,''),10)||0)+_rerollN;
-             const _pk=SovennShuffle.pick(pool,{today:todayISO(), seed:_seed, limit:1});
+             const _opts={today:todayISO(), seed:_seed, limit:1}; const _mh=momentHour(); if(_mh!=null) _opts.now=_mh;
+             const _pk=SovennShuffle.pick(pool,_opts);
              if(_pk&&_pk[0]&&_pk[0].contact) shuf=_pk[0].contact; }catch(e){ if(window.logErr) logErr('shuffle',e); }
       }
       if(!shuf) shuf=pool[Math.floor(Math.random()*pool.length)];
@@ -927,6 +932,7 @@ function viewSettings(){
     +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".enc,.kith,.json" style="display:none" onchange="importFile(event)"></div>'
     +(localStorage.getItem(UNDO_KEY)?'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="undoRestore()">Undo last restore</button></div>':'')+'</div>';
   h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches during the beta, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
+  h+='<div class="kick">Your daily moment</div><div class="card"><div class="sub" style="margin-bottom:9px">Pick the moment you already pause, your chai, your commute, your evening wind-down. Sovenn ties its one gentle nudge to that moment, so staying close rides on a habit you already have.</div><div class="btn-row">'+[['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']].map(function(o){return '<button class="btn sm '+((s.dailyMoment===o[0])?'primary':'ghost')+'" onclick="setMoment(\''+o[0]+'\')">'+o[1]+'</button>';}).join('')+'</div></div>';
   h+='<div class="kick">Reminders</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Add a warm local greeting (Hinglish, German, Dutch) to reconnect messages, based on the contact&rsquo;s number or your region. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
   h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
   h+=lockSection();
@@ -1208,6 +1214,7 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
   h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';
+  h+='<div class="sub" style="text-align:center;margin:6px 2px 0;opacity:.8">They are likely happier to hear from you than you expect. A short hello is plenty.</div>';
   const _wa=c.phone?normalizePhone(c.phone):'';
   h+='<div class="btn-row">'+(_wa?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No usable phone number. Add one with its country code to message on WhatsApp.</div>')+'</div>';
   if(_wa) h+='<div class="sub" style="text-align:center;margin-top:6px;opacity:.7">Opens a chat with +'+esc(_wa)+'. If that country code looks wrong, edit their number with a leading +.</div>';
