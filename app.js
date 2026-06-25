@@ -6,7 +6,8 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.33.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
+const VERSION='0.34.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -98,7 +99,27 @@ function stampChanges(){ const now=Date.now(), cur={};
   DB.deleted=DB.deleted||{}; Object.keys(_snap).forEach(id=>{ if(!cur[id]) DB.deleted[id]=now; });
   snapInit();
 }
-function save(){ stampChanges(); DB.savedAt=Date.now(); localStorage.setItem(KEY, JSON.stringify(DB)); schedulePush(); }
+function save(){ stampChanges(); DB.savedAt=Date.now();
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
+  catch(e){ logErr('save', e); alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.'); return false; }
+  schedulePush(); return true;
+}
+/* ---- privacy-respecting LOCAL diagnostics: errors stay on the device (capped ring buffer); the user can copy them into beta feedback. NO network, ever. ---- */
+function logErr(where, e){ try{
+    const msg=(e&&(e.message||(e.reason&&e.reason.message)))||String((e&&e.reason)||e||'');
+    const rec={ t:new Date().toISOString(), v:VERSION, where:where||'', msg:String(msg).slice(0,300) };
+    let arr=[]; try{ arr=JSON.parse(localStorage.getItem(ERR_KEY))||[]; }catch(_){}
+    arr.push(rec); if(arr.length>30) arr=arr.slice(-30);
+    localStorage.setItem(ERR_KEY, JSON.stringify(arr));
+  }catch(_){}
+}
+window.addEventListener('error', function(ev){ logErr('window', ev&&(ev.error||ev.message)); });
+window.addEventListener('unhandledrejection', function(ev){ logErr('promise', ev&&ev.reason); });
+window.copyDiag=function(){ let arr=[]; try{ arr=JSON.parse(localStorage.getItem(ERR_KEY))||[]; }catch(e){}
+  const txt='Sovenn '+VERSION+' diagnostics ('+arr.length+' events)\n'+(navigator.userAgent||'')+'\n'+arr.map(r=>r.t+' ['+r.where+'] '+r.msg).join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ alert('Diagnostic log copied. Paste it into the feedback chat.'); }, function(){ prompt('Copy this log:', txt); }); }
+  else { prompt('Copy this log:', txt); }
+};
 
 /* ===== Google Drive sync — to a hidden folder in YOUR OWN Drive, no Sovenn server ===== */
 const GCLIENT_ID='331804388562-k4qajob707mft6f5vrvvtsq2cvjbukoa.apps.googleusercontent.com';
@@ -889,7 +910,9 @@ function viewSettings(){
     +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected · auto-syncs on changes':'Not connected')+'</div></div>';
   h+='<div class="kick">Backup &amp; move to another device</div><div class="card"><div class="muted">Your data lives only in this browser. Export an encrypted backup file to keep it safe or move it to your laptop/phone.</div>'
     +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
-    +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".kith,.json" style="display:none" onchange="importFile(event)"></div></div>';
+    +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".enc,.kith,.json" style="display:none" onchange="importFile(event)"></div>'
+    +(localStorage.getItem(UNDO_KEY)?'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="undoRestore()">Undo last restore</button></div>':'')+'</div>';
+  h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches during the beta, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
   h+='<div class="kick">Reminders</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Add a warm local greeting (Hinglish, German, Dutch) to reconnect messages, based on the contact&rsquo;s number or your region. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
   h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
   h+=lockSection();
@@ -952,10 +975,25 @@ window.importFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=ne
         const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:dec(obj.iv)},key,dec(obj.data));
         obj=JSON.parse(new TextDecoder().decode(pt));
       }
-      if(!obj.contacts) throw 0;
-      if(confirm('Restore '+obj.contacts.length+' contacts? This replaces what is on this device.')){ DB=obj; save(); go('today'); }
-    }catch(e){ alert('Could not read that backup (wrong file or passphrase).'); }
+      if(!obj || typeof obj!=='object' || !Array.isArray(obj.contacts)) throw new Error('not a Sovenn backup');
+      const bad=obj.contacts.filter(c=>!c||typeof c!=='object'||!c.id).length;
+      if(bad){ if(!confirm(bad+' of '+obj.contacts.length+' entries look malformed and will be skipped. Continue?')) return; obj.contacts=obj.contacts.filter(c=>c&&typeof c==='object'&&c.id); }
+      if(!confirm('Restore '+obj.contacts.length+' contacts? This replaces what is on this device. You can undo once, right after, from Settings.')) return;
+      try{ localStorage.setItem(UNDO_KEY, JSON.stringify({at:Date.now(), db:DB})); }catch(_){}
+      DB={ v:obj.v||1, contacts:obj.contacts,
+           templates:(Array.isArray(obj.templates)&&obj.templates.length)?obj.templates:DEFAULT_TEMPLATES.slice(),
+           settings:Object.assign({ myName:'', country:'44', leadDays:1, localTouch:true }, obj.settings||{}),
+           me:obj.me||DB.me, deleted:obj.deleted||{} };
+      snapInit(); save(); go('today');
+      alert('Restored '+DB.contacts.length+' contacts. If that was a mistake, open Settings and tap “Undo last restore”.');
+    }catch(e){ logErr('import', e); alert('Could not read that backup (wrong file, wrong passphrase, or not a Sovenn backup).'); }
+    finally{ try{ ev.target.value=''; }catch(_){} }
   }; rd.readAsText(f);
+};
+window.undoRestore=()=>{ let u=null; try{ u=JSON.parse(localStorage.getItem(UNDO_KEY)); }catch(e){}
+  if(!u||!u.db){ alert('Nothing to undo.'); return; }
+  if(!confirm('Undo the last restore and bring back your previous data?')) return;
+  DB=u.db; try{ localStorage.removeItem(UNDO_KEY); }catch(e){} snapInit(); save(); go('today'); alert('Reverted to your previous data.');
 };
 
 /* ===================================================================
