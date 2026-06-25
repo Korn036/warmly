@@ -6,7 +6,7 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const VERSION='0.32.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.33.0', BUILT='2026-06-25';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -239,19 +239,21 @@ function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[
 function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','#6A655B','#3C6E91','#8A5A99']; let h=0; for(const c of (n||'x')) h=(h*31+c.charCodeAt(0))%colors.length; return colors[h]; }
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function today(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
-function nextOccurrence(m,d){ const t=today(); let yr=t.getFullYear(); let occ=new Date(yr,m-1,d); if(occ<t) occ=new Date(yr+1,m-1,d); return occ; }
+function nextOccurrence(m,d){ const t=today(); const mk=y=>{ const o=new Date(y,m-1,d); if(o.getMonth()!==(m-1)) o.setDate(0); return o; }; let occ=mk(t.getFullYear()); if(occ<t) occ=mk(t.getFullYear()+1); return occ; }
 function daysUntil(date){ return Math.round((date-today())/86400000); }
-function addMonths(iso,n){ const p=String(iso).slice(0,10).split('-').map(Number); const d=new Date(p[0],(p[1]||1)-1,p[2]||1); d.setMonth(d.getMonth()+n); return d; }
+function addMonths(iso,n){ const p=String(iso).slice(0,10).split('-').map(Number); const day=p[2]||1; const d=new Date(p[0],(p[1]||1)-1,1); d.setMonth(d.getMonth()+n); const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); d.setDate(Math.min(day,last)); return d; }
 function fmtDate(date){ return MONTHS[date.getMonth()+1]+' '+date.getDate(); }
 function whenLabel(n){ return n===0?'today':n===1?'tomorrow':'in '+n+' days'; }
 function normalizePhone(raw,country){
-  if(!raw) return ''; let s=String(raw).replace(/[^\d+]/g,'');
-  if(s.startsWith('+')) return s.slice(1);
-  if(s.startsWith('00')) return s.slice(2);
+  if(raw==null) return ''; const str=String(raw).trim();
   country=(country||DB.settings.country||'').replace(/\D/g,'');
-  if(s.startsWith('0')) return country+s.slice(1);
-  if(country && s.length<=10) return country+s;
-  return s;
+  if(str.startsWith('+')){ const s=str.replace(/\D/g,''); return s.length>=7?s:''; }
+  if(str.startsWith('00')){ const s=str.replace(/\D/g,'').replace(/^0+/,''); return s.length>=7?s:''; }
+  let s=str.replace(/\D/g,'');
+  if(s.length<7) return '';                 /* junk like 'n/a' -> no number, hide WhatsApp */
+  if(s.startsWith('0')) return country+s.slice(1);  /* national trunk 0 -> swap for country code */
+  if(s.length>=11) return s;                /* already long enough to include a country code */
+  return country? country+s : s;            /* short local number -> prepend default country */
 }
 function parseDateStr(v){
   if(!v) return null; v=String(v).trim();
@@ -782,19 +784,21 @@ window.delTemplate=(id)=>{ if(['t_b','t_a','t_r'].indexOf(id)>=0) return; if(!co
 /* ---------- settings + backup ---------- */
 /* ---- My Card: your shareable profile + offline QR (nothing leaves the phone) ---- */
 let _qrT=null;
-function myVCard(){ const me=DB.me||{}; const L=['BEGIN:VCARD','VERSION:3.0','FN:'+(me.name||'')];
-  if(me.title) L.push('TITLE:'+me.title);
-  if(me.phone) L.push('TEL;TYPE=CELL:'+me.phone);
-  if(me.email) L.push('EMAIL:'+me.email);
+function vEsc(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+function myVCard(){ const me=DB.me||{}; const L=['BEGIN:VCARD','VERSION:3.0','FN:'+vEsc(me.name||'')];
+  if(me.title) L.push('TITLE:'+vEsc(me.title));
+  if(me.phone) L.push('TEL;TYPE=CELL:'+vEsc(me.phone));
+  if(me.email) L.push('EMAIL:'+vEsc(me.email));
   if(me.website) L.push('URL:'+_abs(me.website));
   if(me.linkedin) L.push('URL:'+liUrl(me.linkedin));
   if(me.instagram) L.push('URL:https://instagram.com/'+_handle(me.instagram));
   if(me.x) L.push('URL:https://x.com/'+_handle(me.x));
-  L.push('END:VCARD'); return L.join('\n');
+  L.push('END:VCARD'); return L.join('\r\n');
 }
+function vFold(l){ if(l.length<=75) return l; let o='',i=0; while(i<l.length){ o+=(i?'\r\n ':'')+l.slice(i,i+74); i+=74; } return o; }
 function myVCardFull(){ const me=DB.me||{}; let v=myVCard();
-  if(me.photo){ const b=me.photo.replace(/^data:[^,]+,/,''); v=v.replace('END:VCARD','PHOTO;ENCODING=b;TYPE=JPEG:'+b+'\nEND:VCARD'); }
-  return v;
+  if(me.photo){ const b=me.photo.replace(/^data:[^,]+,/,''); v=v.replace('END:VCARD','PHOTO;ENCODING=b;TYPE=JPEG:'+b+'\r\nEND:VCARD'); }
+  return v.split('\r\n').map(vFold).join('\r\n');
 }
 function renderQR(text, el){ if(!el) return; const q=window.QR&&QR.matrix(text);
   if(!q){ el.innerHTML='<div class="muted" style="text-align:center;padding:20px">Could not make a QR for this card. Share or Download .vcf still include everything.</div>'; return; }
@@ -815,11 +819,11 @@ window.mePhoto=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.va
     img.onerror=()=>alert('Could not read that photo.'); img.src=rd.result; }; rd.readAsDataURL(f);
 };
 window.shareCard=async()=>{ const full=myVCardFull();
-  try{ const file=new File([full],'warmly-card.vcf',{type:'text/vcard'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:(DB.me&&DB.me.name)||'My card'}); return; } }catch(e){}
+  try{ const file=new File([full],'sovenn-card.vcf',{type:'text/vcard'}); if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:(DB.me&&DB.me.name)||'My card'}); return; } }catch(e){}
   try{ if(navigator.share){ await navigator.share({title:'My contact card', text:myVCard()}); return; } }catch(e){}
   downloadCard();
 };
-window.downloadCard=()=>download('warmly-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
+window.downloadCard=()=>download('sovenn-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
 let _editCard=false;
 const CARDSTYLES=['candlelit','hearthglow','mocha','garden','dusk','honey'];
 window.setCardStyle=(s)=>{ DB.me=DB.me||{}; DB.me.cardStyle=s; save(); route(); };
@@ -896,14 +900,15 @@ window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
 window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
 window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings }; save(); go('today'); } };
 function download(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
-window.exportJSON=()=>download('warmly-backup.json', new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));
+window.exportJSON=()=>download('sovenn-backup.json', new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));
 /* ---- Google Calendar export (.ics): the keystone. Your calendar is your source of truth. ---- */
 function icsEsc(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
-function icsFold(l){ let o=''; while(l.length>72){ o+=l.slice(0,72)+'\r\n '; l=l.slice(72); } return o+l; }
+function icsFold(l){ const enc=new TextEncoder(); let o='',line='',bytes=0; for(const ch of String(l)){ const w=enc.encode(ch).length; if(bytes+w>73){ o+=line+'\r\n '; line=''; bytes=0; } line+=ch; bytes+=w; } return o+line; }
+function icsStamp(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getUTCFullYear()+p(d.getUTCMonth()+1)+p(d.getUTCDate())+'T'+p(d.getUTCHours())+p(d.getUTCMinutes())+p(d.getUTCSeconds())+'Z'; }
 function icsYMD(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
 function icsEvent(uid,date,rrule,summary,desc,trigger){
   const end=new Date(date.getTime()+86400000);
-  const L=['BEGIN:VEVENT','UID:'+uid,'DTSTART;VALUE=DATE:'+icsYMD(date),'DTEND;VALUE=DATE:'+icsYMD(end)];
+  const L=['BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+icsStamp(),'DTSTART;VALUE=DATE:'+icsYMD(date),'DTEND;VALUE=DATE:'+icsYMD(end)];
   if(rrule) L.push('RRULE:'+rrule);
   L.push('SUMMARY:'+icsEsc(summary)); if(desc) L.push('DESCRIPTION:'+icsEsc(desc)); L.push('TRANSP:TRANSPARENT');
   L.push('BEGIN:VALARM','ACTION:DISPLAY','TRIGGER:'+trigger,'DESCRIPTION:'+icsEsc(summary),'END:VALARM','END:VEVENT');
@@ -920,14 +925,14 @@ window.exportICS=()=>{
       const desc=(c.context?c.context+'. ':'')+(c.phone?('Message on WhatsApp: '+waLink(c.phone,msg)):'');
       out.push(icsEvent('warmly-'+c.id+'-'+o.type+'-'+o.raw.m+'-'+o.raw.d+'@warmly.app', o.date, 'FREQ=YEARLY', sum, desc, '-PT15H')); n++;
     });
-    if(c.cadence){ const nd=nextDue(c)||today(); const d=nd<today()?today():nd;
+    if(c.cadence){ let d=nextDue(c)||today(); if(d<today()) d=today(); d=new Date(d); if(d.getDate()>28) d.setDate(28); /* keep a monthly cadence from skipping short months */
       const desc=(c.context?c.context+'. ':'')+(c.phone?('Call or message: '+waLink(c.phone,fillTemplate(tb('reconnect'),c))):'');
       out.push(icsEvent('warmly-'+c.id+'-reconnect@warmly.app', d, 'FREQ=MONTHLY;INTERVAL='+c.cadence, 'Reconnect with '+fn+', keep it warm', desc, 'PT9H')); n++;
     }
   });
   out.push('END:VCALENDAR');
   if(!n){ alert('Add some birthdays, or set a reconnect cadence on a few people, then sync.'); return; }
-  download('warmly-calendar.ics', new Blob([out.join('\r\n')],{type:'text/calendar'}));
+  download('sovenn-calendar.ics', new Blob([out.join('\r\n')],{type:'text/calendar'}));
   alert('Downloaded '+n+' calendar entries. Open the file and add it to Google Calendar, you will get a reminder before every birthday, anniversary and reconnect.');
 };
 async function deriveKey(pass,salt){ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
@@ -937,7 +942,7 @@ window.exportEnc=async()=>{ const pass=prompt('Set a passphrase for this backup 
   const key=await deriveKey(pass,salt); const data=new TextEncoder().encode(JSON.stringify(DB));
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data));
   const b64=u=>btoa(String.fromCharCode(...u));
-  download('kith-backup.kith', new Blob([JSON.stringify({kith:1,salt:b64(salt),iv:b64(iv),data:b64(ct)})],{type:'application/octet-stream'}));
+  download('sovenn-backup.enc', new Blob([JSON.stringify({kith:1,salt:b64(salt),iv:b64(iv),data:b64(ct)})],{type:'application/octet-stream'}));
 };
 window.importFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=async()=>{ try{ let obj=JSON.parse(rd.result);
@@ -1042,10 +1047,14 @@ function quickParse(t){ t=t||'';
     .replace(/(https?:\/\/)?(www\.)?t\.me\/[^\s,]+/ig,' ')
     .replace(/(https?:\/\/)?(www\.)?facebook\.com\/[^\s,]+/ig,' ');
   const um=clean.match(/\b(?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*\.[a-z]{2,}(?:\/[^\s,]*)?/i);
-  let website=um?um[0]:''; if(/^(jpg|png|gif|e\.g|i\.e)/i.test(website)) website='';
-  let location=''; const low=t.toLowerCase(); for(const k in GEO){ if(k.length>3 && low.indexOf(k)>=0){ location=k; break; } }
+  let website=um?um[0]:'';
+  if(website){ const tld=(website.replace(/[\/?#].*$/,'').match(/\.([a-z]{2,})$/i)||[])[1]||'';
+    const known=/^(com|org|net|io|co|app|dev|me|ai|in|de|nl|uk|us|edu|gov|info|biz|xyz|so|gg|tech|store|online|site|page|link|sh|fm|tv|cc|club|live|news|blog|design|studio|email|fyi|to|ly|id|eu|ca|au)$/i;
+    if(!/^https?:\/\//i.test(website) && !known.test(tld)) website=''; }   /* skip prose like resume.pdf, St.Pancras, re.invent */
+  let location=''; const low=t.toLowerCase();
+  for(const k in GEO){ if(k.length>3){ const rx=new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b'); if(rx.test(low)){ location=k; break; } } }   /* word-boundary so 'rome' doesn't match 'Jerome' */
   let name=''; const lines=t.split(/[\n,]/).map(x=>x.trim()).filter(Boolean);
-  for(const ln of lines){ if(/@|linkedin|instagram|https?:|t\.me|\d{4,}/i.test(ln)) continue; if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
+  for(let ln of lines){ if(/@|linkedin|instagram|https?:|t\.me|\d{4,}/i.test(ln)) continue; ln=ln.replace(/^(met|meet|spoke to|spoke with|talked to|chatted with|call with|this is|name is|introducing|intro to|saw|with)\s+/i,'').trim(); if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
   return {name,email,linkedin,instagram,x,telegram,bday,phone,location,website};
 }
 window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
@@ -1065,9 +1074,9 @@ window.qaParse=()=>{ const p=quickParse($('#qa_blob').value);
   if(p.name&&!$('#qa_call').value) $('#qa_call').value=firstName(p.name);
   if(p.phone&&!$('#qa_phone').value) $('#qa_phone').value=p.phone;
   if(p.location&&!$('#qa_loc').value) $('#qa_loc').value=p.location;
-  if(p.email) $('#qa_email').value=p.email; if(p.linkedin) $('#qa_li').value=p.linkedin;
-  if(p.instagram) $('#qa_ig').value=p.instagram; if(p.x) $('#qa_x').value=p.x; if(p.telegram) $('#qa_tg').value=p.telegram;
-  if(p.website) $('#qa_web').value=p.website;
+  if(p.email&&!$('#qa_email').value) $('#qa_email').value=p.email; if(p.linkedin&&!$('#qa_li').value) $('#qa_li').value=p.linkedin;
+  if(p.instagram&&!$('#qa_ig').value) $('#qa_ig').value=p.instagram; if(p.x&&!$('#qa_x').value) $('#qa_x').value=p.x; if(p.telegram&&!$('#qa_tg').value) $('#qa_tg').value=p.telegram;
+  if(p.website&&!$('#qa_web').value) $('#qa_web').value=p.website;
   if(p.bday){ $('#qa_bdayraw').value=p.bday; if(/^\d{4}-\d{2}-\d{2}$/.test(p.bday)&&$('#qa_bday')) $('#qa_bday').value=p.bday; }
   renderQaChips(p); };
 function renderQaChips(p){ const el=document.getElementById('qaChips'); if(!el) return;
@@ -1141,15 +1150,19 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
   h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';
-  h+='<div class="btn-row">'+(c.phone?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No phone number on file. Add one to message on WhatsApp.</div>')+'</div>';
+  const _wa=c.phone?normalizePhone(c.phone):'';
+  h+='<div class="btn-row">'+(_wa?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No usable phone number. Add one with its country code to message on WhatsApp.</div>')+'</div>';
+  if(_wa) h+='<div class="sub" style="text-align:center;margin-top:6px;opacity:.7">Opens a chat with +'+esc(_wa)+'. If that country code looks wrong, edit their number with a leading +.</div>';
   h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="logToday(\''+id+'\')">Mark as contacted today</button></div>';
   openModal(h);
 };
 window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid); $('#msg').value=fillTemplate(t.body,c); };
-window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); const txt=$('#msg').value;
-  if(c&&txt){ c.lastMsg=txt; c.msgHistory=c.msgHistory||[]; const meta=(_curMsgMeta.id===id)?_curMsgMeta:{};
-    c.msgHistory.push({text:txt, at:Date.now(), occasion:meta.occasion||'reconnect', openerId:meta.openerId||null});
-    if(c.msgHistory.length>20) c.msgHistory=c.msgHistory.slice(-20); save(); }
+window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const txt=($('#msg').value||'').trim();
+  if(!normalizePhone(c.phone)){ alert('No usable phone number for this person. Add one with its country code first.'); return; }
+  if(!txt){ alert('Write a message first.'); return; }
+  c.lastMsg=txt; c.msgHistory=c.msgHistory||[]; const meta=(_curMsgMeta.id===id)?_curMsgMeta:{};
+  c.msgHistory.push({text:txt, at:Date.now(), occasion:meta.occasion||'reconnect', openerId:meta.openerId||null});
+  if(c.msgHistory.length>20) c.msgHistory=c.msgHistory.slice(-20); save();
   window.open(waLink(c.phone,txt),'_blank','noopener'); };
 window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg && $('#msg')) $('#msg').value=c.lastMsg; };
 window.freshMsg=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
