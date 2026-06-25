@@ -1,0 +1,53 @@
+name: ci
+
+# Free CI for a solo dev: runs the on-device module self-tests and a headless
+# smoke (including an XSS-render guard for the #1 client-side risk) on every
+# push/PR. Public repo => unlimited free GitHub-hosted runner minutes.
+# The repo root stays a pure static PWA; all dev tooling lives in /tooling so
+# nothing here changes how the site is served/deployed.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    name: Module self-tests (pure logic, no browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run window.Sovenn* _selftest() for every module
+        run: node tooling/selftest.mjs
+
+  smoke:
+    name: Headless smoke + XSS-render guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright (chromium only)
+        working-directory: tooling
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Run smoke tests (boot, SW, XSS guard)
+        working-directory: tooling
+        run: npx playwright test
+      - name: Record a build hash of the shipped JS
+        run: |
+          shasum -a 256 *.js | sort > SHA256SUMS
+          cat SHA256SUMS
+      - name: Upload SHA256SUMS
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-hashes
+          path: SHA256SUMS

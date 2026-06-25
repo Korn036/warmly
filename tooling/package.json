@@ -1,0 +1,14 @@
+{
+  "name": "sovenn-tooling",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dev-only CI tooling for Sovenn (module self-tests + headless smoke). NOT shipped to users; the app itself remains a no-build, dependency-free static PWA in the repo root.",
+  "type": "module",
+  "scripts": {
+    "selftest": "node selftest.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}

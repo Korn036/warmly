@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # CI tooling deps (Playwright). One batched PR per week to avoid alert fatigue.
+  - package-ecosystem: npm
+    directory: "/tooling"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      all:
+        patterns: ["*"]
+  # Keep the GitHub Actions pinned versions current.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

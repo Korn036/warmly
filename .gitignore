@@ -22,3 +22,20 @@ Warmly-*Strategy*.pdf
 # throwaway design previews and smoke-test scaffolding
 favicon-*.html
 _smoke*.html
+# any underscore-prefixed html is a temp render/test harness, never ship it
+_*.html
+
+# internal strategy / launch / naming docs (Sovenn-era) - keep OUT of the public repo
+Sovenn-*.md
+Sovenn-*.pdf
+Brand-Naming-*.md
+Brand-*-Exploration.md
+Beta Testing.md
+Play-Store-Listing.md
+
+# dev tooling (CI) artifacts - never commit installed deps or test output
+tooling/node_modules/
+tooling/test-results/
+tooling/playwright-report/
+tooling/package-lock.json
+SHA256SUMS
