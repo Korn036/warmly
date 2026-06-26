@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.39.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.40.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -456,7 +456,7 @@ function viewToday(){
   const _mp={morning:'Your morning minute. Keep your people warm.',afternoon:'A quiet minute to keep your people warm.',evening:'Your evening minute. Keep your people warm.'}[DB.settings.dailyMoment]||'Keep your people warm.';
   let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+_mp+'</p>';
   if(!DB.contacts.length){
-    h+='<div class="empty"><div class="big">No one here yet.</div>Import your contacts to begin, then mark the handful who matter.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
+    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
   }
   h+='<div class="today-top">';
@@ -963,6 +963,7 @@ function viewSettings(section){
   if(section==='lock'){ return render('<div class="view">'+back+'<h1 class="title">App lock</h1>'+lockSection()+'</div>'); }
   if(section==='about'){
     let h='<div class="view">'+back+'<h1 class="title">About &amp; data</h1>';
+    h+='<div class="card"><div class="nm" style="font-size:15px">Private by design</div><div class="sub" style="margin-top:5px">Your people stay on this device. No account, no cloud, no sign-in, no copies. We never see your contacts, your notes, or your messages, because they never leave your phone.</div></div>';
     h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
     h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
     h+='<div class="muted" style="margin-top:18px;font-size:12.5px">Sovenn v'+VERSION+', built '+BUILT+', '+DB.contacts.length+' contacts, all local, no tracking.</div>';
@@ -1265,7 +1266,7 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   h+='<div class="btn-row" style="margin:10px 0">'+(occasion==='reconnect'?'<button class="btn fresh sm" onclick="freshMsg(\''+id+'\')">&#8635; fresh idea</button>':'')+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
   if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
-  h+='<div class="note">Tapping the button opens WhatsApp with this message pre-filled, sent from <b>your</b> number. You review and tap send yourself, nothing goes automatically.</div>';
+  h+='<div class="note">Opens WhatsApp with this message pre-filled, from <b>your</b> number. You review and tap send yourself. It goes straight to them, nothing passes through us, no server, no copy.</div>';
   h+='<div class="sub" style="text-align:center;margin:6px 2px 0;opacity:.8">They are likely happier to hear from you than you expect. A short hello is plenty.</div>';
   const _wa=c.phone?normalizePhone(c.phone):'';
   h+='<div class="btn-row">'+(_wa?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No usable phone number. Add one with its country code to message on WhatsApp.</div>')+'</div>';
