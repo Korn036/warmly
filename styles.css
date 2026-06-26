@@ -481,6 +481,7 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .fb-fab:hover{ opacity:1; }
 .fb-fab:active{ transform:scale(.96); opacity:1; }
 .fb-fab svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.fb-fab[hidden], .fb-bg[hidden]{ display:none !important; }  /* the [hidden] attribute must win over the display rules below */
 .fb-bg{ position:fixed; inset:0; z-index:60; background:rgba(20,14,12,.46); backdrop-filter:blur(3px); display:flex; align-items:flex-end; justify-content:center; }
 .fb-sheet{ width:100%; max-width:480px; background:var(--bg); border-radius:22px 22px 0 0; padding:20px 18px calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -10px 40px rgba(0,0,0,.32); animation:fbup .22s ease-out; }
 @keyframes fbup{ from{ transform:translateY(22px); opacity:.5; } to{ transform:translateY(0); opacity:1; } }
