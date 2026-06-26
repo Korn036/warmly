@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.43.1', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.43.2', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -911,7 +911,7 @@ window.feedbackOpen=function(){ _fbMood='';
 window.feedbackClose=function(){ var bg=document.getElementById('fbBg'); if(bg){ bg.hidden=true; bg.innerHTML=''; } };
 window.fbMood=function(m){ _fbMood=m; var els=document.querySelectorAll('.fb-mood'); for(var i=0;i<els.length;i++){ els[i].classList.toggle('on', els[i].getAttribute('data-m')===m); } };
 window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=ta?ta.value:''; var mood={love:'\u{1F60D} Love',meh:'\u{1F610} Meh',bug:'\u{1F41B} Bug',idea:'\u{1F4A1} Idea'}[_fbMood]||'';
-  var lines=['Sovenn beta feedback']; if(mood) lines.push(mood); if(t.trim()){ lines.push(''); lines.push(t.trim()); } lines.push(''); lines.push('— v'+VERSION+' · '+_fbScreen());
+  var lines=['Sovenn beta feedback']; if(mood) lines.push(mood); if(t.trim()){ lines.push(''); lines.push(t.trim()); } lines.push(''); lines.push('v'+VERSION+' · '+_fbScreen());
   window.open('https://wa.me/'+FB_WA+'?text='+encodeURIComponent(lines.join('\n')),'_blank'); feedbackClose(); };
 window.feedbackDiag=function(){ if(window.copyDiag){ copyDiag(); } };
 window.fbHide=function(){ try{ sessionStorage.setItem('sovenn.fbhide','1'); }catch(e){} var f=document.getElementById('fbFab'); if(f) f.hidden=true; feedbackClose(); };
@@ -953,7 +953,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
   let card='';
   if(look==='poster'){
     const inner=me.photo
-      ?'<div class="mc-pbg" '+pclick+'><img src="'+me.photo+'"></div><div class="mc-duo"></div>'
+      ?'<div class="mc-pbg" '+pclick+'><img src="'+esc(me.photo)+'"></div><div class="mc-duo"></div>'
       :'<div class="mc-addphoto" '+pclick+'><div class="ring">+</div><div class="t1">Tap to add your photo</div><div class="t2">the Poster look turns it into a portrait of you</div></div>';
     card='<div class="mycard poster" style="'+vars+'">'+editBtn+inner+'<div class="mc-scrim"></div>'
       +'<div class="mc-nameback">'+name+'</div>'
@@ -962,7 +962,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
       +'<div class="mc-row2">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div></div>'
       +'<div class="mc-sheen"></div><div class="mc-grain"></div></div>';
   } else if(look==='foil'){
-    const pic=me.photo?'<div class="mc-photo" '+pclick+'><img src="'+me.photo+'"></div>':'<div class="mc-photo ini" '+pclick+'>'+esc(initials(me.name||'You'))+'</div>';
+    const pic=me.photo?'<div class="mc-photo" '+pclick+'><img src="'+esc(me.photo)+'"></div>':'<div class="mc-photo ini" '+pclick+'>'+esc(initials(me.name||'You'))+'</div>';
     card='<div class="mycard foil" style="'+vars+'">'+editBtn+'<div class="mc-paper"></div><div class="mc-grain"></div>'
       +'<div class="mc-idx">'+VENNMARK+'<span>SOVENN &middot; 01</span></div><div class="mc-rule"></div>'
       +'<div class="mc-head">'+pic+'<div class="mc-hd"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div></div></div>'
@@ -970,7 +970,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
       +'<div class="mc-bottom">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div>'
       +'<div class="mc-seal">'+VENNMARK+'</div></div>';
   } else {
-    const pic=me.photo?'<img src="'+me.photo+'">':esc(initials(me.name||'You'));
+    const pic=me.photo?'<img src="'+esc(me.photo)+'">':esc(initials(me.name||'You'));
     card='<div class="mycard aurora" style="'+vars+'">'+editBtn+'<div class="mc-mesh"></div><div class="mc-grain"></div>'
       +'<div class="mc-brand">'+VENNMARK+'<span>SOVENN</span></div>'
       +'<div class="mc-photo" '+pclick+'>'+pic+'</div>'
@@ -1160,7 +1160,7 @@ $('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeMod
 window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,customDates:[]};
   const dv=o=>o&&o.m?(o.y?o.y+'-':'')+String(o.m).padStart(2,'0')+'-'+String(o.d).padStart(2,'0'):'';
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+(id?'Edit':'New')+' contact</h3>';
-  if(c.card) h+='<img class="card-img" src="'+c.card+'">';
+  if(c.card) h+='<img class="card-img" src="'+esc(c.card)+'">';
   if(c.review) h+='<div class="note">Quick-added. Fill the details and Save to clear the review flag.</div>';
   h+='<label class="fl">Name &middot; how you find them, e.g. &ldquo;John from school&rdquo;</label><input id="e_name" value="'+esc(c.name||'')+'">';
   h+='<label class="fl">Calling name &middot; used in your messages (required)</label><input id="e_call" value="'+esc(c.callName||firstName(c.name)||'')+'" placeholder="John">';
