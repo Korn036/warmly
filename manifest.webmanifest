@@ -1,7 +1,11 @@
 {
+  "id": "/",
   "name": "Sovenn, keep your people warm",
   "short_name": "Sovenn",
   "description": "A simple personal CRM: remember the people who matter, never miss a birthday, keep warm contacts from going cold.",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["social", "lifestyle", "productivity"],
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
