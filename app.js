@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.41.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.42.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -872,8 +872,25 @@ window.shareCard=async()=>{ const full=myVCardFull();
 };
 window.downloadCard=()=>download('sovenn-card.vcf', new Blob([myVCardFull()],{type:'text/vcard'}));
 let _editCard=false;
-const CARDSTYLES=['candlelit','hearthglow','mocha','garden','dusk','honey'];
-window.setCardStyle=(s)=>{ DB.me=DB.me||{}; DB.me.cardStyle=s; save(); route(); };
+const CARD_LOOKS=['poster','aurora','foil'];
+/* Relight: curated, on-brand recipes. Colour is ONLY ever chosen from this table, so the
+   surprise-on-open can never be off-brand or garish. Seeded by name, nudged by the hour. */
+const RELIGHT=[
+  {id:'ember',    name:'EMBER',          reg:'dark',  base:'#17121C', ink:'#F4ECDD', a1:'#FF6A3D', a2:'#E8B23A'},
+  {id:'goldhour', name:'GOLD HOUR',      reg:'dark',  base:'#1B1410', ink:'#F8EEDB', a1:'#F0B23E', a2:'#FF7A47'},
+  {id:'sagedusk', name:'SAGE DUSK',      reg:'dark',  base:'#121C17', ink:'#ECF2EA', a1:'#54BE86', a2:'#E8B23A'},
+  {id:'plum',     name:'PLUM CANDLELIT', reg:'dark',  base:'#241A2E', ink:'#F4ECF0', a1:'#FF6A3D', a2:'#C79BE0'},
+  {id:'cream',    name:'CREAM BLOOM',    reg:'light', base:'#FBF8F3', ink:'#2B2622', a1:'#E0552E', a2:'#C9A227'},
+  {id:'sage',     name:'SAGE MORNING',   reg:'light', base:'#F3F2EA', ink:'#2B2622', a1:'#5E7264', a2:'#C9A227'}
+];
+function _cardHash(s){ s=String(s||''); let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h>>>0; }
+function cardRecipe(){ const me=DB.me||{}; if(me.cardRecipe!=null && RELIGHT[me.cardRecipe]) return RELIGHT[me.cardRecipe];
+  const h=_cardHash((me.name||'You')+'|'+(me.title||'')); const hr=new Date().getHours(); const band=hr<10?0:hr<17?1:hr<21?2:3;
+  return RELIGHT[(h+band)%RELIGHT.length]; }
+const VENNMARK='<svg class="vmark" viewBox="0 0 120 80" aria-hidden="true"><circle cx="47" cy="40" r="29" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="73" cy="40" r="29" fill="none" stroke="currentColor" stroke-width="7"/><path d="M60 14.5a29 29 0 0 1 0 51 29 29 0 0 1 0-51z" fill="var(--lens,currentColor)"/></svg>';
+window.setCardLook=(l)=>{ DB.me=DB.me||{}; DB.me.cardLook=l; save(); route(); };
+window.relightCard=()=>{ DB.me=DB.me||{}; const cur=(DB.me.cardRecipe==null?-1:DB.me.cardRecipe); let n=cur; for(let i=0;i<8&&n===cur;i++){ n=Math.floor(Math.random()*RELIGHT.length); } DB.me.cardRecipe=n; save(); route(); };
+window.autoRelight=()=>{ DB.me=DB.me||{}; DB.me.cardRecipe=null; save(); route(); };
 window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
 window.saveCard=()=>{ _editCard=false; route(); };
 function interestIcon(w){ w=w.toLowerCase(); const M=[
@@ -899,18 +916,53 @@ function bizTags(me){ if(!me||!me.interests) return ''; const items=String(me.in
   if(!items.length) return '';
   return '<div class="biz-tags">'+items.map(function(w){ return '<span class="biz-tag">'+interestIcon(w)+esc(w)+'</span>'; }).join('')+'</div>';
 }
-function viewMyCard(){ const me=DB.me=DB.me||{}; let style=me.cardStyle||'candlelit'; if(CARDSTYLES.indexOf(style)<0) style='candlelit';
+function viewMyCard(){ const me=DB.me=DB.me||{};
+  let look=me.cardLook||'poster'; if(CARD_LOOKS.indexOf(look)<0) look='poster';
+  const r=cardRecipe();
+  const foilF=(r.reg==='dark')?{f1:'#A8852A',f2:'#F0D87A',deb:'0 1px 0 rgba(0,0,0,.55),0 -1px 0 rgba(255,255,255,.10)'}:{f1:'#9C7A1E',f2:'#E6C04A',deb:'0 1px 0 rgba(255,255,255,.8),0 -1px 0 rgba(0,0,0,.2)'};
+  const lens=(look==='foil')?foilF.f2:r.a1;
+  const vars='--base:'+r.base+';--ink:'+r.ink+';--a1:'+r.a1+';--a2:'+r.a2+';--f1:'+foilF.f1+';--f2:'+foilF.f2+';--deb:'+foilF.deb+';--lens:'+lens+';';
   const pseudo={id:'me',name:me.name,phone:me.phone,email:me.email,linkedin:me.linkedin,instagram:me.instagram,x:me.x,website:me.website};
-  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your warm, shareable card. Anyone can scan the QR to save you. Nothing leaves your phone.</p>';
-  h+='<div class="biz mc-'+style+'"><button class="biz-edit" onclick="toggleEditCard()" aria-label="edit card"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>'
-    +'<div class="biz-photo" onclick="document.getElementById(\'mephoto\').click()">'+(me.photo?('<img src="'+me.photo+'">'):esc(initials(me.name||'You')))+'</div>'
-    +'<div class="biz-name">'+esc(me.name||'Your name')+'</div>'
-    +'<div class="biz-title">'+esc(me.title||'tap the pencil to fill your card')+'</div>'
-    +bizTags(me)
-    +socialRow(pseudo,false)+'</div>';
+  const name=esc(me.name||'Your name'), title=esc(me.title||'tap the pencil to fill your card');
+  const editBtn='<button class="mc-edit" onclick="toggleEditCard()" aria-label="edit card"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>';
+  const pclick='onclick="document.getElementById(\'mephoto\').click()"';
+  let card='';
+  if(look==='poster'){
+    const inner=me.photo
+      ?'<div class="mc-pbg" '+pclick+'><img src="'+me.photo+'"></div><div class="mc-duo"></div>'
+      :'<div class="mc-addphoto" '+pclick+'><div class="ring">+</div><div class="t1">Tap to add your photo</div><div class="t2">the Poster look turns it into a portrait of you</div></div>';
+    card='<div class="mycard poster" style="'+vars+'">'+editBtn+inner+'<div class="mc-scrim"></div>'
+      +'<div class="mc-nameback">'+name+'</div>'
+      +'<div class="mc-brand">'+VENNMARK+'<span>SOVENN</span></div>'
+      +'<div class="mc-foot"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div>'+bizTags(me)
+      +'<div class="mc-row2">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div></div>'
+      +'<div class="mc-sheen"></div><div class="mc-grain"></div></div>';
+  } else if(look==='foil'){
+    const pic=me.photo?'<div class="mc-photo" '+pclick+'><img src="'+me.photo+'"></div>':'<div class="mc-photo ini" '+pclick+'>'+esc(initials(me.name||'You'))+'</div>';
+    card='<div class="mycard foil" style="'+vars+'">'+editBtn+'<div class="mc-paper"></div><div class="mc-grain"></div>'
+      +'<div class="mc-idx">'+VENNMARK+'<span>SOVENN &middot; 01</span></div><div class="mc-rule"></div>'
+      +'<div class="mc-head">'+pic+'<div class="mc-hd"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div></div></div>'
+      +'<div class="mc-lbl">a few things i love</div>'+bizTags(me)
+      +'<div class="mc-bottom">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div>'
+      +'<div class="mc-seal">'+VENNMARK+'</div></div>';
+  } else {
+    const pic=me.photo?'<img src="'+me.photo+'">':esc(initials(me.name||'You'));
+    card='<div class="mycard aurora" style="'+vars+'">'+editBtn+'<div class="mc-mesh"></div><div class="mc-grain"></div>'
+      +'<div class="mc-brand">'+VENNMARK+'<span>SOVENN</span></div>'
+      +'<div class="mc-photo" '+pclick+'>'+pic+'</div>'
+      +'<div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div>'
+      +bizTags(me)+socialRow(pseudo,false)
+      +'<div class="mc-qrtile"><div class="mc-qr" id="qrbox"></div><span>scan to<br>save me</span></div>'
+      +'<div class="mc-inner"></div></div>';
+  }
+  let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your warm, shareable card. It relights itself with the hour, and stays on this device. Anyone can scan to save you.</p>';
+  h+=card;
   h+='<input type="file" id="mephoto" accept="image/*" style="display:none" onchange="mePhoto(event)">';
-  h+='<div class="biz-styles">'+CARDSTYLES.map(function(s){ return '<button class="biz-sw mc-'+s+(style===s?' on':'')+'" onclick="setCardStyle(\''+s+'\')" title="'+s+'"></button>'; }).join('')+'</div>';
-  h+='<div class="qrwrap"><div id="qrbox" class="qrbox"></div><div class="muted" style="text-align:center;font-size:12px;margin-top:6px">Point a phone camera at this to save me. Test-scan once to confirm.</div></div>';
+  h+='<div class="mc-controls"><div class="mc-looks">'+CARD_LOOKS.map(function(l){ var lbl={poster:'Poster',aurora:'Aurora',foil:'Foil'}[l]; return '<button class="mc-look'+(look===l?' on':'')+'" onclick="setCardLook(\''+l+'\')">'+lbl+'</button>'; }).join('')+'</div>'
+    +'<button class="mc-relight" onclick="relightCard()" title="surprise me"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v4h-4"/></svg>Relight</button>'
+    +(me.cardRecipe!=null?'<button class="mc-auto" onclick="autoRelight()" title="back to auto: name + time of day">Auto</button>':'')
+    +'</div>';
+  h+='<div class="muted" style="text-align:center;font-size:12px;margin:-2px 0 12px">Point a phone camera at the card to save me. Test-scan once to confirm.</div>';
   h+='<div class="btn-row" style="justify-content:center;margin:12px 0 16px"><button class="btn primary" onclick="shareCard()">Share my card</button><button class="btn ghost" onclick="downloadCard()">Download .vcf</button></div>';
   if(_editCard){
     h+='<div id="cardedit" class="kick">Fill your details</div><div class="card">';

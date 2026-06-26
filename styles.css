@@ -380,36 +380,101 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .qrbox{ background:#fff; padding:12px; border-radius:18px; border:1px solid var(--line); box-shadow:var(--shadow); display:inline-block; }
 .qrcanvas{ display:block; image-rendering:pixelated; border-radius:4px; }
 
-/* premium liquid My Card (only the card, flowing colour) */
-.biz{ position:relative; border-radius:26px; padding:28px 20px 24px; text-align:center; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.28); margin:6px 0 14px; isolation:isolate; }
-.biz::before{ content:''; position:absolute; inset:0; z-index:1; background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 46%); pointer-events:none; }
-.biz>*{ position:relative; z-index:2; }
-.biz-edit{ position:absolute; top:13px; right:13px; width:36px; height:36px; border-radius:50%; border:none; background:rgba(255,255,255,.9); color:#222; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:5; box-shadow:0 4px 14px rgba(0,0,0,.25); }
-.biz-edit svg{ width:16px; height:16px; fill:currentColor; }
-.biz-photo{ width:90px; height:90px; border-radius:50%; margin:2px auto 14px; background:rgba(255,255,255,.22); display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-weight:700; font-size:32px; color:inherit; overflow:hidden; cursor:pointer; border:3px solid rgba(255,255,255,.55); box-shadow:0 6px 18px rgba(0,0,0,.18); }
-.biz-photo img{ width:100%; height:100%; object-fit:cover; }
-.biz-name{ font-family:var(--serif); font-weight:700; font-size:26px; letter-spacing:-.015em; }
-.biz-title{ font-family:var(--mono); font-size:12px; margin-top:4px; opacity:.9; letter-spacing:.02em; }
-.biz .socrow{ justify-content:center; margin-top:16px; }
-.biz .soc{ background:rgba(255,255,255,.95); border:none; box-shadow:0 6px 16px rgba(0,0,0,.22); }
-.biz .biz-name, .biz .biz-title{ text-shadow:0 1px 16px rgba(0,0,0,.5); }
-.biz-styles{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:0 0 10px; }
-.biz-sw{ width:38px; height:38px; border-radius:50%; border:2px solid var(--line); cursor:pointer; overflow:hidden; padding:0; position:relative; }
-.biz-sw::before{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.28),transparent 60%); }
-.biz-sw.on{ box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink); }
-@keyframes liquid{ 0%{ transform:translate(-5%,-4%) rotate(0deg) scale(1.08); } 100%{ transform:translate(6%,5%) rotate(12deg) scale(1.25); } }
-@media (prefers-reduced-motion:reduce){ .biz::before{ animation:none; } }
+/* ===================== My Card v2: Poster / Aurora / Foil + Relight ===================== */
+.mycard{ position:relative; width:100%; max-width:420px; margin:8px auto 14px; border-radius:26px; overflow:hidden; isolation:isolate; box-shadow:0 26px 58px rgba(20,12,10,.42), 0 2px 0 rgba(255,255,255,.05); }
+.mycard .vmark{ width:16px; height:11px; flex:0 0 auto; }
+.mycard .biz-tags{ display:flex; gap:7px; flex-wrap:wrap; }
+.mycard .biz-tag{ display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; padding:5px 11px 5px 9px; border-radius:30px; line-height:1; white-space:nowrap; }
+.mycard .biz-tag svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; }
+.mycard .socrow{ display:flex; gap:9px; margin:0; }
+.mycard .soc{ width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; box-shadow:none; border:none; }
+.mycard .soc svg{ width:19px; height:19px; }
+.mycard .mc-name{ overflow-wrap:anywhere; }
+.foil .mc-hd{ min-width:0; flex:1; }
+.mc-edit{ position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:none; background:rgba(255,255,255,.16); color:#fff; backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:9; }
+.mc-edit svg{ width:15px; height:15px; fill:currentColor; }
+.mc-grain{ position:absolute; inset:0; pointer-events:none; z-index:6; opacity:.06; mix-blend-mode:overlay; background-size:140px 140px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.mc-qr .qrcanvas, .mc-qrtile .qrcanvas{ width:100%!important; height:100%!important; display:block; border-radius:3px; }
 
-/* Warm, premium card styles (smooth gradients, no metallic stripes) */
-.mc-candlelit{ background:linear-gradient(158deg,#2F2142,#191220); color:#F3E7D6; }
-.mc-hearthglow{ background:linear-gradient(158deg,#883A1B,#2A130A); color:#FFE9CF; }
-.mc-mocha{ background:linear-gradient(158deg,#8C5942,#39231A); color:#F4E7D8; }
-.mc-garden{ background:linear-gradient(158deg,#3F5A45,#1D3225); color:#EDF0E3; }
-.mc-dusk{ background:linear-gradient(158deg,#F0A07E,#7A5699); color:#FFF3EC; }
-.mc-honey{ background:linear-gradient(158deg,#E59A3A,#894C12); color:#FFF3DC; }
-.biz-tags{ display:flex; gap:7px; flex-wrap:wrap; justify-content:center; margin-top:11px; }
-.biz-tag{ display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10.5px; padding:5px 10px; border-radius:999px; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); }
-.biz-tag svg{ width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.8; }
+/* ---- 1. HEARTH POSTER ---- */
+.mycard.poster{ --sh:color-mix(in srgb, var(--a1) 18%, #0d090c); --hi:color-mix(in srgb, var(--a1) 72%, #ffe7c4); background:var(--sh); color:#F5EEE0; min-height:528px; }
+.poster .mc-pbg{ position:absolute; inset:0; cursor:pointer; }
+.poster .mc-pbg img{ width:100%; height:100%; object-fit:cover; object-position:50% 20%; filter:grayscale(1) contrast(1.07) brightness(1.06); mix-blend-mode:screen; }
+.poster .mc-duo{ position:absolute; inset:0; background:var(--hi); mix-blend-mode:multiply; }
+.poster .mc-scrim{ position:absolute; inset:0; background:linear-gradient(to top, var(--sh) 7%, color-mix(in srgb,var(--sh) 55%,transparent) 34%, transparent 58%); }
+.poster .mc-nameback{ position:absolute; left:18px; right:18px; bottom:198px; font-weight:700; font-size:64px; line-height:.84; letter-spacing:-.03em; color:color-mix(in srgb,#fff 13%,transparent); }
+.poster .mc-brand{ position:absolute; top:18px; left:20px; z-index:4; display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; opacity:.92; }
+.poster .mc-foot{ position:absolute; left:20px; right:20px; bottom:18px; z-index:4; }
+.poster .mc-name{ font-weight:700; font-size:46px; line-height:.92; letter-spacing:-.03em; text-shadow:0 2px 20px rgba(0,0,0,.5); }
+.poster .mc-title{ font-family:var(--mono); font-size:12px; opacity:.88; margin:8px 0 13px; }
+.poster .biz-tags{ }
+.poster .biz-tag{ background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22); color:#F5EEE0; }
+.poster .mc-row2{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-top:14px; }
+.poster .soc{ background:rgba(255,255,255,.14); color:#F5EEE0; }
+.poster .mc-qr{ width:60px; height:60px; border-radius:11px; background:#fff; padding:5px; box-shadow:0 6px 16px rgba(0,0,0,.4); flex:0 0 auto; }
+.poster .mc-sheen{ position:absolute; inset:0; z-index:5; pointer-events:none; background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.14) 49%,transparent 58%); mix-blend-mode:screen; }
+.poster .mc-addphoto{ position:absolute; inset:0; z-index:3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; cursor:pointer; text-align:center; padding:0 30px; }
+.poster .mc-addphoto .ring{ width:76px; height:76px; border-radius:50%; border:2px dashed rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:300; }
+.poster .mc-addphoto .t1{ font-family:var(--mono); font-size:13px; letter-spacing:.02em; }
+.poster .mc-addphoto .t2{ font-family:var(--mono); font-size:11px; opacity:.7; }
+
+/* ---- 2. AURORA HEARTH ---- */
+.mycard.aurora{ background:var(--base); color:var(--ink); min-height:528px; padding:24px 22px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+.aurora .mc-mesh{ position:absolute; inset:0; z-index:0; filter:saturate(1.3); background:
+  radial-gradient(60% 50% at 28% 26%, var(--a1) 0%, transparent 60%),
+  radial-gradient(55% 45% at 88% 12%, var(--a2) 0%, transparent 55%),
+  radial-gradient(72% 62% at 86% 96%, var(--a1) 0%, transparent 58%),
+  radial-gradient(52% 52% at 8% 92%, var(--a2) 0%, transparent 55%);
+  background-blend-mode:screen,screen,soft-light,screen; }
+.aurora>*{ position:relative; z-index:3; }
+.aurora .mc-inner{ position:absolute; inset:0; z-index:7; border-radius:26px; box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(255,255,255,.07); pointer-events:none; }
+.aurora .mc-brand{ align-self:flex-start; display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11px; letter-spacing:.16em; opacity:.85; }
+.aurora .mc-photo{ margin-top:18px; width:96px; height:96px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-weight:700; font-size:34px; overflow:hidden; cursor:pointer; position:relative; background:color-mix(in srgb,var(--a1) 36%,var(--base)); box-shadow:0 8px 22px rgba(0,0,0,.35), 0 0 0 4px color-mix(in srgb,var(--base) 62%,transparent); }
+.aurora .mc-photo::before{ content:''; position:absolute; inset:-16px; border-radius:50%; z-index:-1; background:radial-gradient(circle,var(--a1) 0%,transparent 68%); opacity:.75; filter:blur(4px); }
+.aurora .mc-photo img{ width:100%; height:100%; object-fit:cover; }
+.aurora .mc-name{ font-weight:700; font-size:31px; letter-spacing:-.02em; margin-top:15px; line-height:1; }
+.aurora .mc-title{ font-family:var(--mono); font-size:12px; letter-spacing:.05em; text-transform:uppercase; opacity:.78; margin-top:7px; }
+.aurora .biz-tags{ justify-content:center; margin-top:15px; }
+.aurora .biz-tag{ background:rgba(255,255,255,.14); border:1px solid color-mix(in srgb,var(--ink) 16%,transparent); backdrop-filter:blur(6px); }
+.aurora .socrow{ justify-content:center; margin-top:16px; }
+.aurora .soc{ background:rgba(255,255,255,.16); border:1px solid color-mix(in srgb,var(--ink) 14%,transparent); backdrop-filter:blur(6px); }
+.aurora .mc-qrtile{ margin-top:auto; display:flex; align-items:center; gap:11px; background:#fff; border-radius:15px; padding:9px 14px 9px 9px; box-shadow:0 10px 26px rgba(0,0,0,.28); }
+.aurora .mc-qr{ width:50px; height:50px; flex:0 0 auto; }
+.aurora .mc-qrtile span{ font-family:var(--mono); font-size:10.5px; line-height:1.4; color:#2B2622; text-align:left; }
+
+/* ---- 3. FOIL & PRESS ---- */
+.mycard.foil{ background:var(--base); color:var(--ink); min-height:528px; padding:26px 24px; }
+.foil .mc-paper{ position:absolute; inset:0; z-index:0; background:linear-gradient(160deg, color-mix(in srgb,var(--base) 94%, #fff 6%), var(--base)); }
+.foil>*{ position:relative; z-index:2; }
+.foil .mc-grain{ opacity:.07; mix-blend-mode:multiply; }
+.foil .mc-idx{ font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; font-weight:600; display:flex; align-items:center; gap:8px; background:linear-gradient(100deg,var(--f1),var(--f2) 38%,#fff7e0 50%,var(--f2) 62%,var(--f1)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.foil .vmark{ color:var(--f2); }
+.foil .mc-idx .vmark{ width:18px; height:12px; }
+.foil .mc-rule{ height:1px; background:linear-gradient(90deg, color-mix(in srgb,var(--ink) 38%,transparent), transparent); margin:12px 0 18px; }
+.foil .mc-head{ display:flex; gap:15px; align-items:center; }
+.foil .mc-photo{ width:74px; height:74px; border-radius:50%; flex:0 0 74px; padding:3px; background:linear-gradient(135deg,var(--f1),#fff7e0,var(--f2)); display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
+.foil .mc-photo img{ width:100%; height:100%; border-radius:50%; object-fit:cover; }
+.foil .mc-photo.ini{ font-family:var(--serif); font-weight:700; font-size:27px; color:var(--base); }
+.foil .mc-name{ font-weight:700; font-size:33px; letter-spacing:-.02em; line-height:.97; text-shadow:var(--deb); }
+.foil .mc-title{ font-family:var(--mono); font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; opacity:.7; margin-top:8px; }
+.foil .mc-lbl{ font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; opacity:.55; margin:22px 0 10px; }
+.foil .biz-tag{ border:1px solid color-mix(in srgb,var(--f2) 55%,transparent); color:var(--ink); background:transparent; }
+.foil .biz-tag svg{ stroke:var(--f2); }
+.foil .mc-bottom{ position:absolute; left:24px; right:24px; bottom:24px; z-index:2; display:flex; align-items:flex-end; justify-content:space-between; }
+.foil .soc{ width:34px; height:34px; border-radius:10px; border:1px solid color-mix(in srgb,var(--f2) 50%,transparent); color:var(--ink); }
+.foil .mc-qr{ width:72px; height:72px; background:#fff; border-radius:8px; padding:6px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.18); flex:0 0 auto; }
+.foil .mc-seal{ position:absolute; top:24px; right:22px; z-index:2; }
+.foil .mc-seal .vmark{ width:34px; height:24px; }
+
+/* ---- Relight controls ---- */
+.mc-controls{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; margin:2px 0 10px; }
+.mc-looks{ display:inline-flex; background:var(--card); border:1px solid var(--line); border-radius:30px; padding:3px; }
+.mc-look{ border:none; background:none; font-family:var(--mono); font-size:12px; color:var(--ink-soft); padding:6px 13px; border-radius:24px; cursor:pointer; }
+.mc-look.on{ background:var(--green); color:var(--on-accent); }
+.mc-relight{ display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:12px; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:30px; padding:7px 13px; cursor:pointer; }
+.mc-relight svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.mc-auto{ font-family:var(--mono); font-size:12px; color:var(--ink-soft); background:none; border:1px solid var(--line); border-radius:30px; padding:7px 12px; cursor:pointer; }
+@media (prefers-reduced-motion:reduce){ .mycard *{ animation:none!important; } }
 
 /* voice capture (Wispr-style live listening) */
 .voicebar{ display:flex; align-items:center; gap:12px; background:var(--accent); color:var(--hero-ink); border-radius:14px; padding:10px 14px; margin:8px 0; }
