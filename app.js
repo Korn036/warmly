@@ -7,7 +7,9 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.42.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.43.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
+const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -891,6 +893,28 @@ const VENNMARK='<svg class="vmark" viewBox="0 0 120 80" aria-hidden="true"><circ
 window.setCardLook=(l)=>{ DB.me=DB.me||{}; DB.me.cardLook=l; save(); route(); };
 window.relightCard=()=>{ DB.me=DB.me||{}; const cur=(DB.me.cardRecipe==null?-1:DB.me.cardRecipe); let n=cur; for(let i=0;i<8&&n===cur;i++){ n=Math.floor(Math.random()*RELIGHT.length); } DB.me.cardRecipe=n; save(); route(); };
 window.autoRelight=()=>{ DB.me=DB.me||{}; DB.me.cardRecipe=null; save(); route(); };
+
+/* ---- Beta feedback: a small, non-intrusive floating button -> quick sheet -> your WhatsApp ---- */
+let _fbMood='';
+function _fbScreen(){ return (location.hash.replace('#','').split('/')[0]||'today'); }
+function initFeedback(){ if(!BETA) return; var f=document.getElementById('fbFab'); if(!f) return; try{ if(sessionStorage.getItem('sovenn.fbhide')==='1') return; }catch(e){} f.hidden=false; }
+window.feedbackOpen=function(){ _fbMood='';
+  var moods=[['love','\u{1F60D}','Love'],['meh','\u{1F610}','Meh'],['bug','\u{1F41B}','Bug'],['idea','\u{1F4A1}','Idea']];
+  var h='<div class="fb-sheet" onclick="event.stopPropagation()"><h3>How is it going?</h3><div class="sub">Two seconds. It helps more than you know.</div>'
+    +'<div class="fb-moods">'+moods.map(function(m){ return '<button type="button" class="fb-mood" data-m="'+m[0]+'" onclick="fbMood(\''+m[0]+'\')"><span class="em">'+m[1]+'</span>'+m[2]+'</button>'; }).join('')+'</div>'
+    +'<textarea id="fbText" placeholder="What felt good? What confused you? What is missing?"></textarea>'
+    +'<div class="fb-ctx">attaches: Sovenn v'+VERSION+' &middot; screen: '+_fbScreen()+'</div>'
+    +'<div class="fb-actions"><button type="button" class="btn ghost sm" onclick="feedbackDiag()">Copy a glitch log</button><button type="button" class="btn primary sm fb-send" onclick="feedbackSend()">Send on WhatsApp</button></div>'
+    +'<div class="fb-priv">Opens your own WhatsApp with this pre-filled, straight to the founder. Nothing is sent until you tap send, and nothing is tracked.</div>'
+    +'<div class="fb-foot"><button type="button" onclick="fbHide()">Hide this button</button><button type="button" onclick="feedbackClose()">Close</button></div></div>';
+  var bg=document.getElementById('fbBg'); if(!bg) return; bg.innerHTML=h; bg.hidden=false; setTimeout(function(){ var t=document.getElementById('fbText'); if(t) t.focus(); },80); };
+window.feedbackClose=function(){ var bg=document.getElementById('fbBg'); if(bg){ bg.hidden=true; bg.innerHTML=''; } };
+window.fbMood=function(m){ _fbMood=m; var els=document.querySelectorAll('.fb-mood'); for(var i=0;i<els.length;i++){ els[i].classList.toggle('on', els[i].getAttribute('data-m')===m); } };
+window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=ta?ta.value:''; var mood={love:'\u{1F60D} Love',meh:'\u{1F610} Meh',bug:'\u{1F41B} Bug',idea:'\u{1F4A1} Idea'}[_fbMood]||'';
+  var lines=['Sovenn beta feedback']; if(mood) lines.push(mood); if(t.trim()){ lines.push(''); lines.push(t.trim()); } lines.push(''); lines.push('— v'+VERSION+' · '+_fbScreen());
+  window.open('https://wa.me/'+FB_WA+'?text='+encodeURIComponent(lines.join('\n')),'_blank'); feedbackClose(); };
+window.feedbackDiag=function(){ if(window.copyDiag){ copyDiag(); } };
+window.fbHide=function(){ try{ sessionStorage.setItem('sovenn.fbhide','1'); }catch(e){} var f=document.getElementById('fbFab'); if(f) f.hidden=true; feedbackClose(); };
 window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
 window.saveCard=()=>{ _editCard=false; route(); };
 function interestIcon(w){ w=w.toLowerCase(); const M=[
@@ -1463,6 +1487,7 @@ if(!location.hash) location.hash='#today';
 snapInit();
 route();
 gBoot();
+initFeedback();
 /* app lock: detect biometric support, and gate the app if a passcode is set */
 lockBioAvail().then(v=>{ _bioOK=v; });
 if(lockEnabled()) lockShow();

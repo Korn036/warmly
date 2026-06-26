@@ -52,6 +52,11 @@
 </div>
 <input type="file" id="cardCam" accept="image/*" capture="environment" style="display:none" onchange="cardCaptured(event)">
 
+<button class="fb-fab" id="fbFab" onclick="feedbackOpen()" aria-label="Send beta feedback" hidden>
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.55L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5z"/></svg><span>Feedback</span>
+</button>
+<div class="fb-bg" id="fbBg" hidden onclick="if(event.target===this)feedbackClose()"></div>
+
 <footer class="foot wrap">
   <span>Sovenn keeps everything on this device. Nothing is sent to anyone until you tap send.</span><br>
   <a href="privacy.html" style="color:var(--ink-soft)">Privacy</a> · <a href="terms.html" style="color:var(--ink-soft)">Terms</a> · © 2026 Karthik Onteddu
