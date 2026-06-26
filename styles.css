@@ -255,39 +255,41 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 
 /* per-contact social deep-link icons (only shown for channels a contact has) */
 .socrow{ display:flex; gap:9px; flex-wrap:wrap; margin:12px 0 2px; }
-.soc{ width:42px; height:42px; border-radius:13px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line); background:linear-gradient(180deg, color-mix(in srgb,var(--card) 88%,#fff 12%), var(--card)); color:var(--ink-soft); cursor:pointer; transition:transform .14s ease, box-shadow .14s ease; box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(36,28,20,.05), 0 7px 16px rgba(36,28,20,.08); }
+.soc{ width:44px; height:44px; border-radius:14px; display:inline-flex; align-items:center; justify-content:center; background:#fff; color:var(--ink-soft); cursor:pointer; transition:transform .14s ease, box-shadow .14s ease; box-shadow:0 4px 12px rgba(36,28,20,.11), inset 0 0 0 1px rgba(36,28,20,.05); }
 .soc:hover{ transform:translateY(-2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 12px 24px rgba(36,28,20,.14); }
 .soc:active{ transform:translateY(0) scale(.96); }
-.soc svg{ width:21px; height:21px; fill:currentColor; filter:drop-shadow(0 1px 1px rgba(0,0,0,.12)); }
-[data-theme="dark"] .soc{ background:linear-gradient(180deg, color-mix(in srgb,var(--card) 90%,#fff 10%), var(--card)); box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 2px 6px rgba(0,0,0,.4), 0 10px 22px rgba(0,0,0,.45); }
+.soc svg{ width:22px; height:22px; fill:currentColor; }
+[data-theme="dark"] .soc{ background:#FBFAF8; box-shadow:0 5px 14px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.10); }
 [data-theme="brutal"] .soc{ background:var(--card); box-shadow:2px 2px 0 #111; border:1.5px solid #111; }
 [data-theme="brutal"] .soc svg{ filter:none; }
 .soc-wa{ color:#25D366 } .soc-call{ color:var(--green-2) } .soc-mail{ color:#EA4335 } .soc-in{ color:#0A66C2 } .soc-ig{ color:#E1306C } .soc-x{ color:var(--ink) } .soc-tg{ color:#229ED9 } .soc-web{ color:var(--ink-soft) }
-.socadd{ color:var(--ink-faint); font-size:21px; font-weight:600; border-style:dashed; box-shadow:none; }
+.socadd{ color:var(--ink-faint); font-size:21px; font-weight:600; background:transparent; border:1.5px dashed var(--line); box-shadow:none; }
 
 /* ===== Reach hub — premium tactile channel bar (the hero of a contact) ===== */
 .reach-label{ font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--green-2); margin:18px 2px 11px; }
 [data-theme="dark"] .reach-label{ color:var(--green); }
 .reach{ display:grid; grid-template-columns:repeat(4,1fr); gap:11px; margin-bottom:6px; }
-.reach .act{ -webkit-appearance:none; appearance:none; display:flex; flex-direction:column; align-items:center; gap:9px; padding:15px 6px 13px; border-radius:18px; cursor:pointer; color:var(--ink); font-family:inherit; text-align:center;
-  background:linear-gradient(180deg, color-mix(in srgb,var(--card) 85%,#fff 15%), var(--card));
-  border:1px solid var(--line);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(36,28,20,.05), 0 10px 22px rgba(36,28,20,.10);
-  transition:transform .14s ease, box-shadow .14s ease; }
-.reach .act:hover{ transform:translateY(-3px); box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 18px 34px rgba(36,28,20,.16); }
-.reach .act:active{ transform:translateY(0) scale(.96); }
-.reach .act .ic{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff;
-  box-shadow:inset 0 2px 1.5px rgba(255,255,255,.55), inset 0 -3px 4px rgba(0,0,0,.20), 0 6px 13px rgba(0,0,0,.26); }
-.reach .act .ic svg{ width:23px; height:23px; fill:currentColor; filter:drop-shadow(0 1px 1px rgba(0,0,0,.22)); }
-.reach .act .lb{ font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.01em; }
-.reach .act.call .ic{ background:radial-gradient(120% 120% at 32% 22%, #F4895F 0%, #E2613C 52%, #C0461F 100%); }
-.reach .act.text .ic{ background:radial-gradient(120% 120% at 32% 22%, #E9AE45 0%, #C9871F 52%, #A56C12 100%); }
-.reach .act.wa   .ic{ background:radial-gradient(120% 120% at 32% 22%, #37D777 0%, #1FA855 52%, #117B40 100%); }
-.reach .act.mail .ic{ background:radial-gradient(120% 120% at 32% 22%, #2F8268 0%, #14463A 58%, #0B3128 100%); }
-.reach .act.off .ic{ background:radial-gradient(120% 120% at 32% 22%, color-mix(in srgb,var(--ink-faint) 60%,#fff), var(--ink-faint)); box-shadow:inset 0 2px 1.5px rgba(255,255,255,.35), 0 3px 8px rgba(0,0,0,.12); }
+/* Authentic app logos on soft-edge light tiles (Contacts-app style). The official brand silhouettes
+   render in their TRUE colour on a light tile, so negative space (e.g. the WhatsApp handset) reads
+   correctly. call/text/mail are clean system glyphs tinted to recognisable action colours. */
+.reach .act{ -webkit-appearance:none; appearance:none; display:flex; flex-direction:column; align-items:center; gap:10px; padding:6px 4px 4px; border-radius:16px; cursor:pointer; color:var(--ink); font-family:inherit; text-align:center;
+  background:none; border:0; transition:transform .15s ease; }
+.reach .act:hover{ transform:translateY(-3px); }
+.reach .act:active{ transform:translateY(0) scale(.95); }
+.reach .act .ic{ width:56px; height:56px; border-radius:17px; display:flex; align-items:center; justify-content:center;
+  background:#fff; box-shadow:0 5px 14px rgba(36,28,20,.13), inset 0 0 0 1px rgba(36,28,20,.05); transition:box-shadow .15s ease; }
+.reach .act:hover .ic{ box-shadow:0 11px 24px rgba(36,28,20,.20), inset 0 0 0 1px rgba(36,28,20,.05); }
+.reach .act .ic svg{ width:30px; height:30px; fill:currentColor; }
+.reach .act .lb{ font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:.01em; color:var(--ink-soft); }
+.reach .act.call .ic{ color:#1FA463; }
+.reach .act.text .ic{ color:#E0552E; }
+.reach .act.wa   .ic{ color:#25D366; }
+.reach .act.mail .ic{ color:#C9A227; }
+.reach .act.off .ic{ color:var(--ink-faint); box-shadow:inset 0 0 0 1px rgba(36,28,20,.07); }
 .reach .act.off .lb{ color:var(--ink-faint); }
-[data-theme="dark"] .reach .act{ background:linear-gradient(180deg, color-mix(in srgb,var(--card) 90%,#fff 10%), var(--card)); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 2px 6px rgba(0,0,0,.4), 0 14px 30px rgba(0,0,0,.5); }
-[data-theme="dark"] .reach .act:hover{ box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 20px 38px rgba(0,0,0,.6); }
+[data-theme="dark"] .reach .act .ic{ background:#FBFAF8; box-shadow:0 6px 16px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.10); }
+[data-theme="dark"] .reach .act:hover .ic{ box-shadow:0 12px 26px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.10); }
+[data-theme="dark"] .reach .act.off .ic{ background:#241f29; color:#6f6675; box-shadow:inset 0 0 0 1px rgba(255,255,255,.07); }
 [data-theme="brutal"] .reach .act{ border:2px solid #111; border-radius:12px; background:var(--card); box-shadow:4px 4px 0 #111; }
 [data-theme="brutal"] .reach .act:hover{ transform:translate(-1px,-1px); box-shadow:5px 5px 0 #111; }
 [data-theme="brutal"] .reach .act:active{ transform:translate(1px,1px); box-shadow:2px 2px 0 #111; }

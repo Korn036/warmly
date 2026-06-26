@@ -22,12 +22,22 @@ Warmly-*Strategy*.pdf
 # throwaway design previews and smoke-test scaffolding
 favicon-*.html
 _smoke*.html
-# any underscore-prefixed html is a temp render/test harness, never ship it
+# any underscore-prefixed html/image is a temp render/test harness, never ship it
 _*.html
+_*.png
 
 # internal strategy / launch / naming docs (Sovenn-era) - keep OUT of the public repo
 Sovenn-*.md
 Sovenn-*.pdf
+
+# brand exploration boards (internal design options, not app source)
+Brand-Exploration/
+
+# promo / marketing media renders (internal, never ship with the app)
+Sovenn-*.mp4
+Sovenn-*.avi
+*.mp4
+*.mov
 Brand-Naming-*.md
 Brand-*-Exploration.md
 Beta Testing.md

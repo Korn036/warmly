@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs><linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#251A2E"/><stop offset="1" stop-color="#1C1422"/></linearGradient></defs><rect width="512" height="512" rx="114" fill="url(#bg)"/><rect x="26" y="20" width="460" height="210" rx="96" fill="#ffffff" opacity="0.05"/><g><circle cx="256.0" cy="182.0" r="96" fill="#F2A65A" opacity="0.82" style="mix-blend-mode:screen"/><circle cx="330.0" cy="256.0" r="96" fill="#FF8FA3" opacity="0.82" style="mix-blend-mode:screen"/><circle cx="256.0" cy="330.0" r="96" fill="#FFC061" opacity="0.82" style="mix-blend-mode:screen"/><circle cx="182.0" cy="256.0" r="96" fill="#C58BD0" opacity="0.82" style="mix-blend-mode:screen"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Sovenn">
+  <defs>
+    <radialGradient id="sovbg" cx="32%" cy="20%" r="105%">
+      <stop offset="0" stop-color="#2C2233"/>
+      <stop offset=".72" stop-color="#17121C"/>
+    </radialGradient>
+    <clipPath id="sovlens"><circle cx="200" cy="256" r="128"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#sovbg)"/>
+  <g clip-path="url(#sovlens)"><circle cx="312" cy="256" r="128" fill="#E0552E"/></g>
+  <circle cx="200" cy="256" r="128" fill="none" stroke="#F3ECE2" stroke-width="27"/>
+  <circle cx="312" cy="256" r="128" fill="none" stroke="#F3ECE2" stroke-width="27"/>
+</svg>
