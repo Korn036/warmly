@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.40.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.41.0', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const DEFAULT_TEMPLATES=[
   {id:'t_b',occasion:'birthday',name:'Birthday',body:"Happy birthday, {first}! Hope your day is a brilliant one. We're overdue a proper catch-up, let's fix that soon."},
   {id:'t_a',occasion:'anniversary',name:'Anniversary',body:"Happy anniversary, {first}! Wishing you both the very best today."},
@@ -82,7 +82,9 @@ function isDarkSkin(k){ var s=SKINS.find(function(x){return x.k===k;}); return !
 function applySkin(k){ var el=document.documentElement;
   el.classList.remove('skin-hearthstone','skin-letterpress','skin-pressedgarden','skin-hearthglow','skin-candlelit');
   if(isDarkSkin(k)) el.setAttribute('data-theme','dark'); else el.removeAttribute('data-theme');
-  if(k && k!=='stillmorning' && k!=='lamplight') el.classList.add('skin-'+k); }
+  if(k && k!=='stillmorning' && k!=='lamplight') el.classList.add('skin-'+k);
+  /* keep the Android / TWA status bar colour in step with the active skin (was stuck on light cream) */
+  try{ var m=document.querySelector('meta[name="theme-color"]'); if(m){ var bg=getComputedStyle(el).getPropertyValue('--bg').trim(); if(bg) m.setAttribute('content',bg); } }catch(e){} }
 function updateThemeBtn(){ var tb=document.getElementById('themeBtn'); if(!tb) return; var cur=localStorage.getItem('warmly.skin')||'stillmorning'; var d=isDarkSkin(cur); tb.innerHTML=d?_SUN:_MOON; tb.title=d?'Light (Still Morning)':'Dark (Lamplight)'; tb.setAttribute('aria-label', tb.title); }
 window.setSkin=function(k){ applySkin(k); localStorage.setItem('warmly.skin',k); updateThemeBtn(); if(window.route) route(); };
 let DB = load();
@@ -226,7 +228,7 @@ function socIcon(k){ const I={
   x:'<path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/>',
   tg:'<path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>',
   web:'<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 6h-2.6a15 15 0 0 0-1.3-3.3A8 8 0 0 1 18.9 8zM12 4c.8 1 1.5 2.4 1.9 4h-3.8C10.5 6.4 11.2 5 12 4zM4.3 14a8 8 0 0 1 0-4h3a18 18 0 0 0 0 4zm.8 2h2.6c.3 1.2.8 2.3 1.3 3.3A8 8 0 0 1 5.1 16zM7.7 8H5.1a8 8 0 0 1 3.9-3.3C8.5 5.7 8 6.8 7.7 8zM12 20c-.8-1-1.5-2.4-1.9-4h3.8c-.4 1.6-1.1 3-1.9 4zm2.3-6H9.7a16 16 0 0 1 0-4h4.6a16 16 0 0 1 0 4zm.4 5.3c.5-1 1-2.1 1.3-3.3h2.6a8 8 0 0 1-3.9 3.3zM16.7 14a18 18 0 0 0 0-4h3a8 8 0 0 1 0 4z"/>'
-}; return '<svg viewBox="0 0 24 24" aria-hidden="true">'+(I[k]||I.web)+'</svg>'; }
+}; return '<svg viewBox="0 0 24 24" fill-rule="evenodd" aria-hidden="true">'+(I[k]||I.web)+'</svg>'; }
 function socialRow(c, withAdd, skip){ let links=socialLinks(c); if(skip) links=links.filter(l=>!['wa','call','mail'].includes(l[0])); if(!links.length && !withAdd) return '';
   let h='<div class="socrow">';
   links.forEach(([k,label,url])=>{ h+='<a class="soc soc-'+k+'" href="'+esc(url)+'" target="_blank" rel="noopener" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</a>'; });
@@ -963,7 +965,7 @@ function viewSettings(section){
   if(section==='lock'){ return render('<div class="view">'+back+'<h1 class="title">App lock</h1>'+lockSection()+'</div>'); }
   if(section==='about'){
     let h='<div class="view">'+back+'<h1 class="title">About &amp; data</h1>';
-    h+='<div class="card"><div class="nm" style="font-size:15px">Private by design</div><div class="sub" style="margin-top:5px">Your people stay on this device. No account, no cloud, no sign-in, no copies. We never see your contacts, your notes, or your messages, because they never leave your phone.</div></div>';
+    h+='<div class="card"><div class="nm" style="font-size:15px">Private by design</div><div class="sub" style="margin-top:5px">Your people stay on this device by default. There is no Sovenn account and no Sovenn server, so we never see your contacts, your notes, or your messages. If you turn on Google Drive backup, an encrypted copy goes only to your own Drive, never to us.</div></div>';
     h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
     h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
     h+='<div class="muted" style="margin-top:18px;font-size:12.5px">Sovenn v'+VERSION+', built '+BUILT+', '+DB.contacts.length+' contacts, all local, no tracking.</div>';
@@ -1034,11 +1036,14 @@ window.exportICS=()=>{
 async function deriveKey(pass,salt){ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
 window.exportEnc=async()=>{ const pass=prompt('Set a passphrase for this backup (remember it, it cannot be recovered):'); if(!pass) return;
-  const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
-  const key=await deriveKey(pass,salt); const data=new TextEncoder().encode(JSON.stringify(DB));
-  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data));
-  const b64=u=>btoa(String.fromCharCode(...u));
-  download('sovenn-backup.enc', new Blob([JSON.stringify({kith:1,salt:b64(salt),iv:b64(iv),data:b64(ct)})],{type:'application/octet-stream'}));
+  try{
+    const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+    const key=await deriveKey(pass,salt); const data=new TextEncoder().encode(JSON.stringify(DB));
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data));
+    /* base64 in 32KB windows: a single String.fromCharCode(...bigArray) overflows the call stack once photos grow the backup */
+    const b64=u=>{ let s=''; for(let i=0;i<u.length;i+=0x8000){ s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); } return btoa(s); };
+    download('sovenn-backup.enc', new Blob([JSON.stringify({kith:1,salt:b64(salt),iv:b64(iv),data:b64(ct)})],{type:'application/octet-stream'}));
+  }catch(e){ alert('Backup failed: '+(e&&e.message?e.message:e)+'. Please try again.'); }
 };
 window.importFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=async()=>{ try{ let obj=JSON.parse(rd.result);
@@ -1080,7 +1085,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
   const dv=o=>o&&o.m?(o.y?o.y+'-':'')+String(o.m).padStart(2,'0')+'-'+String(o.d).padStart(2,'0'):'';
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+(id?'Edit':'New')+' contact</h3>';
   if(c.card) h+='<img class="card-img" src="'+c.card+'">';
-  if(c.review) h+='<div class="note">Quick-added &mdash; fill the details and Save to clear the review flag.</div>';
+  if(c.review) h+='<div class="note">Quick-added. Fill the details and Save to clear the review flag.</div>';
   h+='<label class="fl">Name &middot; how you find them, e.g. &ldquo;John from school&rdquo;</label><input id="e_name" value="'+esc(c.name||'')+'">';
   h+='<label class="fl">Calling name &middot; used in your messages (required)</label><input id="e_call" value="'+esc(c.callName||firstName(c.name)||'')+'" placeholder="John">';
   h+='<div class="two"><div><label class="fl">Phone (with country code)</label><input id="e_phone" value="'+esc(c.phone||'')+'" placeholder="+44 7..."></div><div><label class="fl">Closeness</label><select id="e_tier"><option value="1"'+(c.tier===1?' selected':'')+'>inner circle</option><option value="2"'+(c.tier===2?' selected':'')+'>keep warm</option><option value="3"'+(c.tier===3?' selected':'')+'>loose tie</option></select></div></div>';
@@ -1169,7 +1174,7 @@ function quickParse(t){ t=t||'';
   return {name,email,linkedin,instagram,x,telegram,bday,phone,location,website};
 }
 window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
-  h+='<div class="note">Paste anything &mdash; a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33..." &mdash; and Sovenn pulls out the details. Refine later on their page.</div>';
+  h+='<div class="note">Paste anything: a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33...". Sovenn pulls out the details. Refine later on their page.</div>';
   h+='<div id="qaVoice" class="voicebar" style="display:none"><span class="vbars"><i></i><i></i><i></i><i></i><i></i></span><span class="vtext">Listening, speak now</span><button class="btn sm" style="background:var(--hero-ink);color:var(--accent)" onclick="voiceStop()">Done</button></div>';
   h+='<textarea id="qa_blob" placeholder="Paste, type, or tap Speak it: name, city, where you met" style="min-height:78px" oninput="qaParse()"></textarea>';
   h+='<div class="qa-chips" id="qaChips"></div>';
@@ -1262,7 +1267,7 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   if(c.children&&c.children.length) _bits.push('kids: '+c.children.map(k=>k.name).join(', '));
   if(c.food) _bits.push('likes '+c.food);
   if(c.style) _bits.push('tone: '+c.style);
-  if(_last||_bits.length){ h+='<div class="ctx">'+(_last?'<div class="sub">last contacted '+esc(_last.date)+(_last.note?' &mdash; &ldquo;'+esc(_last.note)+'&rdquo;':'')+'</div>':'')+(_bits.length?'<div class="sub">'+esc(_bits.join(' · '))+'</div>':'')+'</div>'; }
+  if(_last||_bits.length){ h+='<div class="ctx">'+(_last?'<div class="sub">last contacted '+esc(_last.date)+(_last.note?', &ldquo;'+esc(_last.note)+'&rdquo;':'')+'</div>':'')+(_bits.length?'<div class="sub">'+esc(_bits.join(' · '))+'</div>':'')+'</div>'; }
   h+='<div class="btn-row" style="margin:10px 0">'+(occasion==='reconnect'?'<button class="btn fresh sm" onclick="freshMsg(\''+id+'\')">&#8635; fresh idea</button>':'')+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
   if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
