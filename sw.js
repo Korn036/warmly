@@ -1,7 +1,8 @@
-/* Sovenn service worker - NETWORK-FIRST.
-   Always fetch the latest files when online (so code updates reach you on a normal
-   refresh); the cache is only an offline fallback. Cache name is bumped each release. */
-const CACHE = 'sovenn-0.46.0';
+/* Sovenn service worker - STALE-WHILE-REVALIDATE.
+   Serve the cached shell instantly for a fast cold start, then refresh it in the
+   background so the next open is current. Cache name is bumped each release; the new
+   version precaches a fresh SHELL on install, so updates still land promptly. */
+const CACHE = 'sovenn-0.47.0';
 const SHELL = ['./','index.html','card.html','app.js','qr.js','capture.js','shuffle.js','memory.js','streak.js','styles.css','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','favicon-32.png','favicon-16.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting()));
@@ -11,11 +12,14 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  // stale-while-revalidate: answer from cache instantly, refresh the cache in the background
   e.respondWith(
-    fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
-      return res;
-    }).catch(() => caches.match(e.request).then(hit => hit || caches.match('index.html')))
+    caches.match(e.request).then(cached => {
+      const net = fetch(e.request).then(res => {
+        if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {}); }
+        return res;
+      }).catch(() => cached || caches.match('index.html'));
+      return cached || net;
+    })
   );
 });

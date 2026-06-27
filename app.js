@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.46.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.47.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -103,9 +103,13 @@ function stampChanges(){ const now=Date.now(), cur={};
   DB.deleted=DB.deleted||{}; Object.keys(_snap).forEach(id=>{ if(!cur[id]) DB.deleted[id]=now; });
   snapInit();
 }
-function save(){ stampChanges(); DB.savedAt=Date.now();
-  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }
-  catch(e){ logErr('save', e); alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.'); return false; }
+/* one quota-guarded write to localStorage; returns false (and logs) on failure. Shared by save() and the sync path so neither can ever report success on a failed write. */
+function persist(){ DB.savedAt=Date.now();
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
+  catch(e){ logErr('save', e); return false; }
+}
+function save(){ stampChanges();
+  if(!persist()){ alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.'); return false; }
   schedulePush(); return true;
 }
 /* ---- privacy-respecting LOCAL diagnostics: errors stay on the device (capped ring buffer); the user can copy them into beta feedback. NO network, ever. ---- */
@@ -180,12 +184,21 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
   try{ if(!_gfile) _gfile=await gFindFile();
     const remote=_gfile?await gDownload(_gfile):null; let changed=false;
     if(remote&&remote.contacts){ const before=JSON.stringify(DB.contacts); DB=mergeDB(DB,remote); snapInit(); changed=JSON.stringify(DB.contacts)!==before; }
-    DB.savedAt=Date.now(); localStorage.setItem(KEY,JSON.stringify(DB));
+    /* persist the merged result through the same quota-guarded path as save(); never claim "Synced" if the local write failed */
+    if(!persist()){ _gstatus('Storage full — couldn’t save the synced copy here. Free a little space, then retry.'); return; }
     const up=await gUpload(_gfile,DB);
-    if(up&&up.ok&&!_gfile){ const j=await up.json(); _gfile=j.id; }
-    if(changed) route();
-    _gstatus((up&&up.ok)?('Synced · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})):'Sync failed, will retry');
-  }catch(e){ _gstatus('Sync error'); }
+    if(up&&up.ok){
+      if(!_gfile){ try{ const j=await up.json(); if(j&&j.id) _gfile=j.id; }catch(_){ _gfile=await gFindFile(); } }  /* capture the new file id so the next sync PATCHes instead of creating a duplicate */
+      if(changed) route();
+      _gstatus('Synced · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+    } else if(up&&up.status===401){
+      _gtok=null; try{ localStorage.removeItem('warmly.gtok'); }catch(_){}    /* token expired: stop the silent-retry loop and tell the truth */
+      _gstatus('Sign in again to resume Drive backup — your changes are saved on this device.');
+    } else {
+      if(up&&up.status===404&&_gfile) _gfile=null;                            /* backup file vanished remotely: recreate it on the next sync */
+      _gstatus('Backup didn’t go through — your changes are saved on this device. Will retry.');
+    }
+  }catch(e){ logErr('sync', e); _gstatus('Sync paused (offline?) — your changes are saved on this device. Will retry.'); }
   finally{ _gsyncing=false; } }
 window.syncNow=syncNow;
 function schedulePush(){ if(localStorage.getItem('warmly.gsync')!=='1'||!_gtok) return; clearTimeout(_gpush); _gpush=setTimeout(syncNow,2500); }
@@ -200,6 +213,11 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;'
 /* esc() is for HTML text. For a value placed inside an inline handler's JS string (onclick="fn('X')"),
    JS-escape FIRST then HTML-escape, so it can't break out of the string after the browser decodes the attribute. */
 function jsq(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
+/* ---- lazy module loading: keep qr.js (57KB) + capture.js off the cold-start path; both call sites degrade gracefully until present ---- */
+const _lazyMod={};
+function loadScript(src){ return _lazyMod[src] || (_lazyMod[src]=new Promise((res,rej)=>{ var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); })); }
+function ensureQR(){ return window.QR?Promise.resolve():loadScript('qr.js'); }
+function ensureCapture(){ return window.SovennCapture?Promise.resolve():loadScript('capture.js'); }
 function firstName(n){ return (n||'').trim().split(/\s+/)[0]||''; }
 function callName(c){ return (c&&c.callName)?c.callName:firstName(c?c.name:''); }
 /* ---- per-contact social deep-links: conditional, generated on-device, nothing leaves the phone ---- */
@@ -307,7 +325,7 @@ function normalizePhone(raw,country){
 }
 function parseDateStr(v){
   if(!v) return null; v=String(v).trim();
-  let m=v.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m) return {y:+m[1]||null,m:+m[2],d:+m[3]};
+  let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/); if(m) return {y:+m[1]||null,m:+m[2],d:+m[3]};  /* ISO date/datetime parsed as plain components — no UTC/local day-shift */
   m=v.match(/^--(\d{2})-?(\d{2})$/); if(m) return {y:null,m:+m[1],d:+m[2]};
   m=v.match(/^(\d{4})(\d{2})(\d{2})$/); if(m) return {y:+m[1],m:+m[2],d:+m[3]};
   m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){ return {y:+m[3]<100?2000+ +m[3]:+m[3], m:+m[1], d:+m[2]}; }
@@ -480,7 +498,7 @@ function viewToday(){
   const _mp={morning:'Your morning minute. Keep your people warm.',afternoon:'A quiet minute to keep your people warm.',evening:'Your evening minute. Keep your people warm.'}[DB.settings.dailyMoment]||'Keep your people warm.';
   let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+_mp+'</p>';
   if(!DB.contacts.length){
-    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="go(\'import\')">Import contacts</button></div></div>';
+    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
   }
   h+='<div class="today-top">';
@@ -771,7 +789,7 @@ function detailRow(k,v){ return '<div class="row between" style="padding:8px 0;b
 window.saveCtx=(id,v)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.context=v; save(); } };
 /* ---- rich-detail handlers (relationships, notes, activities, tasks, gifts, debts, reminders) ---- */
 function patch(id,fn){ const c=DB.contacts.find(x=>x.id===id); if(c){ fn(c); save(); route(); } }
-const TODAYISO=()=>new Date().toISOString().slice(0,10);
+const TODAYISO=()=>todayISO();  /* local date, unified with the reminder engine so "today" agrees across notes, logs, and nudges (no UTC split) */
 window.addTag=id=>{ const t=prompt('Tag (e.g. the office, uni, climbing):'); if(t&&t.trim()) patch(id,c=>{ c.tags=c.tags||[]; c.tags.push(t.trim()); }); };
 window.delTag=(id,i)=>patch(id,c=>{ (c.tags||[]).splice(i,1); });
 window.setPartner=id=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const name=prompt('Significant other name (blank to remove):', c.partner?c.partner.name:''); if(name===null) return; if(!name.trim()){ patch(id,x=>x.partner=null); return; } const note=prompt('A note (optional, e.g. married 2021):', c.partner?(c.partner.note||''):'')||''; patch(id,x=>x.partner={name:name.trim(),note}); };
@@ -894,7 +912,7 @@ function renderQR(text, el){ if(!el) return; const q=window.QR&&QR.matrix(text);
   for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(q.modules[r][c]) ctx.fillRect((c+quiet)*scale,(r+quiet)*scale,scale,scale); }
   cv.className='qrcanvas'; el.innerHTML=''; el.appendChild(cv);
 }
-window.setMe=(k,v)=>{ DB.me=DB.me||{}; DB.me[k]=v; save(); clearTimeout(_qrT); _qrT=setTimeout(()=>{ const el=document.getElementById('qrbox'); if(el) renderQR(myVCard(), el); },400); };
+window.setMe=(k,v)=>{ DB.me=DB.me||{}; DB.me[k]=v; save(); clearTimeout(_qrT); _qrT=setTimeout(()=>{ const el=document.getElementById('qrbox'); if(el) ensureQR().then(()=>renderQR(myVCard(), el)); },400); };
 window.mePhoto=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return;
   const rd=new FileReader(); rd.onload=()=>{ const img=new Image();
     img.onload=()=>{ const s=Math.min(1,256/Math.max(img.width,img.height)); const w=Math.round(img.width*s), h=Math.round(img.height*s); const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); DB.me=DB.me||{}; try{ DB.me.photo=cv.toDataURL('image/jpeg',0.6); }catch(e){ DB.me.photo=rd.result; } save(); route(); };
@@ -963,7 +981,7 @@ window.closeNavMenu=function(){ var m=document.getElementById('navMenu'), s=docu
 /* ---- shake to shuffle (Today) ---- */
 var _lastShake=0, _shakeOn=false;
 function _onMotion(e){ var a=e.accelerationIncludingGravity||e.acceleration; if(!a) return; var mag=Math.abs(a.x||0)+Math.abs(a.y||0)+Math.abs(a.z||0); var now=Date.now(); if(mag>32 && now-_lastShake>1300){ _lastShake=now; if((location.hash||'').indexOf('today')>=0 && window.shuffleToday) shuffleToday(); } }
-window.enableShake=function(){ if(_shakeOn) return; try{ if(typeof DeviceMotionEvent==='undefined') return; if(typeof DeviceMotionEvent.requestPermission==='function'){ DeviceMotionEvent.requestPermission().then(function(s){ if(s==='granted'){ window.addEventListener('devicemotion',_onMotion); _shakeOn=true; } }).catch(function(){}); } else { window.addEventListener('devicemotion',_onMotion); _shakeOn=true; } }catch(e){} };
+window.enableShake=function(){ if(_shakeOn) return; if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches) return; try{ if(typeof DeviceMotionEvent==='undefined') return; if(typeof DeviceMotionEvent.requestPermission==='function'){ DeviceMotionEvent.requestPermission().then(function(s){ if(s==='granted'){ window.addEventListener('devicemotion',_onMotion); _shakeOn=true; } }).catch(function(){}); } else { window.addEventListener('devicemotion',_onMotion); _shakeOn=true; } }catch(e){} };
 window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
 window.saveCard=()=>{ _editCard=false; route(); };
 function interestIcon(w){ w=w.toLowerCase(); const M=[
@@ -1043,7 +1061,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
     h+='<div class="btn-row" style="margin-top:16px"><button class="btn primary block" onclick="saveCard()">Save card</button></div></div>';
   }
   h+='</div>'; render(h);
-  renderQR(myVCard(), document.getElementById('qrbox'));
+  ensureQR().then(()=>{ const qb=document.getElementById('qrbox'); if(qb) renderQR(myVCard(), qb); });
 }
 function viewSettings(section){
   const s=DB.settings;
@@ -1404,7 +1422,7 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="logToday(\''+id+'\')">Mark as contacted today</button></div>';
   openModal(h);
 };
-window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid); $('#msg').value=fillTemplate(t.body,c); };
+window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid), box=$('#msg'); if(!c||!t||!box) return; box.value=fillTemplate(t.body,c); };
 window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const txt=($('#msg').value||'').trim();
   if(!normalizePhone(c.phone)){ alert('No usable phone number for this person. Add one with its country code first.'); return; }
   if(!txt){ alert('Write a message first.'); return; }
@@ -1538,6 +1556,8 @@ snapInit();
 route();
 gBoot();
 initFeedback();
+/* warm the lazy modules in the background once the UI is up (so My Card / quick-add feel instant) */
+(window.requestIdleCallback||function(f){return setTimeout(f,1500);})(function(){ ensureQR(); ensureCapture(); });
 /* app lock: detect biometric support, and gate the app if a passcode is set */
 lockBioAvail().then(v=>{ _bioOK=v; });
 if(lockEnabled()) lockShow();
