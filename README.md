@@ -1,52 +1,44 @@
-# Warmly — personal keep-in-touch CRM (Phase 1)
+# Sovenn — a private, on-device keep-in-touch app
 
-A simple, private relationship manager. Import your contacts, mark who matters, store
-birthdays/anniversaries + a little context, get nudged before each occasion, send a warm
-WhatsApp message from **your own number with one tap** (you review + tap send yourself),
-drop dates onto **Google Calendar**, and set "reconnect every N months" so warm contacts
-don't go cold.
+Remember the people who matter, never miss a birthday, and keep warm contacts from going
+cold. Mark who's in your inner circle, store birthdays/anniversaries + a little context, get
+nudged before each occasion, and send a warm WhatsApp message from **your own number with one
+tap** (you review and send). Drop dates onto **Google Calendar**, and set "reconnect every N
+months" so warm contacts don't drift.
 
-Everything lives **on your device** (the browser's local storage). Nothing is sent to anyone
-until you tap send in WhatsApp or confirm in Google Calendar. No tracking, no accounts, $0.
+**Private by design:** everything lives on your device (the browser's local storage). There's
+no Sovenn server, no account, and no tracking. Nothing is sent to anyone until *you* tap send.
 
-## Try it right now
-- Double-click `index.html` to open it in your browser. (The app works; the installable
-  "add to home screen" / offline bits only kick in once it's hosted over HTTPS.)
-- Go to **Import** → choose `sample-contacts.csv` → tick a few → Import. Then open **Today**.
+- **Live:** https://sovenn.app — installable PWA, published to Google Play as a TWA.
+- **Stack:** single-page vanilla JS (no build step), a service worker (stale-while-revalidate),
+  and a few feature modules. Hosted on Cloudflare Pages (`git push` → deploy).
 
-## Get your real contacts in
-- **Google Contacts:** contacts.google.com → Export → **Google CSV** → import that file.
-- **iPhone:** share a contact as a `.vcf`, or export via iCloud, and import the `.vcf`.
-- You choose exactly who to keep (only import people you actually want to stay warm with).
+## Run / edit locally
+- Serve the folder over HTTP (e.g. `python -m http.server 8753`) and open it — a real origin is
+  needed for the service worker, install, and the Contacts Picker.
+- Everything is hand-editable: `app.js` (views + logic), `styles.css`, `index.html`,
+  feature modules (`shuffle/memory/streak/capture/qr/ai/notify/enrich.js`), `sw.js`.
 
-## How the "automation" works (all human-approved)
-- **Birthday/keep-in-touch reminder** appears under **Today** (a day before, by default).
-- **Message:** opens WhatsApp with a template-filled draft pre-filled to that person — *you*
-  review and tap send. This is the only safe, free, ban-proof way (auto-send gets numbers banned).
-- **+ Calendar:** opens Google Calendar pre-filled with a yearly-recurring event so your iPhone
-  reminds you natively.
-- **Log a call** stamps "last contacted" and schedules the next reconnect automatically.
+## Getting contacts in
+- **Android:** the in-app Contacts Picker (no sign-in, on-device).
+- **Google Contacts:** export → **Google CSV** → Import.
+- **iPhone:** share a contact as `.vcf` and import it.
+- You choose exactly who to keep — only the people you want to stay warm with.
 
-## Deploy it (so it installs on your iPhone)
-1. Cloudflare → Workers & Pages → Create → Pages → **Upload assets**.
-2. Upload this whole folder (index.html, app.js, styles.css, manifest.webmanifest, sw.js,
-   icon.svg, `_headers`). Skip the README and sample CSV if you like.
-3. Optional: set a custom domain like `kith.karthikonteddu.com`.
-4. On your iPhone, open the site in Safari → Share → **Add to Home Screen**.
+## How the gentle automation works (all human-approved)
+- **Today** surfaces who's due (birthdays, anniversaries, and overdue reconnects) as a swipeable
+  deck. **Message** opens WhatsApp with a draft pre-filled — you review and send. **+ Calendar**
+  pre-fills a recurring Google Calendar event. **Log** stamps "last contacted" and schedules the
+  next reconnect.
 
-`_headers` adds the security headers (CSP, HSTS, etc.) automatically on Cloudflare Pages.
+## Backup & optional sync
+- **Encrypted backup:** a passphrase-protected file (real AES-GCM) you save and restore yourself.
+- **Google Drive sync (optional, default-off):** an encrypted copy to a hidden folder in *your own*
+  Drive. Contacts never touch a Sovenn server; the app talks to Drive directly.
 
-## Backup / move between devices
-Settings → **Encrypted backup** (passphrase-protected `.kith` file) → restore it on your laptop
-or phone. (Phase 2 replaces this with real live sync.)
+## Security headers
+`_headers` ships the CSP, HSTS, and related headers automatically on Cloudflare Pages.
 
-## Honest limits (Phase 1)
-- Data is per-device; sync across phone+laptop is manual via the encrypted backup for now.
-- Reminders surface in-app + via the calendar events you add; there's no background push yet.
-- Can't auto-rank contacts by WhatsApp activity (WhatsApp exposes nothing) — you triage, fast.
-
-## Phase 2 (when you want to go public/paid)
-A small Cloudflare Workers + D1 backend for true cross-device sync, real Google Calendar
-auto-sync, multi-user accounts + Stripe. The data model already carries this design, so it's an
-add-on, not a rewrite. (At that point, tighten the CSP off `'unsafe-inline'` — fine for a private
-local app, worth hardening once data is multi-user.)
+## Deploy
+`git push origin main` → Cloudflare Pages builds and serves `sovenn.app`. Bump `VERSION` in
+`app.js` and the cache name in `sw.js` each release so clients pick up the new build.

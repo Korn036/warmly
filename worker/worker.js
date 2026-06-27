@@ -33,6 +33,7 @@ export default {
     /* 1) START — send the user to Google to approve once */
     if (url.pathname === '/auth/start') {
       const app = url.searchParams.get('app') || allowed[0] || '';
+      if (!allowed.some(o => app === o || app.startsWith(o + '/'))) return new Response('invalid app origin', { status: 400 });  /* prevent open-redirect / token exfiltration to an attacker URL */
       const state = rand(12);
       await env.SESSIONS.put('state:'+state, app, { expirationTtl: 600 });
       const p = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: redirectUri, response_type:'code', scope: SCOPE, access_type:'offline', prompt:'consent', include_granted_scopes:'true', state });
@@ -46,10 +47,12 @@ export default {
       if (!code || !app) return new Response('bad request', { status: 400 });
       const body = new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: redirectUri, grant_type:'authorization_code' });
       const t = await (await fetch(TOKEN_URL, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body })).json();
-      if (!t.access_token) return new Response('token exchange failed: ' + JSON.stringify(t), { status: 500 });
+      if (!t.access_token) return new Response('Sign-in could not be completed. Please try again.', { status: 502 });  /* generic error — do not echo Google's raw response */
+      if (!allowed.some(o => app === o || app.startsWith(o + '/'))) return new Response('invalid app origin', { status: 400 });
       const session = rand(24);
       await env.SESSIONS.put('sess:'+session, JSON.stringify({ refresh_token: t.refresh_token || '' }));
-      const frag = '#warmly_session=' + session + '&access_token=' + t.access_token + '&expires_in=' + (t.expires_in||3600);
+      /* session id only — the app fetches a short-lived access token via /auth/token; no access token ever rides in the URL */
+      const frag = '#warmly_session=' + session;
       return Response.redirect(app + frag, 302);
     }
 
@@ -69,11 +72,12 @@ export default {
 
     /* 4) LOGOUT — forget the stored refresh token */
     if (url.pathname === '/auth/logout') {
+      if (!allowed.includes(origin)) return new Response('forbidden', { status: 403 });   /* block cross-site (CSRF) logout via <img>/<link> */
       const session = url.searchParams.get('session');
       if (session) await env.SESSIONS.delete('sess:'+session);
       return new Response('ok', { headers: corsHeaders(origin, allowed) });
     }
 
-    return new Response('Warmly auth worker is running.', { headers: { 'Content-Type':'text/plain' } });
+    return new Response('Sovenn auth worker is running.', { headers: { 'Content-Type':'text/plain' } });
   }
 };
