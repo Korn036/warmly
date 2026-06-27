@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.48.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.49.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -525,10 +525,14 @@ function viewToday(){
   /* the swipe deck: due reconnects + the next ~10 days of dates, as a real pack of cards */
   let heroId=null;
   const upN=upcoming(10); let deck=[];
-  due.forEach(function(d){ deck.push({ c:d.c, label:'time to reconnect', when:(d.overdue<0?(-d.overdue)+' days overdue':'due now'),
-    actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Message '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
+  /* LEAD with the real milestones — birthdays & anniversaries in the next ~10 days, soonest first
+     (so a date like a birthday in 4 days is never buried behind freshly-imported "due now" reconnects) */
   upN.forEach(function(x){ deck.push({ c:x.c, label:String(x.o.label), when:whenLabel(x.n),
     actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>' }); });
+  /* then fill the remaining slots with overdue reconnects, skipping anyone already shown for a date */
+  const _occIds={}; upN.forEach(function(x){ _occIds[x.c.id]=1; });
+  due.forEach(function(d){ if(_occIds[d.c.id]) return; deck.push({ c:d.c, label:'time to reconnect', when:(d.overdue<0?(-d.overdue)+' days overdue':'due now'),
+    actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Message '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
   deck=deck.slice(0,12); window._deck=deck;
   if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><button type="button" class="deck-hint" aria-label="Show the next card" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone &middot; or tap here</button></div></div>';
   else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Nobody is overdue and no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
