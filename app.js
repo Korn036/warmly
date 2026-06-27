@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.43.2', BUILT='2026-06-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.44.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -265,6 +265,24 @@ window.askDetails=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
 };
 function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
 function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','#6A655B','#3C6E91','#8A5A99']; let h=0; for(const c of (n||'x')) h=(h*31+c.charCodeAt(0))%colors.length; return colors[h]; }
+/* avatar: a real photo when we have one (from import), else warm coloured initials */
+function avatarHTML(c, sizeStyle){ sizeStyle=sizeStyle||''; if(c.photo) return '<div class="avatar" style="'+sizeStyle+'"><img src="'+esc(c.photo)+'" alt=""></div>'; return '<div class="avatar" style="background:'+avatarColor(c.name)+';'+sizeStyle+'">'+esc(initials(c.name))+'</div>'; }
+/* warmth bar: replaces the tier pill (inner=3, warm=2, loose=1 filled) */
+function warmthBar(c, label){ const t=c.tier||3; const n=t===1?3:t===2?2:1; const lbl={1:'inner',2:'warm',3:'loose'}[t]; let b=''; for(var i=0;i<3;i++) b+='<i class="'+(i<n?'on':'')+'"></i>';
+  return '<span class="wbar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 15 3 11 3 7.5 3 5 5 3 7.5 3 9.4 3 11 4 12 5.5 13 4 14.6 3 16.5 3 19 3 21 5 21 7.5 21 11 19 15 12 21z"/></svg><span class="seg">'+b+'</span>'+(label===false?'':'<span class="wl">'+lbl+'</span>')+'</span>'; }
+const SHIC='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 3.9M15.4 6.6l-6.8 3.9"/></svg>';
+function shareBtn(id){ return '<button class="cshare" onclick="event.stopPropagation();shareContact(\''+id+'\')" title="Share this contact" aria-label="Share this contact">'+SHIC+'</button>'; }
+/* per-contact vCard share (mirrors myVCard) */
+function contactVCard(c){ const L=['BEGIN:VCARD','VERSION:3.0','FN:'+vEsc(c.name||'')];
+  if(c.phone) L.push('TEL;TYPE=CELL:'+vEsc(c.phone)); if(c.email) L.push('EMAIL:'+vEsc(c.email));
+  if(c.company||c.jobTitle){ L.push('ORG:'+vEsc(c.company||'')); if(c.jobTitle) L.push('TITLE:'+vEsc(c.jobTitle)); }
+  if(c.linkedin) L.push('URL:'+vEsc(c.linkedin)); if(c.website) L.push('URL:'+vEsc(c.website));
+  if(c.address) L.push('ADR;TYPE=HOME:;;'+vEsc(c.address)+';;;;'); if(c.context) L.push('NOTE:'+vEsc(c.context));
+  L.push('END:VCARD'); return L.join('\r\n'); }
+window.shareContact=async(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const v=contactVCard(c); const fn=(firstName(c.name)||'contact')+'.vcf';
+  try{ const file=new File([v],fn,{type:'text/vcard'}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:c.name}); return; } }catch(e){}
+  try{ if(navigator.share){ await navigator.share({title:c.name, text:v}); return; } }catch(e){}
+  download(fn, new Blob([v],{type:'text/vcard'})); };
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function today(){ const t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
 function todayISO(){ const t=today(),p=n=>String(n).padStart(2,'0'); return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate()); }
@@ -446,12 +464,13 @@ let _lastView='', _shuffleId=null, _rerollN=0;
 window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
   const [view,arg]=location.hash.replace('#','').split('/');
-  document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
-  $('#tabs').classList.remove('open');
+  document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
+  if(window.closeNavMenu) closeNavMenu();
   const v=view||'today';
   if(v==='today' && _lastView!=='today') _shuffleId='reroll';
   _lastView=v;
   ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, mycard:viewMyCard, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
+  if(window.updateBell) updateBell();
   window.scrollTo(0,0);
 }
 
@@ -465,16 +484,17 @@ function viewToday(){
   }
   h+='<div class="today-top">';
   /* hero: the nearest upcoming celebration leads; otherwise the most overdue reconnect */
-  let heroId=null, heroOcc=null;
+  let heroId=null, heroOcc=null, heroHTML='';
   if(up.length){ const x=up[0]; heroId=x.c.id; heroOcc=x;
-    h+=heroCard(x.c, x.o.label, whenLabel(x.n),
+    heroHTML=heroCard(x.c, x.o.label, whenLabel(x.n),
       '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button>'+
       '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>');
   } else if(due.length){ const c=due[0].c; heroId=c.id;
-    h+=heroCard(c, 'time to reconnect', (due[0].overdue<0?(-due[0].overdue)+' days overdue':'due now'),
+    heroHTML=heroCard(c, 'time to reconnect', (due[0].overdue<0?(-due[0].overdue)+' days overdue':'due now'),
       '<button class="btn primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message '+esc(callName(c))+'</button>'+
       '<button class="btn ghost" onclick="logToday(\''+c.id+'\')">Log call</button>');
   }
+  if(heroHTML) h+='<div class="deck"><div class="peek p2"></div><div class="peek"></div>'+heroHTML+'</div><div class="deck-hint" onclick="enableShake();shuffleToday()">&#8635; shuffle &middot; or give your phone a shake</div>';
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
@@ -523,10 +543,13 @@ function viewToday(){
   h+='</div>'; render(h);
 }
 function heroCard(c, label, whenText, actions){
-  return '<div class="hero"><svg class="blob" viewBox="0 0 64 44" aria-hidden="true"><circle cx="26" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7" opacity=".5"/><circle cx="40" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7"/></svg>'
-    +'<div class="kick" style="color:var(--hero-ink);opacity:.85;margin:0 0 8px">'+esc(label)+'</div>'
-    +'<div class="nm">'+esc(c.name)+'</div>'
+  return '<div class="hero" data-cid="'+c.id+'"><svg class="blob" viewBox="0 0 64 44" aria-hidden="true"><circle cx="26" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7" opacity=".5"/><circle cx="40" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7"/></svg>'
+    +'<div class="kick" style="color:var(--hero-ink);opacity:.85;margin:0 0 11px">'+esc(label)+'</div>'
+    +'<div class="row" style="gap:13px;align-items:center">'+avatarHTML(c,'width:60px;height:60px;border-radius:18px;flex:0 0 auto;')
+    +'<div class="grow"><div class="nm">'+esc(c.name)+'</div>'
     +'<div class="sub">'+(c.context?esc(c.context)+' · ':'')+'<span class="circ">'+esc(whenText)+'<svg viewBox="0 0 96 30" preserveAspectRatio="none"><path d="M82 7 C 98 13, 92 27, 48 28 C 8 29, 4 16, 12 9 C 20 3, 66 3, 90 12"/></svg></span></div>'
+    +'<div style="margin-top:8px">'+warmthBar(c)+'</div></div>'
+    +'<button class="cshare" onclick="event.stopPropagation();shareContact(\''+c.id+'\')" title="Share" aria-label="Share">'+SHIC+'</button></div>'
     +'<div class="btn-row" style="margin-top:14px">'+actions+'</div></div>';
 }
 function viewMap(){
@@ -548,22 +571,22 @@ function viewMap(){
   h+='</div>'; render(h);
 }
 function personRow(c,pill,actions){
-  return '<div class="card" data-cid="'+c.id+'"><div class="row"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+  return '<div class="card" data-cid="'+c.id+'"><div class="row">'+avatarHTML(c)
     +'<div class="grow" onclick="go(\'person\',\''+c.id+'\')" style="cursor:pointer"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+(c.context?esc(c.context)+' · ':'')+pill+'</div></div>'+kebab(c.id)+'</div>'
     +'<div class="btn-row" style="margin-top:12px">'+actions+'</div></div>';
 }
 
 function peopleTile(c){ const occ=contactOccasions(c)[0];
-  return '<div class="tile" data-cid="'+c.id+'" onclick="go(\'person\',\''+c.id+'\')">'+kebab(c.id)+'<div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+  return '<div class="tile" data-cid="'+c.id+'" onclick="go(\'person\',\''+c.id+'\')"><div class="tint"></div>'+shareBtn(c.id)+avatarHTML(c)
     +'<div class="nm">'+esc(c.name)+'</div>'
     +'<div class="sub">'+esc(c.location||c.company||c.context||'—')+'</div>'
-    +'<div class="sub" style="margin-top:2px">'+(occ?(esc(occ.label)+' '+fmtDate(occ.date)):(c.cadence?('reconnect every '+c.cadence+' mo'):'&nbsp;'))+'</div>'
-    +'<span class="pill t'+(c.tier||3)+'" style="margin-top:10px;align-self:flex-start">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span>'+(c.review?'<span class="review-badge" style="margin-top:8px;align-self:flex-start">review</span>':'')+'</div>';
+    +'<div class="sub" style="margin-top:2px">'+(occ?(esc(occ.label)+' '+fmtDate(occ.date)):(c.cadence?('every '+c.cadence+' mo'):'&nbsp;'))+'</div>'
+    +warmthBar(c)+(c.review?'<span class="review-badge" style="margin-top:8px;align-self:flex-start">review</span>':'')+'</div>';
 }
 function peopleRow(c){ const occ=contactOccasions(c)[0];
-  return '<div class="card row" data-cid="'+c.id+'" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')"><div class="avatar" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
+  return '<div class="card row list-row" data-cid="'+c.id+'" style="cursor:pointer" onclick="go(\'person\',\''+c.id+'\')">'+avatarHTML(c)
     +'<div class="grow"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+esc(c.location||c.company||c.context||'no notes yet')+(occ?(' · '+esc(occ.label)+' '+fmtDate(occ.date)):'')+'</div></div>'
-    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner',2:'warm',3:'loose'}[c.tier||3])+'</span>'+(c.review?'<span class="review-badge">review</span>':'')+kebab(c.id)+'</div>';
+    +warmthBar(c)+kebab(c.id)+'</div>';
 }
 function viewPeople(){
   const f=window._pfilter||{q:'',tier:0};
@@ -660,20 +683,21 @@ function viewPerson(id){
   const occ=contactOccasions(c); const nd=nextDue(c);
   const last=(c.log||[]).slice(-1)[0];
   const work=[c.jobTitle,c.company].filter(Boolean).join(' at ');
-  let h='<div class="view"><a class="btn ghost sm" onclick="go(\'people\')">← People</a>';
-  /* header: quick glance */
-  h+='<div class="card" style="margin-top:14px"><div class="row"><div class="avatar" style="width:56px;height:56px;font-size:22px;background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>'
-    +'<div class="grow"><div class="nm" style="font-size:20px;font-family:var(--serif)">'+esc(c.name)+'</div>'
-    +'<div class="sub">'+esc(work||c.context||'')+'</div>'
-    +'<div class="sub" style="margin-top:2px">'+(last?('last contacted '+esc(last.date)):'not contacted yet')+(c.activities&&c.activities.length?(' · last activity '+esc(c.activities.slice(-1)[0].date)):'')+'</div></div>'
-    +'<span class="pill t'+(c.tier||3)+'">'+({1:'inner circle',2:'keep warm',3:'loose tie'}[c.tier||3])+'</span></div>';
-  h+='<div class="chips" style="margin-top:10px">'+(c.tags||[]).map((t,i)=>'<span class="chip on" onclick="delTag(\''+id+'\','+i+')">'+esc(t)+' ×</span>').join('')+'<span class="chip" onclick="addTag(\''+id+'\')">+ tag</span></div>';
-  h+='<div class="btn-row" style="margin-top:6px">';
-  if(c.phone) h+='<button class="btn ghost sm" onclick="askDetails(\''+id+'\')">Ask for details</button>';
-  h+='<button class="btn ghost sm" onclick="logCall(\''+id+'\')">Log a call</button>';
-  h+='<button class="btn ghost sm" onclick="editContact(\''+id+'\')">Edit details</button></div></div>';
+  let h='<div class="view"><div class="pbar-top"><a class="btn ghost sm" onclick="go(\'people\')">← People</a><div class="grow"></div>'+shareBtn(id)+kebab(id)+'</div>';
+  const tierLabel={1:'inner circle',2:'keep warm',3:'loose tie'}[c.tier||3];
+  const lastTxt=(last?('last contacted '+esc(last.date)):'not contacted yet')+(c.activities&&c.activities.length?(' · last activity '+esc(c.activities.slice(-1)[0].date)):'');
+  /* photo header */
+  h+='<div class="phead">'+(c.photo?'<img src="'+esc(c.photo)+'" alt="">':'<div class="noimg" style="background:'+avatarColor(c.name)+'">'+esc(initials(c.name))+'</div>')
+    +'<div class="scrim"></div><div class="pinfo"><div class="pnm">'+esc(c.name)+'</div>'
+    +'<div class="prow"><span class="tierchip">'+tierLabel+'</span>'+warmthBar(c,false)+'</div>'
+    +'<div class="pctx">'+((work||c.context)?esc(work||c.context)+' · ':'')+lastTxt+'</div></div></div>';
+  h+='<div class="chips" style="margin-top:0">'+(c.tags||[]).map((t,i)=>'<span class="chip on" onclick="delTag(\''+id+'\','+i+')">'+esc(t)+' ×</span>').join('')+'<span class="chip" onclick="addTag(\''+id+'\')">+ tag</span></div>';
   h+=reachBar(c);
   h+=socialRow(c,true,true);
+  h+='<div class="btn-row" style="margin-top:4px">';
+  if(c.phone) h+='<button class="btn ghost sm" onclick="askDetails(\''+id+'\')">Ask for details</button>';
+  h+='<button class="btn ghost sm" onclick="logCall(\''+id+'\')">Log a call</button>';
+  h+='<button class="btn ghost sm" onclick="editContact(\''+id+'\')">Edit details</button></div>';
   if(window.SovennMemory&&SovennMemory.surface){ try{ const _ml=SovennMemory.surface(c,{today:todayISO()}); if(_ml&&_ml.length) h+='<div class="card"><div class="kick" style="margin-top:0">Remember</div>'+_ml.map(function(s){return '<div class="sub" style="padding:3px 0;font-size:13.5px">'+esc(s)+'</div>';}).join('')+'</div>'; }catch(e){ if(window.logErr) logErr('memory',e); } }
 
   /* quick triage */
@@ -780,14 +804,17 @@ window.onFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new Fi
     window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview(); };
   rd.readAsText(f);
 };
+/* downsize a contact-photo Blob (from the picker icon) to a small on-device JPEG data URI */
+function blobToAvatar(blob){ return new Promise(function(res){ try{ var img=new Image(); var url=URL.createObjectURL(blob); img.onload=function(){ try{ var s=Math.min(1,128/Math.max(img.width,img.height)); var w=Math.round(img.width*s),hh=Math.round(img.height*s); var cv=document.createElement('canvas'); cv.width=w; cv.height=hh; cv.getContext('2d').drawImage(img,0,0,w,hh); URL.revokeObjectURL(url); res(cv.toDataURL('image/jpeg',0.7)); }catch(e){ res(''); } }; img.onerror=function(){ URL.revokeObjectURL(url); res(''); }; img.src=url; }catch(e){ res(''); } }); }
 window.pickContacts=async()=>{
   if(!(navigator.contacts && navigator.contacts.select)){ alert('This browser cannot read device contacts. Use the file option instead.'); return; }
   try{
     let props=['name','tel'];
-    try{ const sup=await navigator.contacts.getProperties(); if(sup.includes('email')) props.push('email'); }catch(e){}
+    try{ const sup=await navigator.contacts.getProperties(); if(sup.includes('email')) props.push('email'); if(sup.includes('icon')) props.push('icon'); }catch(e){}
     const sel=await navigator.contacts.select(props,{multiple:true});
     if(!sel||!sel.length) return;
-    const rows=sel.map(c=>({ name:(c.name&&c.name[0])||((c.tel&&c.tel[0])||''), phone:(c.tel&&c.tel[0])||'', email:(c.email&&c.email[0])||'', bday:null, context:'' })).filter(r=>r.name||r.phone);
+    let rows=await Promise.all(sel.map(async function(c){ var photo=''; try{ if(c.icon&&c.icon[0]) photo=await blobToAvatar(c.icon[0]); }catch(e){} return { name:(c.name&&c.name[0])||((c.tel&&c.tel[0])||''), phone:(c.tel&&c.tel[0])||'', email:(c.email&&c.email[0])||'', photo:photo, bday:null, context:'' }; }));
+    rows=rows.filter(function(r){ return r.name||r.phone; });
     if(!rows.length){ alert('No usable contacts were selected.'); return; }
     window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview();
     const pv=document.getElementById('preview'); if(pv) pv.scrollIntoView({behavior:'smooth'});
@@ -809,7 +836,7 @@ window.impSet=(i,k,v)=>{ window._imp[i][k]=v; };
 window.impAll=(v)=>{ window._imp.forEach(r=>r._keep=v); renderPreview(); };
 window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.length){ alert('Tick at least one contact.'); return; }
   let added=0;
-  keep.forEach(r=>{ DB.contacts.push({ id:uid(), name:r.name, phone:r.phone||'', email:r.email||'', linkedin:r.linkedin||'', context:r.context||'', tier:r._tier||2, bday:r.bday||null, anniv:null, customDates:[], cadence:r._tier===1?3:r._tier===2?6:null, lastContacted:null, log:[], createdAt:new Date().toISOString() }); added++; });
+  keep.forEach(r=>{ DB.contacts.push({ id:uid(), name:r.name, phone:r.phone||'', email:r.email||'', linkedin:r.linkedin||'', context:r.context||'', photo:r.photo||'', tier:r._tier||2, bday:r.bday||null, anniv:null, customDates:[], cadence:r._tier===1?3:r._tier===2?6:null, lastContacted:null, log:[], createdAt:new Date().toISOString() }); added++; });
   save(); window._imp=null; alert('Imported '+added+' contacts. Set their birthdays/cadence anytime.'); go('people');
 };
 
@@ -904,17 +931,28 @@ window.feedbackOpen=function(){ _fbMood='';
     +'<div class="fb-moods">'+moods.map(function(m){ return '<button type="button" class="fb-mood" data-m="'+m[0]+'" onclick="fbMood(\''+m[0]+'\')"><span class="em">'+m[1]+'</span>'+m[2]+'</button>'; }).join('')+'</div>'
     +'<textarea id="fbText" placeholder="What felt good? What confused you? What is missing?"></textarea>'
     +'<div class="fb-ctx">attaches: Sovenn v'+VERSION+' &middot; screen: '+_fbScreen()+'</div>'
-    +'<div class="fb-actions"><button type="button" class="btn ghost sm" onclick="feedbackDiag()">Copy a glitch log</button><button type="button" class="btn primary sm fb-send" onclick="feedbackSend()">Send on WhatsApp</button></div>'
-    +'<div class="fb-priv">Opens your own WhatsApp with this pre-filled, straight to the founder. Nothing is sent until you tap send, and nothing is tracked.</div>'
-    +'<div class="fb-foot"><button type="button" onclick="fbHide()">Hide this button</button><button type="button" onclick="feedbackClose()">Close</button></div></div>';
+    +'<div class="fb-actions"><button type="button" class="btn ghost sm" onclick="feedbackDiag()">Copy a glitch log</button><button type="button" class="btn primary sm fb-send" onclick="feedbackSend()">Send feedback</button></div>'
+    +'<div class="fb-priv">Opens a short private form, pre-filled. We never see your number or anything you do not type here, and nothing is tracked.</div>'
+    +'<div class="fb-foot"><button type="button" onclick="feedbackClose()">Minimize</button><button type="button" onclick="feedbackClose()">Close</button></div></div>';
   var bg=document.getElementById('fbBg'); if(!bg) return; bg.innerHTML=h; bg.hidden=false; setTimeout(function(){ var t=document.getElementById('fbText'); if(t) t.focus(); },80); };
 window.feedbackClose=function(){ var bg=document.getElementById('fbBg'); if(bg){ bg.hidden=true; bg.innerHTML=''; } };
 window.fbMood=function(m){ _fbMood=m; var els=document.querySelectorAll('.fb-mood'); for(var i=0;i<els.length;i++){ els[i].classList.toggle('on', els[i].getAttribute('data-m')===m); } };
-window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=ta?ta.value:''; var mood={love:'\u{1F60D} Love',meh:'\u{1F610} Meh',bug:'\u{1F41B} Bug',idea:'\u{1F4A1} Idea'}[_fbMood]||'';
-  var lines=['Sovenn beta feedback']; if(mood) lines.push(mood); if(t.trim()){ lines.push(''); lines.push(t.trim()); } lines.push(''); lines.push('v'+VERSION+' · '+_fbScreen());
-  window.open('https://wa.me/'+FB_WA+'?text='+encodeURIComponent(lines.join('\n')),'_blank'); feedbackClose(); };
+window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=(ta?ta.value:'').trim(); var mood={love:'\u{1F60D} Love',meh:'\u{1F610} Meh',bug:'\u{1F41B} Bug',idea:'\u{1F4A1} Idea'}[_fbMood]||'';
+  var compiled=[mood, t, 'v'+VERSION+' · '+_fbScreen()].filter(Boolean).join('\n');
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(compiled); }catch(e){}
+  var u='https://tally.so/r/zxOD2Z?note='+encodeURIComponent(t)+'&mood='+encodeURIComponent(mood)+'&ctx='+encodeURIComponent('v'+VERSION+' · '+_fbScreen());
+  window.open(u,'_blank','noopener'); feedbackClose(); };
 window.feedbackDiag=function(){ if(window.copyDiag){ copyDiag(); } };
-window.fbHide=function(){ try{ sessionStorage.setItem('sovenn.fbhide','1'); }catch(e){} var f=document.getElementById('fbFab'); if(f) f.hidden=true; feedbackClose(); };
+window.fbHide=function(){ feedbackClose(); };
+/* ---- top nav: notification bell + tucked menu ---- */
+function dueCount(){ try{ return (typeof dueToReach==='function'?(dueToReach()||[]).length:0); }catch(e){ return 0; } }
+window.updateBell=function(){ var el=document.getElementById('bellN'); if(!el) return; var n=dueCount(); if(n>0){ el.textContent=n>99?'99+':String(n); el.hidden=false; } else { el.hidden=true; } };
+window.toggleNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(!m) return; var open=!m.classList.contains('open'); m.classList.toggle('open',open); if(s) s.classList.toggle('open',open); };
+window.closeNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(m) m.classList.remove('open'); if(s) s.classList.remove('open'); };
+/* ---- shake to shuffle (Today) ---- */
+var _lastShake=0, _shakeOn=false;
+function _onMotion(e){ var a=e.accelerationIncludingGravity||e.acceleration; if(!a) return; var mag=Math.abs(a.x||0)+Math.abs(a.y||0)+Math.abs(a.z||0); var now=Date.now(); if(mag>32 && now-_lastShake>1300){ _lastShake=now; if((location.hash||'').indexOf('today')>=0 && window.shuffleToday) shuffleToday(); } }
+window.enableShake=function(){ if(_shakeOn) return; try{ if(typeof DeviceMotionEvent==='undefined') return; if(typeof DeviceMotionEvent.requestPermission==='function'){ DeviceMotionEvent.requestPermission().then(function(s){ if(s==='granted'){ window.addEventListener('devicemotion',_onMotion); _shakeOn=true; } }).catch(function(){}); } else { window.addEventListener('devicemotion',_onMotion); _shakeOn=true; } }catch(e){} };
 window.toggleEditCard=()=>{ _editCard=!_editCard; route(); if(_editCard) setTimeout(()=>{ const e=document.getElementById('cardedit'); if(e) e.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
 window.saveCard=()=>{ _editCard=false; route(); };
 function interestIcon(w){ w=w.toLowerCase(); const M=[
@@ -1477,7 +1515,8 @@ window.lockAuto=(k)=>{ const c=lockCfg(); if(!c) return; c.autolock=k; lockSave(
 function render(h){ $('#app').innerHTML=h; }
 (function(){ const bv=document.getElementById('brandVer'); if(bv) bv.textContent='v'+VERSION; })();
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
-$('#menuBtn').addEventListener('click',()=>$('#tabs').classList.toggle('open'));
+$('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleNavMenu(); });
+{ var _ms=$('#menuScrim'); if(_ms) _ms.addEventListener('click',closeNavMenu); var _nm=$('#navMenu'); if(_nm) _nm.addEventListener('click',closeNavMenu); var _bb=$('#bellBtn'); if(_bb) _bb.addEventListener('click',function(){ go('today'); }); try{ enableShake(); }catch(e){} }
 const tb=$('#themeBtn');
 applySkin(localStorage.getItem('warmly.skin')||'stillmorning');
 updateThemeBtn();
