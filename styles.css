@@ -582,6 +582,29 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .tbtns .icon-btn{ width:36px; height:36px; }
 @media(max-width:680px){ .tabs{ position:static; transform:none; flex-direction:row; background:none; border:none; padding:0; box-shadow:none; } .tabs a{ border:none; padding:8px 11px; font-size:12px; } }
 @media(max-width:400px){ .brand .brandname{ font-size:20px; } .topbar .tabs a{ padding:8px 9px; } }
+/* calmer, smaller top-bar buttons + bell badge */
+.tbtns .icon-btn{ width:34px; height:34px; }
+.bell .nb{ min-width:16px; height:16px; font-size:9.5px; top:-4px; right:-4px; }
+/* Today swipe deck (a pack of cards) */
+.deckwrap{ margin-bottom:16px; }
+.deckstack{ position:relative; min-height:242px; }
+.deckstack .dcard{ position:absolute; left:0; right:0; top:0; margin:0; transform-origin:50% 100%; transition:transform .3s ease, opacity .25s; touch-action:pan-y; will-change:transform; transform:translateY(calc(var(--k,0)*11px)) scale(calc(1 - var(--k,0)*0.045)); }
+.deckstack .dcard.top{ cursor:grab; }
+.deckstack .dcard.top:active{ cursor:grabbing; }
+.deckbar{ display:flex; align-items:center; justify-content:space-between; margin-top:13px; padding:0 4px; }
+.deckcount{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); }
+.deck-hint{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); cursor:pointer; }
+/* notification panel (bell) */
+.notif-panel{ position:fixed; top:58px; right:14px; z-index:41; width:300px; max-width:calc(100vw - 28px); background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 16px 40px rgba(20,14,10,.24); padding:8px; display:none; max-height:72vh; overflow:auto; }
+.notif-panel.open{ display:block; }
+.np-h{ font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); padding:8px 10px 6px; }
+.np-empty{ padding:14px 12px 16px; color:var(--ink-soft); font-size:13.5px; line-height:1.5; }
+.np-row{ display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:11px; cursor:pointer; }
+.np-row:hover{ background:var(--bg); }
+.np-dot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+.np-dot.d{ background:#E0552E; } .np-dot.e{ background:#C9A227; }
+.np-n{ font-size:14.5px; font-weight:500; color:var(--ink); }
+.np-w{ font-family:var(--mono); font-size:11px; color:var(--ink-soft); margin-top:1px; }
 
 /* voice capture (Wispr-style live listening) */
 .voicebar{ display:flex; align-items:center; gap:12px; background:var(--accent); color:var(--hero-ink); border-radius:14px; padding:10px 14px; margin:8px 0; }

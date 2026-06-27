@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.44.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.45.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -466,6 +466,7 @@ function route(){
   const [view,arg]=location.hash.replace('#','').split('/');
   document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
   if(window.closeNavMenu) closeNavMenu();
+  if(window.closeNotif) closeNotif();
   const v=view||'today';
   if(v==='today' && _lastView!=='today') _shuffleId='reroll';
   _lastView=v;
@@ -483,18 +484,16 @@ function viewToday(){
     return render(h);
   }
   h+='<div class="today-top">';
-  /* hero: the nearest upcoming celebration leads; otherwise the most overdue reconnect */
-  let heroId=null, heroOcc=null, heroHTML='';
-  if(up.length){ const x=up[0]; heroId=x.c.id; heroOcc=x;
-    heroHTML=heroCard(x.c, x.o.label, whenLabel(x.n),
-      '<button class="btn primary" onclick="compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button>'+
-      '<button class="btn ghost" onclick="addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>');
-  } else if(due.length){ const c=due[0].c; heroId=c.id;
-    heroHTML=heroCard(c, 'time to reconnect', (due[0].overdue<0?(-due[0].overdue)+' days overdue':'due now'),
-      '<button class="btn primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message '+esc(callName(c))+'</button>'+
-      '<button class="btn ghost" onclick="logToday(\''+c.id+'\')">Log call</button>');
-  }
-  if(heroHTML) h+='<div class="deck"><div class="peek p2"></div><div class="peek"></div>'+heroHTML+'</div><div class="deck-hint" onclick="enableShake();shuffleToday()">&#8635; shuffle &middot; or give your phone a shake</div>';
+  /* the swipe deck: due reconnects + the next ~10 days of dates, as a real pack of cards */
+  let heroId=null;
+  const upN=upcoming(10); let deck=[];
+  due.forEach(function(d){ deck.push({ c:d.c, label:'time to reconnect', when:(d.overdue<0?(-d.overdue)+' days overdue':'due now'),
+    actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Message '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
+  upN.forEach(function(x){ deck.push({ c:x.c, label:String(x.o.label), when:whenLabel(x.n),
+    actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>' }); });
+  deck=deck.slice(0,12); window._deck=deck;
+  if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><span class="deck-hint" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone</span></div></div>';
+  else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Nobody is overdue and no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
@@ -522,26 +521,33 @@ function viewToday(){
       const seen=_why||(shuf.lastContacted?('last spoke '+shuf.lastContacted):'not spoken yet');
       h+='<div class="kick">A nudge &middot; rekindle someone</div>'+personRow(shuf, '<span class="pill warm">'+esc(seen)+'</span>', '<button class="btn sm primary" onclick="compose(\''+shuf.id+'\',\'reconnect\')">Message '+esc(callName(shuf))+'</button> <button class="btn sm ghost" onclick="shuffleToday()">Shuffle</button>'); }
   }
-  /* coming up FIRST: upcoming celebrations on top */
-  h+='<div class="kick">Coming up'+(up.length?' ('+up.length+')':'')+'</div>';
-  const upList=up.filter(x=>x!==heroOcc).slice(0,20);
-  if(!up.length) h+='<div class="card muted" style="text-align:center">No birthdays or anniversaries in the next three weeks.</div>';
-  else if(!upList.length) h+='<div class="card muted" style="text-align:center">The nearest celebration is up top.</div>';
-  else { h+='<div class="grid">'; upList.forEach(({c,o,n})=>{
-    const pill='<span class="pill '+(o.type==='birthday'?'bday':o.type==='anniversary'?'anniv':'warm')+'">'+esc(o.label)+' '+whenLabel(n)+'</span>';
-    h+=personRow(c, pill,
-      '<button class="btn sm gold" onclick="compose(\''+c.id+'\',\''+(o.type==='anniversary'?'anniversary':o.type==='birthday'?'birthday':'reconnect')+'\')">Wish</button> '+
-      '<button class="btn sm ghost" onclick="addCal(\''+c.id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+jsq(o.label)+'\')">+ Calendar</button>');
-  }); h+='</div>'; }
-  /* reach out SECOND */
-  h+='<div class="kick">Time to reach out ('+due.length+')</div>';
-  const dueList=due.filter(d=>d.c.id!==heroId).slice(0,12);
-  if(!due.length) h+='<div class="card muted" style="text-align:center">Nobody is overdue. Nicely kept.</div>';
-  else if(!dueList.length) h+='<div class="card muted" style="text-align:center">Your most overdue person is up top.</div>';
-  else { h+='<div class="grid">'; dueList.forEach(({c,overdue})=>{ h+=personRow(c, overdue===0?'<span class="pill warm">due now</span>':'<span class="pill warm">'+(-overdue)+'d overdue</span>',
-      '<button class="btn sm primary" onclick="compose(\''+c.id+'\',\'reconnect\')">Message</button> <button class="btn sm ghost" onclick="logToday(\''+c.id+'\')">Log call</button>'); }); h+='</div>'; }
   h+='</div>'; render(h);
+  if(window._deck && window._deck.length) initDeck();
 }
+/* ---- Today swipe deck: a pack of cards you flick through ---- */
+function deckInner(item){ var c=item.c;
+  return '<div class="kick" style="color:var(--hero-ink);opacity:.85;margin:0">'+esc(item.label)+'</div>'
+    +'<div class="row" style="gap:13px;align-items:center;margin:11px 0 0">'+avatarHTML(c,'width:58px;height:58px;border-radius:17px;flex:0 0 auto;')
+    +'<div class="grow"><div class="nm">'+esc(c.name)+'</div><div class="sub">'+(c.context?esc(c.context)+' · ':'')+'<b>'+esc(item.when)+'</b></div><div style="margin-top:7px">'+warmthBar(c)+'</div></div>'
+    +'<button class="cshare" onclick="event.stopPropagation();shareContact(\''+c.id+'\')" aria-label="Share">'+SHIC+'</button></div>'
+    +'<div class="btn-row" style="margin-top:14px">'+item.actions+'</div>';
+}
+function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack) return; var items=window._deck||[]; var n=items.length; var show=Math.min(4,n); var html='';
+  for(var k=show-1;k>=0;k--){ html+='<div class="dcard hero'+(k===0?' top':'')+'" style="--k:'+k+';z-index:'+(30-k)+'">'+deckInner(items[k])+'</div>'; }
+  stack.innerHTML=html;
+  var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent= n>1?('1 / '+n):'1 card';
+  wireDeck();
+}
+function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); if(!card) return; var sx=0,dx=0,drag=false;
+  card.addEventListener('pointerdown',function(e){ if(e.target.closest('button,a')) return; drag=true; sx=e.clientX; try{card.setPointerCapture(e.pointerId);}catch(_){} card.style.transition='none'; });
+  card.addEventListener('pointermove',function(e){ if(!drag) return; dx=e.clientX-sx; card.style.transform='translateX('+dx+'px) rotate('+(dx*0.05)+'deg)'; });
+  function end(){ if(!drag) return; drag=false; card.style.transition='transform .32s ease, opacity .25s';
+    if(Math.abs(dx)>85){ card.style.transform='translateX('+(dx>0?540:-540)+'px) rotate('+(dx>0?22:-22)+'deg)'; card.style.opacity='0'; setTimeout(deckAdvance,170); }
+    else { card.style.transform=''; } dx=0; }
+  card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
+}
+window.deckAdvance=function(){ var items=window._deck||[]; if(items.length<2){ renderDeck(); return; } items.push(items.shift()); renderDeck(); };
+function initDeck(){ renderDeck(); }
 function heroCard(c, label, whenText, actions){
   return '<div class="hero" data-cid="'+c.id+'"><svg class="blob" viewBox="0 0 64 44" aria-hidden="true"><circle cx="26" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7" opacity=".5"/><circle cx="40" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7"/></svg>'
     +'<div class="kick" style="color:var(--hero-ink);opacity:.85;margin:0 0 11px">'+esc(label)+'</div>'
@@ -945,7 +951,12 @@ window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=
 window.feedbackDiag=function(){ if(window.copyDiag){ copyDiag(); } };
 window.fbHide=function(){ feedbackClose(); };
 /* ---- top nav: notification bell + tucked menu ---- */
-function dueCount(){ try{ return (typeof dueToReach==='function'?(dueToReach()||[]).length:0); }catch(e){ return 0; } }
+function notifItems(){ var out=[]; try{ (dueToReach()||[]).forEach(function(d){ out.push({c:d.c, txt:(d.overdue<0?(-d.overdue)+'d overdue':'due now'), k:'d'}); }); (upcoming(10)||[]).forEach(function(x){ out.push({c:x.c, txt:String(x.o.label)+' '+whenLabel(x.n), k:'e'}); }); }catch(e){} return out.slice(0,15); }
+function dueCount(){ try{ return notifItems().length; }catch(e){ return 0; } }
+window.toggleNotif=function(){ var p=document.getElementById('notifPanel'), s=document.getElementById('menuScrim'); if(!p) return; var open=!p.classList.contains('open');
+  if(open){ var items=notifItems(); var h='<div class="np-h">Needs a hello</div>'; if(!items.length) h+='<div class="np-empty">You are all caught up. Nicely kept.</div>'; else items.forEach(function(it){ h+='<div class="np-row" onclick="closeNotif();go(\'person\',\''+it.c.id+'\')"><span class="np-dot '+it.k+'"></span><div class="grow"><div class="np-n">'+esc(it.c.name)+'</div><div class="np-w">'+esc(it.txt)+'</div></div></div>'; }); p.innerHTML=h; }
+  if(window.closeNavMenu) closeNavMenu(); p.classList.toggle('open',open); if(s) s.classList.toggle('open',open); };
+window.closeNotif=function(){ var p=document.getElementById('notifPanel'); if(p) p.classList.remove('open'); var nm=document.getElementById('navMenu'); var s=document.getElementById('menuScrim'); if(s && !(nm&&nm.classList.contains('open'))) s.classList.remove('open'); };
 window.updateBell=function(){ var el=document.getElementById('bellN'); if(!el) return; var n=dueCount(); if(n>0){ el.textContent=n>99?'99+':String(n); el.hidden=false; } else { el.hidden=true; } };
 window.toggleNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(!m) return; var open=!m.classList.contains('open'); m.classList.toggle('open',open); if(s) s.classList.toggle('open',open); };
 window.closeNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(m) m.classList.remove('open'); if(s) s.classList.remove('open'); };
@@ -1516,7 +1527,7 @@ function render(h){ $('#app').innerHTML=h; }
 (function(){ const bv=document.getElementById('brandVer'); if(bv) bv.textContent='v'+VERSION; })();
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleNavMenu(); });
-{ var _ms=$('#menuScrim'); if(_ms) _ms.addEventListener('click',closeNavMenu); var _nm=$('#navMenu'); if(_nm) _nm.addEventListener('click',closeNavMenu); var _bb=$('#bellBtn'); if(_bb) _bb.addEventListener('click',function(){ go('today'); }); try{ enableShake(); }catch(e){} }
+{ var _ms=$('#menuScrim'); if(_ms) _ms.addEventListener('click',function(){ closeNavMenu(); if(window.closeNotif) closeNotif(); }); var _nm=$('#navMenu'); if(_nm) _nm.addEventListener('click',closeNavMenu); var _bb=$('#bellBtn'); if(_bb) _bb.addEventListener('click',function(e){ e.stopPropagation(); toggleNotif(); }); try{ enableShake(); }catch(e){} }
 const tb=$('#themeBtn');
 applySkin(localStorage.getItem('warmly.skin')||'stillmorning');
 updateThemeBtn();
