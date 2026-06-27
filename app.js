@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.49.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.50.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -574,8 +574,9 @@ function deckInner(item){ var c=item.c;
     +'<button class="cshare" onclick="event.stopPropagation();shareContact(\''+c.id+'\')" aria-label="Share">'+SHIC+'</button></div>'
     +'<div class="btn-row" style="margin-top:14px">'+item.actions+'</div>';
 }
+var DECK_BANDS=['','linear-gradient(90deg,#FF7A4E,#E8B23A)','linear-gradient(90deg,#B07AC0,#FF7A4E)','linear-gradient(90deg,#E8B23A,#E0552E)'];
 function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack) return; var items=window._deck||[]; var n=items.length; var show=Math.min(4,n); var html='';
-  for(var k=show-1;k>=0;k--){ html+='<div class="dcard hero'+(k===0?' top':'')+'" style="--k:'+k+';z-index:'+(30-k)+'">'+deckInner(items[k])+'</div>'; }
+  for(var k=show-1;k>=0;k--){ var isTop=(k===0); var bandBg=isTop?'':(';background:'+DECK_BANDS[Math.min(k,3)]); html+='<div class="dcard hero'+(isTop?' top':' dpeek')+'" style="--k:'+k+';z-index:'+(30-k)+bandBg+'">'+deckInner(items[k])+'</div>'; }
   stack.innerHTML=html;
   var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent= n>1?('1 / '+n):'1 card';
   wireDeck();
