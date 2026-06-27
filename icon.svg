@@ -1,13 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Sovenn">
-  <defs>
-    <radialGradient id="sovbg" cx="32%" cy="20%" r="105%">
-      <stop offset="0" stop-color="#2C2233"/>
-      <stop offset=".72" stop-color="#17121C"/>
-    </radialGradient>
-    <clipPath id="sovlens"><circle cx="200" cy="256" r="128"/></clipPath>
-  </defs>
-  <rect width="512" height="512" rx="114" fill="url(#sovbg)"/>
-  <g clip-path="url(#sovlens)"><circle cx="312" cy="256" r="128" fill="#E0552E"/></g>
-  <circle cx="200" cy="256" r="128" fill="none" stroke="#F3ECE2" stroke-width="27"/>
-  <circle cx="312" cy="256" r="128" fill="none" stroke="#F3ECE2" stroke-width="27"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><radialGradient id="cor" cx="0.30" cy="0.20" r="1.05"><stop offset="0" stop-color="#FF7A4E"/><stop offset="0.72" stop-color="#E0552E"/><stop offset="1" stop-color="#D9502B"/></radialGradient></defs><rect x="0" y="0" width="1024" height="1024" rx="230" ry="230" fill="url(#cor)"/><g transform="translate(133.91,223.53) scale(2.8007)"><path d="M18 178 C 34 132 70 100 108 74 C 120 60 130 44 140 36 C 148 30 158 28 165 34 C 172 40 174 46 175 52 C 181 54 184 60 179 65 C 185 68 187 74 181 79 C 188 82 189 88 182 92 C 189 96 188 103 180 106 C 196 116 226 140 252 170 C 254 173 252 178 247 178 L 150 178 C 140 168 137 160 135 150 C 128 160 120 170 108 178 Z" fill="#ffffff"/></g></svg>
