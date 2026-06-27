@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.47.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.48.0', BUILT='2026-06-27';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -140,8 +140,8 @@ let _gtok=null,_gclient=null,_gfile=null,_gsyncing=false,_gpush=null,_gpending=n
 function _gstatus(t){ const e=document.getElementById('gstat'); if(e) e.textContent=t; }
 function gisReady(cb){ if(window.google&&google.accounts&&google.accounts.oauth2) return cb();
   const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.onload=cb; s.onerror=()=>_gstatus('Could not reach Google'); document.head.appendChild(s); }
-function gCacheTok(r){ if(r&&r.access_token){ _gtok=r.access_token; try{ localStorage.setItem('warmly.gtok', JSON.stringify({t:_gtok, exp:Date.now()+((r.expires_in||3600)*1000)-90000})); }catch(e){} localStorage.setItem('warmly.gsync','1'); } }
-function gCachedTok(){ try{ const o=JSON.parse(localStorage.getItem('warmly.gtok')); if(o&&o.t&&o.exp>Date.now()) return o.t; }catch(e){} return null; }
+function gCacheTok(r){ if(r&&r.access_token){ _gtok=r.access_token; try{ sessionStorage.setItem('warmly.gtok', JSON.stringify({t:_gtok, exp:Date.now()+((r.expires_in||3600)*1000)-90000})); }catch(e){}  /* Bearer token in sessionStorage (cleared on tab close), not persisted to disk */ localStorage.setItem('warmly.gsync','1'); } }
+function gCachedTok(){ try{ const o=JSON.parse(sessionStorage.getItem('warmly.gtok')); if(o&&o.t&&o.exp>Date.now()) return o.t; }catch(e){} return null; }
 function gInitClient(){ if(_gclient) return; _gclient=google.accounts.oauth2.initTokenClient({ client_id:GCLIENT_ID, scope:GSCOPE,
   callback:(r)=>{ gCacheTok(r);
     if(_gpending){ const p=_gpending; _gpending=null; p(r); } else { syncNow(); } } }); }
@@ -160,10 +160,10 @@ function gToken(interactive){ if(!interactive){ const c=gCachedTok(); if(c){ _gt
   if(AUTH_WORKER){ if(interactive){ window.location.href=AUTH_WORKER+'/auth/start?app='+encodeURIComponent(location.origin+location.pathname); return new Promise(()=>{}); } return gWorkerToken(); }
   return new Promise(res=>{ gInitClient(); _gpending=res; try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ _gpending=null; res(null); } }); }
 window.gConnect=()=>{ if(AUTH_WORKER){ _gstatus('Opening Google…'); gToken(true); return; } gisReady(async()=>{ _gstatus('Opening Google…'); const r=await gToken(true); if(r&&r.access_token) syncNow(); else _gstatus('Sign-in cancelled'); }); };
-window.gDisconnect=()=>{ if(AUTH_WORKER&&gSession()){ try{ fetch(AUTH_WORKER+'/auth/logout?session='+encodeURIComponent(gSession())); }catch(e){} } _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); localStorage.removeItem('warmly.gtok'); localStorage.removeItem('warmly.session'); route(); };
+window.gDisconnect=()=>{ if(AUTH_WORKER&&gSession()){ try{ fetch(AUTH_WORKER+'/auth/logout?session='+encodeURIComponent(gSession())); }catch(e){} } _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); sessionStorage.removeItem('warmly.gtok'); localStorage.removeItem('warmly.session'); route(); };
 async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'Authorization':'Bearer '+_gtok},opts.headers||{});
   let r=await fetch(url,opts);
-  if(r.status===401){ try{ localStorage.removeItem('warmly.gtok'); }catch(e){} const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }
+  if(r.status===401){ try{ sessionStorage.removeItem('warmly.gtok'); }catch(e){} const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }
   return r; }
 async function gFindFile(){ const r=await gFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+encodeURIComponent("name='warmly.json'")); if(!r.ok) return null; const j=await r.json(); return j.files&&j.files[0]?j.files[0].id:null; }
 async function gDownload(id){ const r=await gFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media'); return r.ok?await r.json():null; }
@@ -174,7 +174,7 @@ async function gUpload(id,data){ const body=JSON.stringify(data);
   return gFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',body:form}); }
 function mergeDB(local,remote){ const out=JSON.parse(JSON.stringify(local)); const byId={};
   (out.contacts||[]).forEach(c=>byId[c.id]=c);
-  (remote.contacts||[]).forEach(rc=>{ const lc=byId[rc.id]; if(!lc||(rc.updatedAt||0)>(lc.updatedAt||0)) byId[rc.id]=rc; });
+  (remote.contacts||[]).forEach(rc=>{ if(!rc||typeof rc!=='object'||!rc.id) return; const lc=byId[rc.id]; if(!lc||(rc.updatedAt||0)>(lc.updatedAt||0)) byId[rc.id]=rc; });
   const del={}; [remote.deleted||{},out.deleted||{}].forEach(m=>Object.keys(m).forEach(id=>{ del[id]=Math.max(del[id]||0,m[id]); }));
   out.contacts=Object.values(byId).filter(c=>{ const t=del[c.id]; return !(t&&t>=(c.updatedAt||0)); });
   out.deleted=del;
@@ -192,7 +192,7 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
       if(changed) route();
       _gstatus('Synced · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
     } else if(up&&up.status===401){
-      _gtok=null; try{ localStorage.removeItem('warmly.gtok'); }catch(_){}    /* token expired: stop the silent-retry loop and tell the truth */
+      _gtok=null; try{ sessionStorage.removeItem('warmly.gtok'); }catch(_){}    /* token expired: stop the silent-retry loop and tell the truth */
       _gstatus('Sign in again to resume Drive backup — your changes are saved on this device.');
     } else {
       if(up&&up.status===404&&_gfile) _gfile=null;                            /* backup file vanished remotely: recreate it on the next sync */
@@ -218,6 +218,26 @@ const _lazyMod={};
 function loadScript(src){ return _lazyMod[src] || (_lazyMod[src]=new Promise((res,rej)=>{ var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); })); }
 function ensureQR(){ return window.QR?Promise.resolve():loadScript('qr.js'); }
 function ensureCapture(){ return window.SovennCapture?Promise.resolve():loadScript('capture.js'); }
+/* ---- a11y: dialog focus management — return focus on close, Escape to dismiss, Tab trapped inside ---- */
+let _focusReturn=null;
+function _focusables(el){ return [].slice.call(el.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(n=>n.offsetWidth||n.offsetHeight||n===document.activeElement); }
+function dialogOpen(el){ if(!el) return; _focusReturn=document.activeElement; var f=_focusables(el); setTimeout(function(){ var t=f[0]||el; if(t&&t.focus){ try{ t.focus(); }catch(e){} } },30); }
+function dialogClose(){ if(!_focusReturn) return; var r=_focusReturn; _focusReturn=null; if(r&&r.focus){ try{ r.focus(); }catch(e){} } }
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape'&&e.key!=='Tab') return;
+  var mb=document.getElementById('modalBg'), fb=document.getElementById('fbBg'), np=document.getElementById('notifPanel'), nm=document.getElementById('navMenu'), ls=document.getElementById('lockScreen');
+  var open=null, closer=null;
+  if(ls&&ls.style.display==='flex') open=ls;                                       /* lock screen: trap, never Escape-close */
+  else if(mb&&mb.classList.contains('show')){ open=document.getElementById('modal'); closer=window.closeModal; }
+  else if(fb&&!fb.hidden){ open=fb.querySelector('.fb-sheet')||fb; closer=window.feedbackClose; }
+  else if(np&&np.classList.contains('open')){ open=np; closer=window.closeNotif; }
+  else if(nm&&nm.classList.contains('open')){ open=nm; closer=window.closeNavMenu; }
+  if(!open) return;
+  if(e.key==='Escape'){ if(closer){ e.preventDefault(); closer(); } return; }
+  var f=_focusables(open); if(!f.length){ e.preventDefault(); return; } var first=f[0], last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey&&(document.activeElement===last||!open.contains(document.activeElement))){ e.preventDefault(); first.focus(); }
+});
 function firstName(n){ return (n||'').trim().split(/\s+/)[0]||''; }
 function callName(c){ return (c&&c.callName)?c.callName:firstName(c?c.name:''); }
 /* ---- per-contact social deep-links: conditional, generated on-device, nothing leaves the phone ---- */
@@ -284,7 +304,7 @@ window.askDetails=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
 function initials(n){ const p=(n||'?').trim().split(/\s+/); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
 function avatarColor(n){ const colors=['#0E3B2E','#2E8C6A','#C9756B','#D99A2B','#6A655B','#3C6E91','#8A5A99']; let h=0; for(const c of (n||'x')) h=(h*31+c.charCodeAt(0))%colors.length; return colors[h]; }
 /* avatar: a real photo when we have one (from import), else warm coloured initials */
-function avatarHTML(c, sizeStyle){ sizeStyle=sizeStyle||''; if(c.photo) return '<div class="avatar" style="'+sizeStyle+'"><img src="'+esc(c.photo)+'" alt=""></div>'; return '<div class="avatar" style="background:'+avatarColor(c.name)+';'+sizeStyle+'">'+esc(initials(c.name))+'</div>'; }
+function avatarHTML(c, sizeStyle){ sizeStyle=sizeStyle||''; if(c.photo) return '<div class="avatar" style="'+sizeStyle+'"><img src="'+esc(c.photo)+'" alt="'+esc(c.name||'Contact')+'"></div>'; return '<div class="avatar" role="img" aria-label="'+esc(c.name||'Contact')+'" style="background:'+avatarColor(c.name)+';'+sizeStyle+'">'+esc(initials(c.name))+'</div>'; }
 /* warmth bar: replaces the tier pill (inner=3, warm=2, loose=1 filled) */
 function warmthBar(c, label){ const t=c.tier||3; const n=t===1?3:t===2?2:1; const lbl={1:'inner',2:'warm',3:'loose'}[t]; let b=''; for(var i=0;i<3;i++) b+='<i class="'+(i<n?'on':'')+'"></i>';
   return '<span class="wbar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 15 3 11 3 7.5 3 5 5 3 7.5 3 9.4 3 11 4 12 5.5 13 4 14.6 3 16.5 3 19 3 21 5 21 7.5 21 11 19 15 12 21z"/></svg><span class="seg">'+b+'</span>'+(label===false?'':'<span class="wl">'+lbl+'</span>')+'</span>'; }
@@ -482,7 +502,7 @@ let _lastView='', _shuffleId=null, _rerollN=0;
 window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
   const [view,arg]=location.hash.replace('#','').split('/');
-  document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>a.classList.toggle('active',a.dataset.go===(view||'today')));
+  document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>{ var on=a.dataset.go===(view||'today'); a.classList.toggle('active',on); if(a.parentNode&&a.parentNode.id==='tabs') a.setAttribute('aria-current', on?'page':'false'); });
   if(window.closeNavMenu) closeNavMenu();
   if(window.closeNotif) closeNotif();
   const v=view||'today';
@@ -510,7 +530,7 @@ function viewToday(){
   upN.forEach(function(x){ deck.push({ c:x.c, label:String(x.o.label), when:whenLabel(x.n),
     actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>' }); });
   deck=deck.slice(0,12); window._deck=deck;
-  if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><span class="deck-hint" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone</span></div></div>';
+  if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><button type="button" class="deck-hint" aria-label="Show the next card" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone &middot; or tap here</button></div></div>';
   else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Nobody is overdue and no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
@@ -699,7 +719,7 @@ window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.targ
   };
   rd.readAsDataURL(f);
 };
-window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); const list=document.querySelectorAll('.view .card.row'); viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } };
+window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); clearTimeout(window._pSearchT); window._pSearchT=setTimeout(function(){ viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } },150); };
 window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t,review:false}); viewPeople(); };
 
 function viewPerson(id){
@@ -742,13 +762,13 @@ function viewPerson(id){
 
   /* details */
   h+='<div class="card"><div class="kick" style="margin-top:0">Details</div>';
-  h+=detailRow('Phone',c.phone||'—'); h+=detailRow('Email',c.email||'—');
+  h+=detailRow('Phone',esc(c.phone||'—')); h+=detailRow('Email',esc(c.email||'—'));
   h+=detailRow('LinkedIn', c.linkedin?'<a style="color:var(--green-2)" target="_blank" rel="noopener" href="'+esc(c.linkedin)+'">profile ↗</a>':'—');
   h+=detailRow('Address', c.address?esc(c.address):'—');
   h+=detailRow('How we met', c.howMet?esc(c.howMet):'—');
   h+=detailRow('Work', work?esc(work):'—');
   h+=detailRow('Food / drink', c.food?esc(c.food):'—');
-  occ.forEach(o=>{ const age=o.raw.y?(' (turns '+(o.date.getFullYear()-o.raw.y)+')'):''; h+=detailRow(o.label[0].toUpperCase()+o.label.slice(1), fmtDate(o.date)+esc(age)+' · '+whenLabel(daysUntil(o.date))+' <a style="color:var(--green-2)" onclick="addCal(\''+id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+jsq(o.label)+'\')">+ cal</a>'); });
+  occ.forEach(o=>{ const age=o.raw.y?(' (turns '+(o.date.getFullYear()-o.raw.y)+')'):''; h+=detailRow(esc(o.label[0].toUpperCase()+o.label.slice(1)), fmtDate(o.date)+esc(age)+' · '+whenLabel(daysUntil(o.date))+' <a style="color:var(--green-2)" onclick="addCal(\''+id+'\','+(o.date.getMonth()+1)+','+o.date.getDate()+',\''+jsq(o.label)+'\')">+ cal</a>'); });
   h+=detailRow('Keep in touch', c.cadence?('every '+c.cadence+' months'+(nd?(' · next '+(nd<=today()?'now':fmtDate(nd))):'')):'not set');
   h+='</div>';
 
@@ -958,8 +978,8 @@ window.feedbackOpen=function(){ _fbMood='';
     +'<div class="fb-actions"><button type="button" class="btn ghost sm" onclick="feedbackDiag()">Copy a glitch log</button><button type="button" class="btn primary sm fb-send" onclick="feedbackSend()">Send feedback</button></div>'
     +'<div class="fb-priv">Opens a short private form, pre-filled. We never see your number or anything you do not type here, and nothing is tracked.</div>'
     +'<div class="fb-foot"><button type="button" onclick="feedbackClose()">Minimize</button><button type="button" onclick="feedbackClose()">Close</button></div></div>';
-  var bg=document.getElementById('fbBg'); if(!bg) return; bg.innerHTML=h; bg.hidden=false; setTimeout(function(){ var t=document.getElementById('fbText'); if(t) t.focus(); },80); };
-window.feedbackClose=function(){ var bg=document.getElementById('fbBg'); if(bg){ bg.hidden=true; bg.innerHTML=''; } };
+  var bg=document.getElementById('fbBg'); if(!bg) return; _focusReturn=document.activeElement; bg.innerHTML=h; bg.hidden=false; setTimeout(function(){ var t=document.getElementById('fbText'); if(t) t.focus(); },80); };
+window.feedbackClose=function(){ var bg=document.getElementById('fbBg'); if(bg){ bg.hidden=true; bg.innerHTML=''; } dialogClose(); };
 window.fbMood=function(m){ _fbMood=m; var els=document.querySelectorAll('.fb-mood'); for(var i=0;i<els.length;i++){ els[i].classList.toggle('on', els[i].getAttribute('data-m')===m); } };
 window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=(ta?ta.value:'').trim(); var mood={love:'\u{1F60D} Love',meh:'\u{1F610} Meh',bug:'\u{1F41B} Bug',idea:'\u{1F4A1} Idea'}[_fbMood]||'';
   var compiled=[mood, t, 'v'+VERSION+' · '+_fbScreen()].filter(Boolean).join('\n');
@@ -972,12 +992,12 @@ window.fbHide=function(){ feedbackClose(); };
 function notifItems(){ var out=[]; try{ (dueToReach()||[]).forEach(function(d){ out.push({c:d.c, txt:(d.overdue<0?(-d.overdue)+'d overdue':'due now'), k:'d'}); }); (upcoming(10)||[]).forEach(function(x){ out.push({c:x.c, txt:String(x.o.label)+' '+whenLabel(x.n), k:'e'}); }); }catch(e){} return out.slice(0,15); }
 function dueCount(){ try{ return notifItems().length; }catch(e){ return 0; } }
 window.toggleNotif=function(){ var p=document.getElementById('notifPanel'), s=document.getElementById('menuScrim'); if(!p) return; var open=!p.classList.contains('open');
-  if(open){ var items=notifItems(); var h='<div class="np-h">Needs a hello</div>'; if(!items.length) h+='<div class="np-empty">You are all caught up. Nicely kept.</div>'; else items.forEach(function(it){ h+='<div class="np-row" onclick="closeNotif();go(\'person\',\''+it.c.id+'\')"><span class="np-dot '+it.k+'"></span><div class="grow"><div class="np-n">'+esc(it.c.name)+'</div><div class="np-w">'+esc(it.txt)+'</div></div></div>'; }); p.innerHTML=h; }
-  if(window.closeNavMenu) closeNavMenu(); p.classList.toggle('open',open); if(s) s.classList.toggle('open',open); };
-window.closeNotif=function(){ var p=document.getElementById('notifPanel'); if(p) p.classList.remove('open'); var nm=document.getElementById('navMenu'); var s=document.getElementById('menuScrim'); if(s && !(nm&&nm.classList.contains('open'))) s.classList.remove('open'); };
+  if(open){ var items=notifItems(); var h='<div class="np-h">Needs a hello</div>'; if(!items.length) h+='<div class="np-empty">You are all caught up. Nicely kept.</div>'; else items.forEach(function(it){ h+='<button type="button" class="np-row" onclick="closeNotif();go(\'person\',\''+it.c.id+'\')"><span class="np-dot '+it.k+'"></span><div class="grow"><div class="np-n">'+esc(it.c.name)+'</div><div class="np-w">'+esc(it.txt)+'</div></div></button>'; }); p.innerHTML=h; }
+  if(window.closeNavMenu) closeNavMenu(); p.classList.toggle('open',open); if(s) s.classList.toggle('open',open); if(open) dialogOpen(p); else dialogClose(); };
+window.closeNotif=function(){ var p=document.getElementById('notifPanel'); var was=p&&p.classList.contains('open'); if(p) p.classList.remove('open'); var nm=document.getElementById('navMenu'); var s=document.getElementById('menuScrim'); if(s && !(nm&&nm.classList.contains('open'))) s.classList.remove('open'); if(was) dialogClose(); };
 window.updateBell=function(){ var el=document.getElementById('bellN'); if(!el) return; var n=dueCount(); if(n>0){ el.textContent=n>99?'99+':String(n); el.hidden=false; } else { el.hidden=true; } };
-window.toggleNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(!m) return; var open=!m.classList.contains('open'); m.classList.toggle('open',open); if(s) s.classList.toggle('open',open); };
-window.closeNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(m) m.classList.remove('open'); if(s) s.classList.remove('open'); };
+window.toggleNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); if(!m) return; var open=!m.classList.contains('open'); m.classList.toggle('open',open); if(s) s.classList.toggle('open',open); if(open) dialogOpen(m); else dialogClose(); };
+window.closeNavMenu=function(){ var m=document.getElementById('navMenu'), s=document.getElementById('menuScrim'); var was=m&&m.classList.contains('open'); if(m) m.classList.remove('open'); if(s) s.classList.remove('open'); if(was) dialogClose(); };
 /* ---- shake to shuffle (Today) ---- */
 var _lastShake=0, _shakeOn=false;
 function _onMotion(e){ var a=e.accelerationIncludingGravity||e.acceleration; if(!a) return; var mag=Math.abs(a.x||0)+Math.abs(a.y||0)+Math.abs(a.z||0); var now=Date.now(); if(mag>32 && now-_lastShake>1300){ _lastShake=now; if((location.hash||'').indexOf('today')>=0 && window.shuffleToday) shuffleToday(); } }
@@ -1139,7 +1159,7 @@ function viewSettings(section){
 window.settingsFilter=function(){ var el=document.getElementById('setSearch'); if(!el) return; var q=(el.value||'').toLowerCase().trim(); var rows=document.querySelectorAll('#setList [data-kw]'); for(var i=0;i<rows.length;i++){ var r=rows[i]; var hay=((r.getAttribute('data-kw')||'')+' '+(r.textContent||'')).toLowerCase(); r.style.display=(!q||hay.indexOf(q)>=0)?'':'none'; } };
 window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
 window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
-window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings }; save(); go('today'); } };
+window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings, me:DB.me, deleted:DB.deleted||{} }; save(); go('today'); } };
 function download(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
 window.exportJSON=()=>download('sovenn-backup.json', new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));
 /* ---- Google Calendar export (.ics): the keystone. Your calendar is your source of truth. ---- */
@@ -1220,8 +1240,8 @@ window.undoRestore=()=>{ let u=null; try{ u=JSON.parse(localStorage.getItem(UNDO
 /* ===================================================================
    MODALS  (edit, compose, calendar, log)
    =================================================================== */
-function openModal(html){ $('#modal').innerHTML=html; $('#modalBg').classList.add('show'); }
-window.closeModal=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } $('#modalBg').classList.remove('show'); };
+function openModal(html){ $('#modal').innerHTML=html; $('#modalBg').classList.add('show'); dialogOpen($('#modal')); }
+window.closeModal=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } $('#modalBg').classList.remove('show'); dialogClose(); };
 $('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
 
 window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,customDates:[]};
@@ -1497,21 +1517,26 @@ function lockMarkup(){ const c=lockCfg()||{}; const len=c.len||4;
 }
 function lockPaint(){ const d=document.getElementById('lkDots'); if(!d) return; const n=_entered.length;
   Array.prototype.forEach.call(d.children,(el,i)=>el.classList.toggle('full', i<n)); }
+/* ---- app-lock brute-force resistance: escalating cooldown after repeated wrong passcodes (persists across restarts) ---- */
+function lockFail(){ try{ return JSON.parse(localStorage.getItem('warmly.lockfail'))||{n:0,until:0}; }catch(e){ return {n:0,until:0}; } }
+function lockFailSet(o){ try{ localStorage.setItem('warmly.lockfail', JSON.stringify(o)); }catch(e){} }
+function lockCoolMsg(){ const ms=Math.max(0,(lockFail().until||0)-Date.now()); if(ms>0){ const m=document.getElementById('lkMsg'); if(m){ m.textContent='Too many tries — wait '+Math.ceil(ms/1000)+'s'; m.classList.add('err'); } setTimeout(lockCoolMsg,500); return true; } return false; }
 function lockShow(){ _unlocked=false; _entered=''; const el=document.getElementById('lockScreen'); if(!el) return;
   el.innerHTML=lockMarkup(); el.style.display='flex'; el.classList.remove('unlocked'); lockPaint();
   const c=lockCfg(); if(c&&c.bio) setTimeout(()=>{ if(!_unlocked) lockTapBio(); }, 350); }
 function lockHide(){ _unlocked=true; _entered=''; const el=document.getElementById('lockScreen'); if(!el) return;
   const ic=document.getElementById('lkIcon'); if(ic) ic.innerHTML=LOCKI.open; const m=document.getElementById('lkMsg'); if(m){ m.textContent='Welcome back'; m.classList.remove('err'); }
   el.classList.add('unlocked'); setTimeout(()=>{ el.style.display='none'; el.classList.remove('unlocked'); }, 480); }
-window.lockTap=(n)=>{ const c=lockCfg(); const len=(c&&c.len)||4; if(_entered.length>=len) return;
+window.lockTap=(n)=>{ if(lockCoolMsg()) return; const c=lockCfg(); const len=(c&&c.len)||4; if(_entered.length>=len) return;
   _entered+=n; lockPaint(); const m=document.getElementById('lkMsg'); if(m){ m.textContent='Enter your passcode'; m.classList.remove('err'); }
   if(_entered.length>=len) setTimeout(lockTry, 130); };
 window.lockDel=()=>{ _entered=_entered.slice(0,-1); lockPaint(); };
 async function lockTry(){ const ok=await lockVerifyPin(_entered);
-  if(ok){ lockHide(); return; }
+  if(ok){ lockFailSet({n:0,until:0}); lockHide(); return; }
+  const f=lockFail(); f.n=(f.n||0)+1; if(f.n>=5){ const wait=Math.min(300,15*Math.pow(2,f.n-5)); f.until=Date.now()+wait*1000; } lockFailSet(f);
   const m=document.getElementById('lkMsg'); if(m){ m.textContent='Wrong passcode, try again'; m.classList.add('err'); }
   const d=document.getElementById('lkDots'); if(d){ d.classList.add('shake'); setTimeout(()=>d.classList.remove('shake'),420); }
-  _entered=''; setTimeout(lockPaint, 60); }
+  _entered=''; setTimeout(lockPaint, 60); if((f.until||0)>Date.now()) setTimeout(lockCoolMsg,440); }
 window.lockTapBio=async()=>{ const m=document.getElementById('lkMsg'); if(m){ m.textContent='Verifying…'; m.classList.remove('err'); }
   const ok=await lockBioVerify(); if(ok){ lockHide(); } else if(m && !_unlocked){ m.textContent='Enter your passcode'; } };
 function lockShouldRelock(){ const c=lockCfg(); if(!c) return true; const mode=c.autolock||'now'; if(mode==='now') return true;

@@ -2,7 +2,7 @@
    Same components, two skins, toggled via [data-theme="dark"]. */
 :root{
   --bg:#FBF8F3; --bg-2:#F2EDE5; --card:#FFFFFF;
-  --ink:#2B2622; --ink-soft:#6F675F; --ink-faint:#6F675F;
+  --ink:#2B2622; --ink-soft:#6F675F; --ink-faint:#615A50;
   --line:#E7DFD4;
   --green:#946145; --green-2:#5E7264; --gold:#5E7264; --gold-soft:#5E7264; --rose:#946145;
   --accent:#946145; --on-accent:#FBF8F3; --hero:#F0E6DA; --hero-ink:#3A332D;
@@ -160,7 +160,12 @@ h1.title{ font-family:var(--serif); font-weight:600; font-size:31px; letter-spac
 /* forms */
 label.fl{ display:block; font-family:var(--mono); font-size:11.5px; font-weight:500; letter-spacing:.03em; color:var(--ink-soft); margin:12px 0 5px; text-transform:uppercase; }
 input,select,textarea{ width:100%; font-family:var(--sans); font-size:15px; color:var(--ink); background:var(--bg-2); border:1px solid var(--line); border-radius:11px; padding:11px 13px; }
-input:focus,select,textarea:focus{ outline:none; border-color:var(--green-2); }
+input:focus,select:focus,textarea:focus{ outline:none; border-color:var(--green-2); box-shadow:0 0 0 3px rgba(94,114,100,.28); }
+/* visible keyboard focus everywhere (pointer clicks stay clean via :focus-visible) */
+a:focus-visible,button:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.icon-btn:focus-visible,.act:focus-visible,.kebab:focus-visible,.cshare:focus-visible,.deck-hint:focus-visible{ outline:2px solid var(--green-2); outline-offset:2px; }
+/* skip-to-content link (visible only when keyboard-focused) */
+.skip{ position:fixed; left:8px; top:-60px; z-index:200; background:var(--accent); color:var(--on-accent); padding:10px 14px; border-radius:10px; font-weight:600; text-decoration:none; transition:top .15s ease; }
+.skip:focus{ top:8px; }
 textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .two{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .three{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
@@ -235,7 +240,7 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .sortsel{ width:auto; font-family:var(--mono); font-size:12px; color:var(--ink-soft); background:var(--card); border:1px solid var(--line); border-radius:30px; padding:7px 12px; }
 .ctx{ background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin:10px 0; }
 .ctx .sub{ margin:2px 0; }
-.kebab{ background:none; border:none; color:var(--ink-faint); cursor:pointer; padding:6px; line-height:0; flex-shrink:0; border-radius:8px; }
+.kebab{ background:none; border:none; color:var(--ink-faint); cursor:pointer; padding:8px; line-height:0; flex-shrink:0; border-radius:8px; min-width:40px; min-height:40px; display:inline-flex; align-items:center; justify-content:center; }
 .kebab:hover{ background:color-mix(in srgb,var(--ink) 7%,transparent); color:var(--ink); }
 .kebab svg{ fill:currentColor; }
 .tile{ position:relative; }
@@ -513,7 +518,7 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .wbar .wl{ font-family:var(--mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-faint); }
 [data-theme="dark"] .wbar i{ background:rgba(255,255,255,.16); }
 /* per-card share */
-.cshare{ -webkit-appearance:none; appearance:none; width:30px; height:30px; border-radius:9px; border:1px solid var(--line); background:var(--card); color:var(--ink); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.cshare{ -webkit-appearance:none; appearance:none; width:38px; height:38px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); display:flex; align-items:center; justify-content:center; cursor:pointer; }
 .cshare svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 /* People = photo cards */
 .tile{ position:relative; overflow:hidden; }
