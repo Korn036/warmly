@@ -1,9 +1,9 @@
-/* Cloudflare Pages Function — scoped to /card.html only.
+/* Cloudflare Pages Function — route /card (Pages serves card.html here via clean-URLs).
    Gives shared contact-card links a personalised social preview ("<Name> wants to keep
-   in touch — via Sovenn") by rewriting the OG/Twitter title with the ?from= name.
-   Additive + fail-safe: any error returns the original static card.html unchanged. */
+   in touch — via Sovenn") by rewriting the OG/Twitter title from the ?from= name.
+   Additive + fail-safe: any error returns the original static page unchanged. */
 export async function onRequest(context) {
-  const res = await context.next();           // the static card.html asset
+  const res = await context.next();           // the static card.html asset served at /card
   try {
     const from = (new URL(context.request.url).searchParams.get('from') || '')
       .slice(0, 40).replace(/[<>&"]/g, '').trim();
