@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.56.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.57.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -123,8 +123,16 @@ function logErr(where, e){ try{
 }
 window.addEventListener('error', function(ev){ logErr('window', ev&&(ev.error||ev.message)); });
 window.addEventListener('unhandledrejection', function(ev){ logErr('promise', ev&&ev.reason); });
+/* #20: private on-device feedback counters - kept only in localStorage, NEVER auto-transmitted,
+   surfaced to the user (viewable + clearable), included in copyDiag only when THEY tap Copy. */
+const FB_KEY='sovenn.fb';
+function fbCounters(){ try{ return JSON.parse(localStorage.getItem(FB_KEY))||{}; }catch(e){ return {}; } }
+function fbBump(k,n){ try{ var o=fbCounters(); o[k]=(o[k]||0)+(n||1); localStorage.setItem(FB_KEY,JSON.stringify(o)); }catch(e){} }
+window.fbClear=function(){ try{ localStorage.removeItem(FB_KEY); }catch(e){} if(window.route) route(); };
+function _fbSummary(){ var c=fbCounters(); var op=c.opens||0, sn=c.sends||0; var parts=[op+(op===1?' open':' opens'), sn+(sn===1?' message sent':' messages sent')]; var md=(c.mood_lighter||0)+(c.mood_okay||0)+(c.mood_awkward||0); if(md) parts.push(md+(md===1?' feeling logged':' feelings logged')); return parts.join(', ')+'.'; }
 window.copyDiag=function(){ let arr=[]; try{ arr=JSON.parse(localStorage.getItem(ERR_KEY))||[]; }catch(e){}
-  const txt='Sovenn '+VERSION+' diagnostics ('+arr.length+' events)\n'+(navigator.userAgent||'')+'\n'+arr.map(r=>r.t+' ['+r.where+'] '+r.msg).join('\n');
+  const _c=fbCounters(); const _cs='counters '+(Object.keys(_c).map(function(k){return k+'='+_c[k];}).join(' ')||'(none)');
+  const txt='Sovenn '+VERSION+' diagnostics ('+arr.length+' events)\n'+(navigator.userAgent||'')+'\n'+_cs+'\n'+arr.map(r=>r.t+' ['+r.where+'] '+r.msg).join('\n');
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(function(){ alert('Diagnostic log copied. Paste it into the feedback chat.'); }, function(){ prompt('Copy this log:', txt); }); }
   else { prompt('Copy this log:', txt); }
 };
@@ -1143,6 +1151,7 @@ function viewSettings(section){
     let h='<div class="view">'+back+'<h1 class="title">About &amp; data</h1>';
     h+='<div class="card"><div class="nm" style="font-size:15px">Private by design</div><div class="sub" style="margin-top:5px">Your people stay on this device by default. There is no Sovenn account and no Sovenn server, so we never see your contacts, your notes, or your messages. If you turn on Google Drive backup, an encrypted copy goes only to your own Drive, never to us.</div></div>';
     h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
+    h+='<div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Your private counts</div><div class="sub">Kept only on this phone, never sent anywhere: '+_fbSummary()+'</div></div><button class="btn sm ghost" onclick="fbClear()">Clear</button></div></div>';
     h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
     h+='<div class="muted" style="margin-top:18px;font-size:12.5px">Sovenn v'+VERSION+', built '+BUILT+', '+DB.contacts.length+' contacts, all local, no tracking.</div>';
     return render(h+'</div>');
@@ -1483,12 +1492,13 @@ window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
 };
 /* one place that records "reached this person today": Log call, Mark contacted, and the post-send confirm all use it */
 function _doReach(c,note){ const prev={ lastContacted:(c.lastContacted||null), logLen:(c.log||[]).length };
-  const t=todayISO(); c.log=c.log||[]; c.log.push({date:t,type:'contacted',note:note||''}); c.lastContacted=t; return prev; }
+  const t=todayISO(); c.log=c.log||[]; c.log.push({date:t,type:'contacted',note:note||''}); c.lastContacted=t; try{ fbBump('sends'); }catch(e){} return prev; }
 window.logToday=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const note=prompt('Quick note about this catch-up (optional):')||'';
   _doReach(c,note); save(); closeModal(); route();
 };
 window.reachClose=()=>{ closeModal(); route(); };
+window.reachMood=function(m){ try{ fbBump('mood_'+m); }catch(e){} reachClose(); }; /* #18: one-tap after-send mood, stored on-device only */
 /* post-send: Sovenn cannot see inside WhatsApp, so it asks; "Yes" marks reached so they drop off Today, with a one-tap undo */
 let _undoReach=null;
 window.markReached=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
@@ -1505,9 +1515,13 @@ function _confirmSent(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ close
 function _reachedDone(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ reachClose(); return; } const nm=esc(callName(c));
   var h='<button class="x" onclick="reachClose()">&times;</button><h3>Nice. '+nm+' is back in rhythm.</h3>';
   h+='<div class="note">Marked as reached today, so '+nm+' will rest until your next reconnect.</div>';
-  /* #11: at the peak good feeling (a real send), offer the daily reminder ONCE, only if undecided. */
+  /* #11 (one-time permission offer) and #18 (after-send mood) show ONE AT A TIME (#21): the first
+     qualifying send offers the daily reminder; every send after that asks how reaching out felt. */
   if(DB.settings && !DB.settings.notify && !DB.settings.notifAsked && typeof SovennNotify!=='undefined' && SovennNotify.permission()==='default'){
     h+='<div class="card" style="margin-top:12px;padding:13px 14px"><div class="nm" style="font-size:15px">Want a gentle nudge like this each day?</div><div class="sub" style="margin-top:4px">One calm reminder of who to reach next. Built on this device, off any time.</div><div class="btn-row" style="margin-top:10px"><button class="btn primary sm" onclick="enableNudgesFromReach()">Turn on daily reminder</button><button class="btn ghost sm" onclick="dismissNudgeAsk()">Not now</button></div></div>';
+  } else {
+    h+='<div class="sub" style="margin:14px 0 6px;text-align:center">How did reaching out feel?</div>';
+    h+='<div class="btn-row" style="justify-content:center"><button class="btn ghost sm" onclick="reachMood(\'lighter\')">Lighter</button><button class="btn ghost sm" onclick="reachMood(\'okay\')">Okay</button><button class="btn ghost sm" onclick="reachMood(\'awkward\')">Awkward</button></div>';
   }
   h+='<div class="btn-row"><button class="btn primary block" onclick="reachClose()">Done</button></div>';
   h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="undoReach()">Undo</button></div>';
@@ -1650,6 +1664,7 @@ gReturn();
 if(!location.hash) location.hash='#today';
 snapInit();
 route();
+try{ fbBump('opens'); }catch(e){}
 maybeNudge();
 gBoot();
 initFeedback();
