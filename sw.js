@@ -2,8 +2,8 @@
    Serve the cached shell instantly for a fast cold start, then refresh it in the
    background so the next open is current. Cache name is bumped each release; the new
    version precaches a fresh SHELL on install, so updates still land promptly. */
-const CACHE = 'sovenn-0.59.0';
-const SHELL = ['./','index.html','app.html','card.html','app.js','qr.js','capture.js','shuffle.js','memory.js','streak.js','notify.js','styles.css','logo.svg','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','favicon-32.png','favicon-16.png'];
+const CACHE = 'sovenn-0.60.0';
+const SHELL = ['./','app','card','app.js','qr.js','capture.js','shuffle.js','memory.js','streak.js','notify.js','styles.css','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','favicon-32.png','favicon-16.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting()));
 });
@@ -18,7 +18,14 @@ self.addEventListener('fetch', e => {
       const net = fetch(e.request).then(res => {
         if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {}); }
         return res;
-      }).catch(() => cached || caches.match('index.html'));
+      }).catch(() => {
+        if (cached) return cached;
+        // offline navigation fallback: serve the APP shell for /app routes, the landing only for /
+        if (e.request.mode === 'navigate') {
+          return caches.match(new URL(e.request.url).pathname.indexOf('/app') === 0 ? 'app' : './');
+        }
+        return undefined;
+      });
       return cached || net;
     })
   );
