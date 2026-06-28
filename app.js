@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.52.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.53.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -1407,8 +1407,12 @@ window.captureHub=()=>{
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>Add someone</h3>';
   h+='<div class="sub" style="margin:-6px 0 14px">Three effortless ways. You almost never type.</div>';
   const row=(cls,k,ti,ds,act)=>'<button class="cap '+cls+'" onclick="closeModal();'+act+'"><span class="capic">'+capIcon(k)+'</span><span class="capt"><span class="ti">'+ti+'</span><span class="ds">'+ds+'</span></span></button>';
-  h+=row('hero','share','Let them share their card','Send a warm link. They fill it in, it comes back to you. Zero typing.','shareRequest()');
-  h+=row('','paste','Paste anything','A signature, a bio, a line. Sovenn pulls out every detail.','quickAdd()');
+  /* #4: the share-their-card hero needs your own number to route replies back; hide it for a
+     brand-new user (no number set) so the most prominent action never dead-ends, and promote
+     the always-works "Paste anything" into the hero slot instead. */
+  const ready=!!String((DB.me&&DB.me.phone)||'').trim();  /* String() so a non-string phone can never throw */
+  if(ready) h+=row('hero','share','Let them share their card','Send a warm link. They fill it in, it comes back to you. Zero typing.','shareRequest()');
+  h+=row(ready?'':'hero','paste','Paste anything','A signature, a bio, a line. Sovenn pulls out every detail.','quickAdd()');
   h+=row('','scan','Scan a card','Snap a business card and start from the photo.','fabPick(\'camera\')');
   h+=row('','voice','Speak it','Just say who they are.','voiceAdd()');
   h+=row('','import','Import from your phone','Bring in contacts you already have.','go(\'import\')');
