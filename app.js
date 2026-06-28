@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.53.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.54.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -1101,6 +1101,8 @@ function viewSettings(section){
     h+='<label class="fl">Default country code (for phone numbers without +)</label><input value="'+esc(s.country)+'" oninput="setS(\'country\',this.value.replace(/[^0-9]/g,\'\'))" placeholder="44 for UK, 91 for India">';
     h+='<label class="fl">Remind me this many days before</label><input type="number" min="0" max="14" value="'+(s.leadDays)+'" oninput="setS(\'leadDays\',+this.value)"></div>';
     h+='<div class="kick">Your daily moment</div><div class="card"><div class="sub" style="margin-bottom:9px">Pick the moment you already pause, your chai, your commute, your evening wind-down. Sovenn ties its one gentle nudge to that moment, so staying close rides on a habit you already have.</div><div class="btn-row">'+[['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']].map(function(o){return '<button class="btn sm '+((s.dailyMoment===o[0])?'primary':'ghost')+'" onclick="setMoment(\''+o[0]+'\')">'+o[1]+'</button>';}).join('')+'</div></div>';
+    var _notifOn=!!(s&&s.notify), _notifPerm=(typeof SovennNotify!=='undefined'?SovennNotify.permission():'unsupported');
+    h+='<div class="kick">Daily reminder</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Remind me to reach out</div><div class="sub">One calm notification a day for birthdays and people to reconnect with. It is built on this device, nothing is sent to a server. Turn it off any time.</div></div><button class="btn sm '+(_notifOn?'primary':'ghost')+'" onclick="toggleNotify()">'+(_notifOn?'On':'Off')+'</button></div>'+((_notifOn&&_notifPerm!=='granted')?'<div class="sub" style="margin-top:8px;color:var(--rose)">Notifications are blocked for Sovenn right now, so this cannot fire. Allow them in your browser or phone settings.</div>':'')+'</div>';
     h+='<div class="kick">Gestures</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Swipe for quick actions</div><div class="sub">Swipe left on anyone to open Message, triage and Delete. The 3-dot button does the same.</div></div><button class="btn sm '+(swon?'primary':'ghost')+'" onclick="toggleSwipe()">'+(swon?'On':'Off')+'</button></div></div>';
     return render(h+'</div>');
   }
@@ -1165,6 +1167,11 @@ function viewSettings(section){
 window.settingsFilter=function(){ var el=document.getElementById('setSearch'); if(!el) return; var q=(el.value||'').toLowerCase().trim(); var rows=document.querySelectorAll('#setList [data-kw]'); for(var i=0;i<rows.length;i++){ var r=rows[i]; var hay=((r.getAttribute('data-kw')||'')+' '+(r.textContent||'')).toLowerCase(); r.style.display=(!q||hay.indexOf(q)>=0)?'':'none'; } };
 window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
 window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
+window.toggleNotify=async()=>{ DB.settings=DB.settings||{};
+  if(DB.settings.notify){ DB.settings.notify=false; save(); route(); return; }
+  let p='unsupported'; try{ if(typeof SovennNotify!=='undefined') p=await SovennNotify.requestPermission(); }catch(e){ logErr('toggleNotify',e); }
+  if(p==='granted'){ DB.settings.notify=true; save(); route(); try{ maybeNudge(); }catch(e){} }
+  else { DB.settings.notify=false; save(); route(); alert(p==='denied'?'Notifications are blocked for Sovenn. Turn them on in your browser or phone settings, then try again.':'This browser cannot show notifications yet. On Android, add Sovenn to your home screen first, then turn this on.'); } };
 window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings, me:DB.me, deleted:DB.deleted||{} }; save(); go('today'); } };
 function download(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
 window.exportJSON=()=>download('sovenn-backup.json', new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));
@@ -1575,8 +1582,9 @@ window.lockTapBio=async()=>{ const m=document.getElementById('lkMsg'); if(m){ m.
   const ok=await lockBioVerify(); if(ok){ lockHide(); } else if(m && !_unlocked){ m.textContent='Enter your passcode'; } };
 function lockShouldRelock(){ const c=lockCfg(); if(!c) return true; const mode=c.autolock||'now'; if(mode==='now') return true;
   const mins=mode==='5'?5:1; return (Date.now()-_bgAt) > mins*60000; }
-document.addEventListener('visibilitychange',()=>{ if(document.hidden){ _bgAt=Date.now(); }
-  else if(lockEnabled() && _unlocked && lockShouldRelock()){ lockShow(); } });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){ _bgAt=Date.now(); return; }
+  if(lockEnabled() && _unlocked && lockShouldRelock()){ lockShow(); }
+  maybeNudge(); });
 function lockSection(){ const c=lockCfg()||{}; const on=lockEnabled();
   let h='<div class="kick">App lock</div><div class="card">';
   h+='<div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Lock Sovenn</div><div class="sub">Ask for a passcode every time the app opens, so your people stay private on this device. Stored only here, never synced.</div></div><button class="btn sm '+(on?'primary':'ghost')+'" onclick="lockToggle()">'+(on?'On':'Off')+'</button></div>';
@@ -1601,6 +1609,21 @@ window.lockAuto=(k)=>{ const c=lockCfg(); if(!c) return; c.autolock=k; lockSave(
 
 /* ---------- render + boot ---------- */
 function render(h){ $('#app').innerHTML=h; }
+/* #6: fire at most ONE calm local notification per day, only when the user opted in AND granted
+   permission. Pure on-device (SovennNotify uses no network); never throws; de-duped via a per-day key. */
+function maybeNudge(){
+  try{
+    if(!DB.settings || !DB.settings.notify) return;
+    if(typeof SovennNotify==='undefined') return;
+    if(SovennNotify.permission()!=='granted') return;
+    const t=todayISO();
+    if(localStorage.getItem('sovenn.lastNudge')===t) return; /* already nudged today */
+    const due=SovennNotify.dueToday(DB.contacts,{today:t});
+    localStorage.setItem('sovenn.lastNudge',t); /* mark done even if nothing is due, so we do not recompute all day */
+    if(!due || !due.length) return;
+    SovennNotify.notify({title:'Sovenn', body:SovennNotify.digest(DB.contacts,t), tag:'daily-'+t});
+  }catch(e){ logErr('maybeNudge',e); }
+}
 (function(){ const bv=document.getElementById('brandVer'); if(bv) bv.textContent='v'+VERSION; })();
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleNavMenu(); });
@@ -1613,6 +1636,7 @@ gReturn();
 if(!location.hash) location.hash='#today';
 snapInit();
 route();
+maybeNudge();
 gBoot();
 initFeedback();
 /* warm the lazy modules in the background once the UI is up (so My Card / quick-add feel instant) */
