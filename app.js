@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.54.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.55.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -519,7 +519,7 @@ function viewToday(){
   const _mp={morning:'Your morning minute. Keep your people warm.',afternoon:'A quiet minute to keep your people warm.',evening:'Your evening minute. Keep your people warm.'}[DB.settings.dailyMoment]||'Keep your people warm.';
   let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+_mp+'</p>';
   if(!DB.contacts.length){
-    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button></div></div>';
+    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div><div style="font-weight:600;margin:2px 0 12px;color:var(--ink)">Each day Sovenn shows you who to reach and writes the first message. You always tap send.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button></div></div>';
     return render(h);
   }
   h+='<div class="today-top">';
@@ -534,7 +534,7 @@ function viewToday(){
   const _occIds={}; upN.forEach(function(x){ _occIds[x.c.id]=1; });
   due.forEach(function(d){ if(_occIds[d.c.id]) return; deck.push({ c:d.c, label:'time to reconnect', when:(d.overdue<0?(-d.overdue)+' days overdue':'due now'),
     actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Message '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
-  deck=deck.slice(0,12); window._deck=deck;
+  deck=deck.slice(0,5); window._deck=deck;  /* #10: a finite, completable deck (max 5) drives return, not an endless list */
   if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><button type="button" class="deck-hint" aria-label="Show the next card" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone &middot; or tap here</button></div></div>';
   else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Nobody is overdue and no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
   /* progress: warmth */
@@ -576,10 +576,15 @@ function deckInner(item){ var c=item.c;
     +'<div class="btn-row" style="margin-top:14px">'+item.actions+'</div>';
 }
 var DECK_BANDS=['','linear-gradient(90deg,#FF7A4E,#E8B23A)','linear-gradient(90deg,#B07AC0,#FF7A4E)','linear-gradient(90deg,#E8B23A,#E0552E)'];
-function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack) return; var items=window._deck||[]; var n=items.length; var show=Math.min(4,n); var html='';
+function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack) return; var items=window._deck||[]; var n=items.length;
+  /* #10: a bounded deck. Once you have flicked through everyone, end on a dignified "All caught up"
+     card that reads "done", never an endless loop. */
+  if(n===0){ stack.innerHTML='<div class="dcard hero top" style="z-index:30"><div class="kick" style="color:var(--hero-ink);opacity:.85;margin:0">All caught up</div><div class="nm" style="margin-top:10px">You have been through everyone for today.</div><div class="sub" style="margin-top:6px">Nice work keeping your people close. New cards arrive as dates and rhythms come due.</div></div>';
+    var bar=document.querySelector('.deckbar'); if(bar) bar.style.display='none'; return; }
+  var show=Math.min(4,n); var html='';
   for(var k=show-1;k>=0;k--){ var isTop=(k===0); var bandBg=isTop?'':(';background:'+DECK_BANDS[Math.min(k,3)]); html+='<div class="dcard hero'+(isTop?' top':' dpeek')+'" style="--k:'+k+';z-index:'+(30-k)+bandBg+'">'+deckInner(items[k])+'</div>'; }
   stack.innerHTML=html;
-  var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent= n>1?('1 / '+n):'1 card';
+  var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent=(n+(n===1?' card left':' cards left'));
   wireDeck();
 }
 function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); if(!card) return; var sx=0,dx=0,drag=false;
@@ -590,7 +595,7 @@ function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); i
     else { card.style.transform=''; } dx=0; }
   card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
 }
-window.deckAdvance=function(){ var items=window._deck||[]; if(items.length<2){ renderDeck(); return; } items.push(items.shift()); renderDeck(); };
+window.deckAdvance=function(){ var items=window._deck||[]; if(items.length){ items.shift(); } renderDeck(); }; /* #10: advancing permanently removes the top card so the deck completes */
 function initDeck(){ renderDeck(); }
 function heroCard(c, label, whenText, actions){
   return '<div class="hero" data-cid="'+c.id+'"><svg class="blob" viewBox="0 0 64 44" aria-hidden="true"><circle cx="26" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7" opacity=".5"/><circle cx="40" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7"/></svg>'
