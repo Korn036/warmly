@@ -226,7 +226,8 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 
 /* layout density on bigger screens */
 .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; align-items:start; }
-.today-top{ display:grid; gap:10px; }
+.today-top{ display:grid; gap:10px; min-width:0; }
+.today-top>*{ min-width:0; }  /* let grid tracks shrink so a long deck hint can't force horizontal overflow */
 @media(min-width:820px){ .today-top{ grid-template-columns:1.7fr 1.3fr; align-items:start; } }
 .today-top .hero, .today-top .prog{ margin-bottom:0; }
 .seg{ display:inline-flex; background:color-mix(in srgb,var(--ink) 7%,transparent); border-radius:30px; padding:3px; }
@@ -599,9 +600,10 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 /* deck "pack of cards": cards behind the top one are thin coloured bands with their own shadow (edge-peek) */
 .deckstack .dcard.dpeek{ box-shadow:0 9px 20px rgba(150,90,40,.22); }
 .deckstack .dcard.dpeek > *{ visibility:hidden; }
-.deckbar{ display:flex; align-items:center; justify-content:space-between; margin-top:13px; padding:0 4px; }
+.deckbar{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-top:13px; padding:0 4px; }
+.deckbar .deck-hint{ min-width:0; }
 .deckcount{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); }
-.deck-hint{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); cursor:pointer; }
+.deck-hint{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); cursor:pointer; background:none; border:none; padding:0; -webkit-appearance:none; appearance:none; }
 /* notification panel (bell) */
 .notif-panel{ position:fixed; top:58px; right:14px; z-index:41; width:300px; max-width:calc(100vw - 28px); background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 16px 40px rgba(20,14,10,.24); padding:8px; display:none; max-height:72vh; overflow:auto; }
 .notif-panel.open{ display:block; }
