@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sovenn · keep your people warm</title>
+<meta name="description" content="A simple personal CRM to remember the people who matter, never miss a birthday, and keep warm contacts from going cold.">
+<link rel="canonical" href="https://sovenn.app/">
+<!-- Open Graph / social preview -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sovenn">
+<meta property="og:url" content="https://sovenn.app/">
+<meta property="og:title" content="Sovenn · keep your people warm">
+<meta property="og:description" content="A private personal CRM: remember the people who matter, never miss a birthday, keep warm contacts from going cold. No account — nothing leaves your device.">
+<meta property="og:image" content="https://sovenn.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Sovenn — keep your people warm">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sovenn · keep your people warm">
+<meta name="twitter:description" content="A private personal CRM. No account, no tracking — nothing leaves your device.">
+<meta name="twitter:image" content="https://sovenn.app/og-image.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Sovenn","alternateName":"Sovenn — keep your people warm","url":"https://sovenn.app/","description":"A private personal CRM to remember the people who matter, never miss a birthday, and keep warm contacts from going cold. Private by design — your contacts never leave your device.","applicationCategory":"LifestyleApplication","operatingSystem":"Android, iOS, Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Karthik Onteddu","url":"https://karthikonteddu.com"}}
+</script>
+<meta name="theme-color" content="#FBF8F3">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a href="#app" class="skip">Skip to content</a>
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#today" aria-label="Sovenn home"><span class="brandname">Sovenn<span class="dot">.</span></span><span class="ver" id="brandVer"></span></a>
+    <nav class="tabs" id="tabs" aria-label="Primary">
+      <a data-go="today">today</a>
+      <a data-go="people">people</a>
+    </nav>
+    <div class="tbtns">
+      <button class="icon-btn bell" id="bellBtn" aria-label="People to reach out to"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="nb" id="bellN" hidden>0</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="switch skin">D</button>
+      <button class="icon-btn menu" id="menuBtn" aria-label="menu">☰</button>
+    </div>
+  </div>
+</header>
+<div class="menu-scrim" id="menuScrim"></div>
+<nav class="navmenu" id="navMenu" aria-label="More">
+  <a data-go="map"><svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg>Map of your people</a>
+  <a data-go="mycard"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M14 9h4M14 13h4M5.5 16c.8-1.6 5.2-1.6 6 0"/></svg>My Card</a>
+  <a data-go="import"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>Import contacts</a>
+  <div class="sep"></div>
+  <a data-go="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 7 19.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.3 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 0 1 4 0v.1A1.7 1.7 0 0 0 17 4.7l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
+</nav>
+<div class="notif-panel" id="notifPanel" role="dialog" aria-label="Upcoming and overdue"></div>
+
+<main class="wrap" id="app"><!-- rendered by app.js --></main>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+
+<div class="lockscreen" id="lockScreen" role="dialog" aria-modal="true" aria-label="Sovenn is locked — enter your passcode"></div>
+
+<!-- (removed an unused animated "liquid" SVG filter — it was applied to nothing yet ran continuously, draining battery and ignoring prefers-reduced-motion) -->
+
+<div class="fab-wrap">
+  <button class="fab" id="fabBtn" aria-label="Add a contact" onclick="captureHub()">+</button>
+</div>
+<input type="file" id="cardCam" accept="image/*" capture="environment" style="display:none" onchange="cardCaptured(event)">
+
+<button class="fb-fab" id="fbFab" onclick="feedbackOpen()" aria-label="Send beta feedback" hidden>
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.55L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5z"/></svg><span>Feedback</span>
+</button>
+<div class="fb-bg" id="fbBg" hidden role="dialog" aria-modal="true" aria-label="Send feedback" onclick="if(event.target===this)feedbackClose()"></div>
+
+<footer class="foot wrap">
+  <span>Sovenn keeps your people on your device. No server, no tracking. Nothing is sent to anyone until you tap send.</span><br>
+  <a href="privacy.html" style="color:var(--ink-soft)">Privacy</a> · <a href="terms.html" style="color:var(--ink-soft)">Terms</a> · © 2026 Karthik Onteddu
+</footer>
+
+<!-- qr.js + capture.js are lazy-loaded on demand (My Card / quick-add) to keep cold start light -->
+<script defer src="shuffle.js"></script>
+<script defer src="memory.js"></script>
+<script defer src="streak.js"></script>
+<script defer src="notify.js"></script>
+<script defer src="app.js"></script>
+<script>
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+</script>
+</body>
+</html>

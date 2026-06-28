@@ -3,94 +3,115 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sovenn · keep your people warm</title>
-<meta name="description" content="A simple personal CRM to remember the people who matter, never miss a birthday, and keep warm contacts from going cold.">
+<title>Sovenn · reach the people you've been meaning to</title>
+<meta name="description" content="Sovenn shows you who to reach and writes the first warm line, so you actually hit send. No account, no server — nothing leaves your phone.">
 <link rel="canonical" href="https://sovenn.app/">
-<!-- Open Graph / social preview -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Sovenn">
 <meta property="og:url" content="https://sovenn.app/">
-<meta property="og:title" content="Sovenn · keep your people warm">
-<meta property="og:description" content="A private personal CRM: remember the people who matter, never miss a birthday, keep warm contacts from going cold. No account — nothing leaves your device.">
+<meta property="og:title" content="Sovenn · the people you love are one message away">
+<meta property="og:description" content="Sovenn shows you who to reach today and writes the first warm line, so you actually hit send. Private by design — nothing leaves your phone.">
 <meta property="og:image" content="https://sovenn.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Sovenn — keep your people warm">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Sovenn · keep your people warm">
-<meta name="twitter:description" content="A private personal CRM. No account, no tracking — nothing leaves your device.">
+<meta name="twitter:title" content="Sovenn · the people you love are one message away">
+<meta name="twitter:description" content="Reach the people you've been meaning to. Private by design — nothing leaves your phone.">
 <meta name="twitter:image" content="https://sovenn.app/og-image.png">
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Sovenn","alternateName":"Sovenn — keep your people warm","url":"https://sovenn.app/","description":"A private personal CRM to remember the people who matter, never miss a birthday, and keep warm contacts from going cold. Private by design — your contacts never leave your device.","applicationCategory":"LifestyleApplication","operatingSystem":"Android, iOS, Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Karthik Onteddu","url":"https://karthikonteddu.com"}}
-</script>
 <meta name="theme-color" content="#FBF8F3">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-<link rel="stylesheet" href="styles.css">
+<style>
+  :root{--bg:#FBF8F3;--ink:#2b241d;--soft:#6f655a;--line:#e9e0d2;--accent:#946145;--coral:#E0552E;--dark:#1d1622;--cream:#F5ECDD;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{overflow-x:hidden}
+  body{font-family:'Space Grotesk','Segoe UI',system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  a{color:inherit}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:20px 0}
+  .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .logo img{height:30px;width:auto;display:block}
+  .logo b{font-size:21px;font-weight:700}.logo .dot{color:var(--coral)}
+  .btn{display:inline-block;border:none;cursor:pointer;text-decoration:none;font:inherit;font-weight:600;border-radius:14px;padding:13px 22px;max-width:100%}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{color:#fff;background:linear-gradient(180deg,#F0703E,var(--coral));box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 16px rgba(224,85,46,.28)}
+  .btn-ghost{color:var(--ink);background:#fff;border:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .btn-sm{padding:10px 16px;border-radius:12px;font-size:14px}
+  .hero{text-align:center;padding:50px 0 26px}
+  .hero h1{font-size:clamp(28px,6vw,52px);line-height:1.08;letter-spacing:-.5px;max-width:15ch;margin:0 auto}
+  .hero p{font-size:clamp(16px,2.4vw,20px);color:var(--soft);max-width:40ch;margin:18px auto 26px}
+  .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .reassure{margin:16px auto 0;font-size:13.5px;color:var(--soft);max-width:38ch}
+  .short{padding:30px 0 6px}.short h2{text-align:center;font-size:24px;margin-bottom:22px}
+  .deliv{list-style:none;max-width:760px;margin:0 auto;display:grid;gap:14px}
+  .deliv li{display:flex;gap:14px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 6px 16px rgba(0,0,0,.045)}
+  .deliv .m{flex:0 0 auto;width:11px;height:11px;border-radius:50%;background:var(--coral);margin-top:7px}
+  .deliv .t{font-size:15.5px;color:var(--soft)}.deliv b{color:var(--ink)}
+  .steps{background:var(--dark);color:var(--cream);border-radius:24px;padding:36px 30px;margin:40px 0}
+  .steps h2{text-align:center;font-size:25px;margin-bottom:22px}
+  .steps .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  .step .n{color:var(--coral);font-weight:700;font-size:14px;letter-spacing:2px}
+  .step h4{font-size:17px;margin:6px 0 5px}.step p{font-size:14.5px;color:#cbb9a6}
+  .band{text-align:center;padding:6px 0 48px}
+  footer{border-top:1px solid var(--line);padding:26px 0;color:var(--soft);font-size:13.5px;text-align:center}
+  footer a{color:var(--accent);text-decoration:none}
+  @media(max-width:760px){.steps .grid{grid-template-columns:1fr}.wrap{padding:0 18px}.steps{padding:30px 22px}}
+</style>
 </head>
 <body>
-<a href="#app" class="skip">Skip to content</a>
-<header class="topbar">
-  <div class="wrap">
-    <a class="brand" href="#today" aria-label="Sovenn home"><span class="brandname">Sovenn<span class="dot">.</span></span><span class="ver" id="brandVer"></span></a>
-    <nav class="tabs" id="tabs" aria-label="Primary">
-      <a data-go="today">today</a>
-      <a data-go="people">people</a>
-    </nav>
-    <div class="tbtns">
-      <button class="icon-btn bell" id="bellBtn" aria-label="People to reach out to"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/></svg><span class="nb" id="bellN" hidden>0</span></button>
-      <button class="icon-btn" id="themeBtn" aria-label="switch skin">D</button>
-      <button class="icon-btn menu" id="menuBtn" aria-label="menu">☰</button>
+<div class="wrap">
+
+  <header>
+    <a class="logo" href="/"><img src="logo.svg" alt="Sovenn logo"><b>Sovenn<span class="dot">.</span></b></a>
+    <a class="btn btn-ghost btn-sm" href="/app.html">Explore Sovenn</a>
+  </header>
+
+  <section class="hero">
+    <h1>The people you love are one message away.</h1>
+    <p>Sovenn shows you who to reach today and writes the first warm line, so you actually hit send.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/app.html">Explore Sovenn</a>
+      <a class="btn btn-ghost" href="https://play.google.com/store/apps/details?id=app.sovenn.twa">Get it on Google Play</a>
     </div>
-  </div>
-</header>
-<div class="menu-scrim" id="menuScrim"></div>
-<nav class="navmenu" id="navMenu" aria-label="More">
-  <a data-go="map"><svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg>Map of your people</a>
-  <a data-go="mycard"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M14 9h4M14 13h4M5.5 16c.8-1.6 5.2-1.6 6 0"/></svg>My Card</a>
-  <a data-go="import"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>Import contacts</a>
-  <div class="sep"></div>
-  <a data-go="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 7 19.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.3 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 0 1 4 0v.1A1.7 1.7 0 0 0 17 4.7l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</a>
-</nav>
-<div class="notif-panel" id="notifPanel" role="dialog" aria-label="Upcoming and overdue"></div>
+    <div class="reassure">No account. No server. Nothing leaves your phone, and you always tap send.</div>
+  </section>
 
-<main class="wrap" id="app"><!-- rendered by app.js --></main>
+  <section class="short">
+    <h2>The short version</h2>
+    <ul class="deliv">
+      <li><span class="m"></span><span class="t"><b>Who it's for.</b> People who keep meaning to text a friend, a cousin, an old teammate, and then six months slip by.</span></li>
+      <li><span class="m"></span><span class="t"><b>What makes it different.</b> It writes the brave first line for you, in your own words. No account and no server, so your people never leave your phone.</span></li>
+      <li><span class="m"></span><span class="t"><b>Why we made it.</b> To make staying close feel light again, in the few seconds you already have, without the guilt.</span></li>
+      <li><span class="m"></span><span class="t"><b>Where it lives.</b> Made in India, built around WhatsApp, ready for the people you love wherever they are.</span></li>
+    </ul>
+  </section>
 
-<div class="modal-bg" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+  <section class="steps">
+    <h2>How it works</h2>
+    <div class="grid">
+      <div class="step"><div class="n">01</div><h4>Add the few who matter</h4><p>Paste a name, scan a card, or import. No typing marathons.</p></div>
+      <div class="step"><div class="n">02</div><h4>Get a gentle nudge</h4><p>Sovenn quietly reminds you when it's time, never with guilt.</p></div>
+      <div class="step"><div class="n">03</div><h4>Send in eight seconds</h4><p>Tap the drafted message, edit if you like, and reconnect.</p></div>
+    </div>
+  </section>
 
-<div class="lockscreen" id="lockScreen" role="dialog" aria-modal="true" aria-label="Sovenn is locked — enter your passcode"></div>
+  <div class="band"><a class="btn btn-primary" href="/app.html">Explore Sovenn</a></div>
 
-<!-- (removed an unused animated "liquid" SVG filter — it was applied to nothing yet ran continuously, draining battery and ignoring prefers-reduced-motion) -->
+  <footer>
+    <div>Private by design · sovenn.app</div>
+    <div style="margin-top:8px"><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · © 2026 Sovenn</div>
+  </footer>
 
-<div class="fab-wrap">
-  <button class="fab" id="fabBtn" aria-label="Add a contact" onclick="captureHub()">+</button>
 </div>
-<input type="file" id="cardCam" accept="image/*" capture="environment" style="display:none" onchange="cardCaptured(event)">
-
-<button class="fb-fab" id="fbFab" onclick="feedbackOpen()" aria-label="Send beta feedback" hidden>
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.55L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5z"/></svg><span>Feedback</span>
-</button>
-<div class="fb-bg" id="fbBg" hidden role="dialog" aria-modal="true" aria-label="Send feedback" onclick="if(event.target===this)feedbackClose()"></div>
-
-<footer class="foot wrap">
-  <span>Sovenn keeps your people on your device. No server, no tracking. Nothing is sent to anyone until you tap send.</span><br>
-  <a href="privacy.html" style="color:var(--ink-soft)">Privacy</a> · <a href="terms.html" style="color:var(--ink-soft)">Terms</a> · © 2026 Karthik Onteddu
-</footer>
-
-<!-- qr.js + capture.js are lazy-loaded on demand (My Card / quick-add) to keep cold start light -->
-<script defer src="shuffle.js"></script>
-<script defer src="memory.js"></script>
-<script defer src="streak.js"></script>
-<script defer src="notify.js"></script>
-<script defer src="app.js"></script>
 <script>
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
 </script>
 </body>
 </html>
