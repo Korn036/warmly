@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.51.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.52.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -366,6 +366,7 @@ function upcoming(within){
   DB.contacts.forEach(c=>contactOccasions(c).forEach(o=>{ const n=daysUntil(o.date); if(n<=within) list.push({c,o,n}); }));
   return list.sort((a,b)=>a.n-b.n);
 }
+function cadenceForTier(t){ return t===1?3 : t===2?6 : null; } /* inner=3mo, keep-warm=6mo, loose or none=off; mirrors the Import mapping */
 function nextDue(c){ if(!c.cadence) return null; return c.lastContacted? addMonths(c.lastContacted,c.cadence) : today(); }
 function dueToReach(){
   const list=[];
@@ -716,7 +717,7 @@ window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.targ
   rd.onload=()=>{ const img=new Image();
     img.onload=()=>{ const max=720; let w=img.width,h=img.height; if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
       let card=rd.result; try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); card=cv.toDataURL('image/jpeg',0.55); }catch(e){}
-      const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:'New card',callName:'',tier:2,card:card,review:true};
+      const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:'New card',callName:'',tier:2,cadence:cadenceForTier(2),card:card,review:true};
       DB.contacts.push(c); save(); editContact(c.id);
     };
     img.onerror=()=>{ alert('Could not read that photo.'); };
@@ -1275,7 +1276,7 @@ window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   let c=id?DB.contacts.find(x=>x.id===id):null;
   if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; DB.contacts.push(c); }
   c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.style=g('e_style'); c.review=false; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li'); c.instagram=g('e_ig'); c.x=g('e_x'); c.telegram=g('e_tg'); c.website=g('e_web');
-  c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; c.context=g('e_ctx');
+  c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; if(!id && !c.cadence) c.cadence=cadenceForTier(c.tier); c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   save(); closeModal(); route();
 };
@@ -1390,7 +1391,7 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
     if(bd&&!c.bday) c.bday=bd;
     c.review=false; save(); closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); return;
   }
-  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),company:g('qa_company'),jobTitle:g('qa_job'),context:g('qa_ctx'),bday:bd,review:true};
+  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,cadence:cadenceForTier(+$('#qa_tier').value),email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),company:g('qa_company'),jobTitle:g('qa_job'),context:g('qa_ctx'),bday:bd,review:true};
   DB.contacts.push(nc); save(); closeModal(); go('person',nc.id); };
 
 /* ===== Capture hub: every effortless way to add someone, in one place ===== */
@@ -1454,7 +1455,7 @@ window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; con
   c.lastMsg=txt; c.msgHistory=c.msgHistory||[]; const meta=(_curMsgMeta.id===id)?_curMsgMeta:{};
   c.msgHistory.push({text:txt, at:Date.now(), occasion:meta.occasion||'reconnect', openerId:meta.openerId||null});
   if(c.msgHistory.length>20) c.msgHistory=c.msgHistory.slice(-20); save();
-  window.open(waLink(c.phone,txt),'_blank','noopener'); };
+  window.open(waLink(c.phone,txt),'_blank','noopener'); _confirmSent(id); };
 window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg && $('#msg')) $('#msg').value=c.lastMsg; };
 window.freshMsg=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const fr=freshDraft(c,'reconnect',(_curMsgMeta.id===id?_curMsgMeta.openerId:null));
@@ -1464,11 +1465,35 @@ window.addCal=(id,m,d,label)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   const title=callName(c)+"'s "+label; const details=(c.context?c.context+' · ':'')+(c.phone?('WhatsApp: '+waLink(c.phone,'')):'');
   window.open(gcalLink(title,date,details,true),'_blank','noopener');
 };
+/* one place that records "reached this person today": Log call, Mark contacted, and the post-send confirm all use it */
+function _doReach(c,note){ const prev={ lastContacted:(c.lastContacted||null), logLen:(c.log||[]).length };
+  const t=todayISO(); c.log=c.log||[]; c.log.push({date:t,type:'contacted',note:note||''}); c.lastContacted=t; return prev; }
 window.logToday=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const note=prompt('Quick note about this catch-up (optional):')||'';
-  const t=new Date().toISOString().slice(0,10); c.log=c.log||[]; c.log.push({date:t,type:'contacted',note}); c.lastContacted=t; save(); closeModal(); route();
+  _doReach(c,note); save(); closeModal(); route();
 };
-window.setTier=(id,t)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.tier=t; save(); route(); } };
+window.reachClose=()=>{ closeModal(); route(); };
+/* post-send: Sovenn cannot see inside WhatsApp, so it asks; "Yes" marks reached so they drop off Today, with a one-tap undo */
+let _undoReach=null;
+window.markReached=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
+  try{ const prev=_doReach(c,''); if(save()){ _undoReach={id:id, prev:prev, set:c.lastContacted}; _reachedDone(id); } else { closeModal(); route(); } }
+  catch(e){ logErr('markReached',e); closeModal(); route(); } };
+window.undoReach=()=>{ try{ if(_undoReach){ const c=DB.contacts.find(x=>x.id===_undoReach.id); if(c && c.lastContacted===_undoReach.set){ c.lastContacted=_undoReach.prev.lastContacted; if((c.log||[]).length>_undoReach.prev.logLen) c.log.length=_undoReach.prev.logLen; save(); } } }catch(e){ logErr('undoReach',e); } _undoReach=null; closeModal(); route(); };
+function _confirmSent(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ closeModal(); return; } const nm=esc(callName(c));
+  var h='<button class="x" onclick="closeModal()">&times;</button><h3>Did your message to '+nm+' send?</h3>';
+  h+='<div class="note">Sovenn cannot peek inside WhatsApp, so just tell us. If you sent it, we will mark '+nm+' as reached so they stop showing as due.</div>';
+  h+='<div class="btn-row"><button class="btn wa block" onclick="markReached(\''+id+'\')">Yes, I sent it</button></div>';
+  h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="closeModal()">Not yet</button></div>';
+  openModal(h);
+}
+function _reachedDone(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ reachClose(); return; } const nm=esc(callName(c));
+  var h='<button class="x" onclick="reachClose()">&times;</button><h3>Nice. '+nm+' is back in rhythm.</h3>';
+  h+='<div class="note">Marked as reached today, so '+nm+' will rest until your next reconnect.</div>';
+  h+='<div class="btn-row"><button class="btn primary block" onclick="reachClose()">Done</button></div>';
+  h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="undoReach()">Undo</button></div>';
+  openModal(h);
+}
+window.setTier=(id,t)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ const _un=(c.cadence==null); c.tier=t; if(_un) c.cadence=cadenceForTier(t); save(); route(); } };
 window.setCad=(id,m)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.cadence=m||null; save(); route(); } };
 
 /* ===================================================================
