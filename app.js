@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.55.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.56.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -532,11 +532,11 @@ function viewToday(){
     actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+x.c.id+'\',\''+(x.o.type==='anniversary'?'anniversary':x.o.type==='birthday'?'birthday':'reconnect')+'\')">Wish '+esc(callName(x.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();addCal(\''+x.c.id+'\','+(x.o.date.getMonth()+1)+','+x.o.date.getDate()+',\''+jsq(x.o.label)+'\')">+ Calendar</button>' }); });
   /* then fill the remaining slots with overdue reconnects, skipping anyone already shown for a date */
   const _occIds={}; upN.forEach(function(x){ _occIds[x.c.id]=1; });
-  due.forEach(function(d){ if(_occIds[d.c.id]) return; deck.push({ c:d.c, label:'time to reconnect', when:(d.overdue<0?(-d.overdue)+' days overdue':'due now'),
-    actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Message '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
+  due.forEach(function(d){ if(_occIds[d.c.id]) return; deck.push({ c:d.c, label:'time to reconnect', when:(d.overdue<0?'Drifting':'Time to say hi'),
+    actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Say hi to '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
   deck=deck.slice(0,5); window._deck=deck;  /* #10: a finite, completable deck (max 5) drives return, not an endless list */
   if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><button type="button" class="deck-hint" aria-label="Show the next card" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone &middot; or tap here</button></div></div>';
-  else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Nobody is overdue and no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
+  else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Everyone is warm and there are no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
@@ -1000,7 +1000,7 @@ window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=
 window.feedbackDiag=function(){ if(window.copyDiag){ copyDiag(); } };
 window.fbHide=function(){ feedbackClose(); };
 /* ---- top nav: notification bell + tucked menu ---- */
-function notifItems(){ var out=[]; try{ (dueToReach()||[]).forEach(function(d){ out.push({c:d.c, txt:(d.overdue<0?(-d.overdue)+'d overdue':'due now'), k:'d'}); }); (upcoming(10)||[]).forEach(function(x){ out.push({c:x.c, txt:String(x.o.label)+' '+whenLabel(x.n), k:'e'}); }); }catch(e){} return out.slice(0,15); }
+function notifItems(){ var out=[]; try{ (dueToReach()||[]).forEach(function(d){ out.push({c:d.c, txt:(d.overdue<0?'Drifting':'Time to say hi'), k:'d'}); }); (upcoming(10)||[]).forEach(function(x){ out.push({c:x.c, txt:String(x.o.label)+' '+whenLabel(x.n), k:'e'}); }); }catch(e){} return out.slice(0,15); }
 function dueCount(){ try{ return notifItems().length; }catch(e){ return 0; } }
 window.toggleNotif=function(){ var p=document.getElementById('notifPanel'), s=document.getElementById('menuScrim'); if(!p) return; var open=!p.classList.contains('open');
   if(open){ var items=notifItems(); var h='<div class="np-h">Needs a hello</div>'; if(!items.length) h+='<div class="np-empty">You are all caught up. Nicely kept.</div>'; else items.forEach(function(it){ h+='<button type="button" class="np-row" onclick="closeNotif();go(\'person\',\''+it.c.id+'\')"><span class="np-dot '+it.k+'"></span><div class="grow"><div class="np-n">'+esc(it.c.name)+'</div><div class="np-w">'+esc(it.txt)+'</div></div></button>'; }); p.innerHTML=h; }
@@ -1113,7 +1113,7 @@ function viewSettings(section){
   }
   if(section==='messages'){
     let h='<div class="view">'+back+'<h1 class="title">Messages</h1>';
-    h+='<div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Add a warm local greeting (Hinglish, German, Dutch) to reconnect messages, based on the contact&rsquo;s number or your region. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
+    h+='<div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Local language touch</div><div class="sub">Adds an occasional Hinglish, German or Dutch opener for contacts in those regions. Everywhere else your messages stay in English. Always editable before you send.</div></div><button class="btn sm '+((s.localTouch!==false)?'primary':'ghost')+'" onclick="toggleLocal()">'+((s.localTouch!==false)?'On':'Off')+'</button></div></div>';
     h+='<div class="kick">Templates</div><div class="card"><div class="muted">The messages Sovenn pre-fills for birthdays, anniversaries and reconnects. Write them once, in your own voice.</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="go(\'templates\')">Edit templates</button></div></div>';
     return render(h+'</div>');
   }
@@ -1505,10 +1505,19 @@ function _confirmSent(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ close
 function _reachedDone(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ reachClose(); return; } const nm=esc(callName(c));
   var h='<button class="x" onclick="reachClose()">&times;</button><h3>Nice. '+nm+' is back in rhythm.</h3>';
   h+='<div class="note">Marked as reached today, so '+nm+' will rest until your next reconnect.</div>';
+  /* #11: at the peak good feeling (a real send), offer the daily reminder ONCE, only if undecided. */
+  if(DB.settings && !DB.settings.notify && !DB.settings.notifAsked && typeof SovennNotify!=='undefined' && SovennNotify.permission()==='default'){
+    h+='<div class="card" style="margin-top:12px;padding:13px 14px"><div class="nm" style="font-size:15px">Want a gentle nudge like this each day?</div><div class="sub" style="margin-top:4px">One calm reminder of who to reach next. Built on this device, off any time.</div><div class="btn-row" style="margin-top:10px"><button class="btn primary sm" onclick="enableNudgesFromReach()">Turn on daily reminder</button><button class="btn ghost sm" onclick="dismissNudgeAsk()">Not now</button></div></div>';
+  }
   h+='<div class="btn-row"><button class="btn primary block" onclick="reachClose()">Done</button></div>';
   h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="undoReach()">Undo</button></div>';
   openModal(h);
 }
+window.enableNudgesFromReach=async()=>{ DB.settings=DB.settings||{}; DB.settings.notifAsked=true;
+  let p='unsupported'; try{ if(typeof SovennNotify!=='undefined') p=await SovennNotify.requestPermission(); }catch(e){ logErr('enableNudgesFromReach',e); }
+  if(p==='granted'){ DB.settings.notify=true; save(); try{ maybeNudge(); }catch(e){} } else { save(); }
+  reachClose(); };
+window.dismissNudgeAsk=()=>{ DB.settings=DB.settings||{}; DB.settings.notifAsked=true; save(); reachClose(); };
 window.setTier=(id,t)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ const _un=(c.cadence==null); c.tier=t; if(_un) c.cadence=cadenceForTier(t); save(); route(); } };
 window.setCad=(id,m)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.cadence=m||null; save(); route(); } };
 
