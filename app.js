@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.57.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.58.0', BUILT='2026-06-28';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -128,6 +128,7 @@ window.addEventListener('unhandledrejection', function(ev){ logErr('promise', ev
 const FB_KEY='sovenn.fb';
 function fbCounters(){ try{ return JSON.parse(localStorage.getItem(FB_KEY))||{}; }catch(e){ return {}; } }
 function fbBump(k,n){ try{ var o=fbCounters(); o[k]=(o[k]||0)+(n||1); localStorage.setItem(FB_KEY,JSON.stringify(o)); }catch(e){} }
+function fbSet(k,v){ try{ var o=fbCounters(); o[k]=v; localStorage.setItem(FB_KEY,JSON.stringify(o)); }catch(e){} }
 window.fbClear=function(){ try{ localStorage.removeItem(FB_KEY); }catch(e){} if(window.route) route(); };
 function _fbSummary(){ var c=fbCounters(); var op=c.opens||0, sn=c.sends||0; var parts=[op+(op===1?' open':' opens'), sn+(sn===1?' message sent':' messages sent')]; var md=(c.mood_lighter||0)+(c.mood_okay||0)+(c.mood_awkward||0); if(md) parts.push(md+(md===1?' feeling logged':' feelings logged')); return parts.join(', ')+'.'; }
 window.copyDiag=function(){ let arr=[]; try{ arr=JSON.parse(localStorage.getItem(ERR_KEY))||[]; }catch(e){}
@@ -1363,7 +1364,7 @@ function quickParse(t){ t=t||'';
   for(let ln of lines){ if(/@|linkedin|instagram|https?:|t\.me|\d{4,}/i.test(ln)) continue; ln=ln.replace(/^(met|meet|spoke to|spoke with|talked to|chatted with|call with|this is|name is|introducing|intro to|saw|with)\s+/i,'').trim(); if(/^[A-Za-z][A-Za-z .'\-]{1,40}$/.test(ln)){ name=ln; break; } }
   return {name,email,linkedin,instagram,x,telegram,bday,phone,location,website};
 }
-window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
+window.quickAdd=()=>{ try{ ensureCapture(); }catch(e){} /* #17: preload the strong parser so the first paste uses it */ let h='<button class="x" onclick="closeModal()">&times;</button><h3>Quick add</h3>';
   h+='<div class="note">Paste anything: a signature, a LinkedIn line, "Met Aisha, ESCP Paris, +33...". Sovenn pulls out the details. Refine later on their page.</div>';
   h+='<div id="qaVoice" class="voicebar" style="display:none"><span class="vbars"><i></i><i></i><i></i><i></i><i></i></span><span class="vtext">Listening, speak now</span><button class="btn sm" style="background:var(--hero-ink);color:var(--accent)" onclick="voiceStop()">Done</button></div>';
   h+='<textarea id="qa_blob" placeholder="Paste, type, or tap Speak it: name, city, where you met" style="min-height:78px" oninput="qaParse()"></textarea>';
@@ -1375,7 +1376,8 @@ window.quickAdd=()=>{ let h='<button class="x" onclick="closeModal()">&times;</b
   h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden"><input id="qa_web" type="hidden"><input id="qa_bdayraw" type="hidden"><input id="qa_company" type="hidden"><input id="qa_job" type="hidden"><input id="qa_ctx" type="hidden">';
   h+='<div class="btn-row" style="margin-top:14px"><button class="btn primary block" onclick="quickSave()">Add person</button></div>';
   openModal(h); };
-window.qaParse=()=>{ const p=(window.SovennCapture&&SovennCapture.parse)?SovennCapture.parse($('#qa_blob').value):quickParse($('#qa_blob').value);
+window.qaParse=()=>{ if(!(window.SovennCapture&&SovennCapture.parse)){ try{ ensureCapture().then(function(){ if(document.getElementById('qa_blob')) qaParse(); }); }catch(e){} } /* #17: if the strong parser is not loaded yet, load it and re-parse so paste upgrades to the full result */
+  const p=(window.SovennCapture&&SovennCapture.parse)?SovennCapture.parse($('#qa_blob').value):quickParse($('#qa_blob').value);
   if(p.name&&!$('#qa_name').value) $('#qa_name').value=p.name;
   if(!$('#qa_call').value) $('#qa_call').value=(p.callName||firstName(p.name||''));
   if(p.company&&$('#qa_company')&&!$('#qa_company').value) $('#qa_company').value=p.company;
@@ -1652,6 +1654,30 @@ function maybeNudge(){
     SovennNotify.notify({title:'Sovenn', body:SovennNotify.digest(DB.contacts,t), tag:'daily-'+t});
   }catch(e){ logErr('maybeNudge',e); }
 }
+/* #22: a gentle, guilt-free churn confessional - when an existing user returns after a real gap,
+   ask ONCE (one tap) what nearly stopped them. Reopen-only (a PWA cannot intercept uninstall). */
+function maybeChurnAsk(){
+  try{
+    if(!DB.contacts || !DB.contacts.length) return; /* never during onboarding */
+    if(typeof lockEnabled==='function' && lockEnabled()) return; /* don't stack on the lock screen */
+    var c=fbCounters(); var t=todayISO(); var prev=c.lastOpen;
+    fbSet('lastOpen', t);
+    if(!prev || prev===t) return;
+    var gap=Math.round((Date.parse(t)-Date.parse(prev))/86400000);
+    if(!(gap>=5)) return; /* only after a real absence */
+    if(c.churnAskedFor===prev) return; /* ask at most once per return */
+    fbSet('churnAskedFor', prev);
+    churnAsk();
+  }catch(e){ logErr('maybeChurnAsk',e); }
+}
+window.churnPick=function(k){ try{ fbBump('churn_'+k); }catch(e){} closeModal(); route(); };
+function churnAsk(){
+  var chips=[['chore','Felt like a chore'],['timing','Bad timing'],['words',"Didn't know what to say"],['forgot','Just forgot'],['guilt','Felt guilty'],['broke','Something broke'],['busy','Nothing, just busy']];
+  var h='<button class="x" onclick="closeModal()">&times;</button><h3>Welcome back.</h3>';
+  h+='<div class="note">It has been a little while, and that is completely okay - relationships do not expire. If anything nearly made you stop, one tap helps me make Sovenn gentler. Nothing leaves your phone.</div>';
+  h+='<div class="btn-row" style="flex-wrap:wrap;gap:8px;margin-top:6px">'+chips.map(function(x){ return '<button class="btn ghost sm" onclick="churnPick(\''+x[0]+'\')">'+x[1]+'</button>'; }).join('')+'</div>';
+  openModal(h);
+}
 (function(){ const bv=document.getElementById('brandVer'); if(bv) bv.textContent='v'+VERSION; })();
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleNavMenu(); });
@@ -1666,6 +1692,7 @@ snapInit();
 route();
 try{ fbBump('opens'); }catch(e){}
 maybeNudge();
+try{ maybeChurnAsk(); }catch(e){}
 gBoot();
 initFeedback();
 /* warm the lazy modules in the background once the UI is up (so My Card / quick-add feel instant) */
