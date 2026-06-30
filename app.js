@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.60.0', BUILT='2026-06-29';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.61.0', BUILT='2026-06-30';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -248,7 +248,7 @@ document.addEventListener('keydown',function(e){
   else if(!e.shiftKey&&(document.activeElement===last||!open.contains(document.activeElement))){ e.preventDefault(); first.focus(); }
 });
 function firstName(n){ return (n||'').trim().split(/\s+/)[0]||''; }
-function callName(c){ return (c&&c.callName)?c.callName:firstName(c?c.name:''); }
+function callName(c){ if(c&&c.petName&&String(c.petName).trim()) return String(c.petName).trim(); return (c&&c.callName)?c.callName:firstName(c?c.name:''); }
 /* ---- per-contact social deep-links: conditional, generated on-device, nothing leaves the phone ---- */
 function _handle(s){ return String(s||'').trim().replace(/^@/,'').replace(/^https?:\/\/(www\.)?[^\/]+\//i,'').replace(/[\/?#].*$/,''); }
 function _abs(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u)?u:('https://'+u); }
@@ -599,12 +599,25 @@ function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack
 function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); if(!card) return; var sx=0,dx=0,drag=false;
   card.addEventListener('pointerdown',function(e){ if(e.target.closest('button,a')) return; drag=true; sx=e.clientX; try{card.setPointerCapture(e.pointerId);}catch(_){} card.style.transition='none'; });
   card.addEventListener('pointermove',function(e){ if(!drag) return; dx=e.clientX-sx; card.style.transform='translateX('+dx+'px) rotate('+(dx*0.05)+'deg)'; });
-  function end(){ if(!drag) return; drag=false; card.style.transition='transform .32s ease, opacity .25s';
-    if(Math.abs(dx)>85){ card.style.transform='translateX('+(dx>0?540:-540)+'px) rotate('+(dx>0?22:-22)+'deg)'; card.style.opacity='0'; setTimeout(deckAdvance,170); }
-    else { card.style.transform=''; } dx=0; }
+  function end(){ if(!drag) return; drag=false;
+    if(Math.abs(dx)>85){ deckAdvance(); }
+    else { card.style.transition='transform .28s ease'; card.style.transform=''; } dx=0; }
   card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
 }
-window.deckAdvance=function(){ var items=window._deck||[]; if(items.length){ items.shift(); } renderDeck(); }; /* #10: advancing permanently removes the top card so the deck completes */
+window.deckAdvance=function(){ var items=window._deck||[]; if(items.length<=1){ renderDeck(); return; }
+  var stack=document.getElementById('deckstack'); var cards=stack?[].slice.call(stack.querySelectorAll('.dcard')):[];
+  if(!cards.length){ items.push(items.shift()); renderDeck(); return; }
+  var show=cards.length;
+  /* cycle: animate the top card tucking down to the BACK of the stack while the rest rise one slot (real-deck feel).
+     Colours stay by slot (DECK_BANDS unchanged), so the gradient theme never changes - only the cards rotate. */
+  cards.forEach(function(el){ var k=parseInt(el.style.getPropertyValue('--k'),10); if(isNaN(k)) k=0;
+    var nk=(k===0)?show:(k-1); if(k===0) el.style.zIndex='0';
+    el.style.transition='transform .36s cubic-bezier(.22,.61,.36,1)';
+    el.style.setProperty('--k', nk);
+    el.style.transform='translateY(calc('+nk+' * 13px)) scale(calc(1 - '+nk+' * 0.045))';
+  });
+  setTimeout(function(){ items.push(items.shift()); renderDeck(); }, 340);
+}; /* #10->cycle: swiping rotates the top card to the bottom (no longer destroys it); empty only when the deck is genuinely empty */
 function initDeck(){ renderDeck(); }
 function heroCard(c, label, whenText, actions){
   return '<div class="hero" data-cid="'+c.id+'"><svg class="blob" viewBox="0 0 64 44" aria-hidden="true"><circle cx="26" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7" opacity=".5"/><circle cx="40" cy="22" r="13" fill="none" stroke="var(--hero-ink)" stroke-width="7"/></svg>'
@@ -1279,6 +1292,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
   if(c.review) h+='<div class="note">Quick-added. Fill the details and Save to clear the review flag.</div>';
   h+='<label class="fl">Name &middot; how you find them, e.g. &ldquo;John from school&rdquo;</label><input id="e_name" value="'+esc(c.name||'')+'">';
   h+='<label class="fl">Calling name &middot; used in your messages (required)</label><input id="e_call" value="'+esc(c.callName||firstName(c.name)||'')+'" placeholder="John">';
+  h+='<label class="fl">Tag / pet name &middot; optional &mdash; messages use this instead of the calling name</label><input id="e_pet" value="'+esc(c.petName||'')+'" placeholder="e.g. Bro, Bubs">';
   h+='<div class="two"><div><label class="fl">Phone (with country code)</label><input id="e_phone" value="'+esc(c.phone||'')+'" placeholder="+44 7..."></div><div><label class="fl">Closeness</label><select id="e_tier"><option value="1"'+(c.tier===1?' selected':'')+'>inner circle</option><option value="2"'+(c.tier===2?' selected':'')+'>keep warm</option><option value="3"'+(c.tier===3?' selected':'')+'>loose tie</option></select></div></div>';
   h+='<div class="two"><div><label class="fl">Email</label><input id="e_email" value="'+esc(c.email||'')+'"></div><div><label class="fl">LinkedIn URL</label><input id="e_li" value="'+esc(c.linkedin||'')+'"></div></div>';
   h+='<div class="two"><div><label class="fl">Instagram (handle)</label><input id="e_ig" value="'+esc(c.instagram||'')+'" placeholder="username"></div><div><label class="fl">X / Twitter (handle)</label><input id="e_x" value="'+esc(c.x||'')+'" placeholder="username"></div></div>';
@@ -1297,7 +1311,7 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
 window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   let c=id?DB.contacts.find(x=>x.id===id):null;
   if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; DB.contacts.push(c); }
-  c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.style=g('e_style'); c.review=false; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li'); c.instagram=g('e_ig'); c.x=g('e_x'); c.telegram=g('e_tg'); c.website=g('e_web');
+  c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.petName=g('e_pet'); c.style=g('e_style'); c.review=false; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li'); c.instagram=g('e_ig'); c.x=g('e_x'); c.telegram=g('e_tg'); c.website=g('e_web');
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; if(!id && !c.cadence) c.cadence=cadenceForTier(c.tier); c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   save(); closeModal(); route();
@@ -1371,6 +1385,7 @@ window.quickAdd=()=>{ try{ ensureCapture(); }catch(e){} /* #17: preload the stro
   h+='<div class="qa-chips" id="qaChips"></div>';
   h+='<div class="two"><div><label class="fl">Name</label><input id="qa_name"></div><div><label class="fl">Phone</label><input id="qa_phone"></div></div>';
   h+='<label class="fl">Calling name &middot; used in messages</label><input id="qa_call" placeholder="John">';
+  h+='<label class="fl">Tag / pet name &middot; optional</label><input id="qa_pet" placeholder="e.g. Bro">';
   h+='<div class="two"><div><label class="fl">City / location</label><input id="qa_loc"></div><div><label class="fl">Closeness</label><select id="qa_tier"><option value="2">keep warm</option><option value="1">inner circle</option><option value="3">loose tie</option></select></div></div>';
   h+='<label class="fl">Birthday (optional)</label><input id="qa_bday" type="date">';
   h+='<input id="qa_email" type="hidden"><input id="qa_li" type="hidden"><input id="qa_ig" type="hidden"><input id="qa_x" type="hidden"><input id="qa_tg" type="hidden"><input id="qa_web" type="hidden"><input id="qa_bdayraw" type="hidden"><input id="qa_company" type="hidden"><input id="qa_job" type="hidden"><input id="qa_ctx" type="hidden">';
@@ -1401,6 +1416,7 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
   if(c){ /* a returned card: merge into the existing contact, fill blanks, never clobber */
     if(!c.name||c.name==='Unnamed') c.name=name;
     if(g('qa_call')) c.callName=g('qa_call');
+    if(g('qa_pet')) c.petName=g('qa_pet');
     if(g('qa_loc')&&!c.location) c.location=g('qa_loc');
     if(g('qa_email')&&!c.email) c.email=g('qa_email');
     if(g('qa_li')&&!c.linkedin) c.linkedin=g('qa_li');
@@ -1414,7 +1430,7 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
     if(bd&&!c.bday) c.bday=bd;
     c.review=false; save(); closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); return;
   }
-  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,cadence:cadenceForTier(+$('#qa_tier').value),email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),company:g('qa_company'),jobTitle:g('qa_job'),context:g('qa_ctx'),bday:bd,review:true};
+  const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),petName:g('qa_pet'),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,cadence:cadenceForTier(+$('#qa_tier').value),email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),company:g('qa_company'),jobTitle:g('qa_job'),context:g('qa_ctx'),bday:bd,review:true};
   DB.contacts.push(nc); save(); closeModal(); go('person',nc.id); };
 
 /* ===== Capture hub: every effortless way to add someone, in one place ===== */
