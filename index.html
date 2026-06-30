@@ -18,51 +18,135 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Sovenn · the people you love are one message away">
 <meta name="twitter:description" content="Reach the people you've been meaning to. Private by design — nothing leaves your phone.">
-<meta name="twitter:image" content="https://sovenn.app/og-image.png">
 <meta name="theme-color" content="#FBF8F3">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <style>
-  :root{--bg:#FBF8F3;--ink:#2b241d;--soft:#6f655a;--line:#e9e0d2;--accent:#946145;--coral:#E0552E;--dark:#1d1622;--cream:#F5ECDD;}
+  :root{--bg:#FBF8F3;--ink:#2b241d;--soft:#6f655a;--line:#e9e0d2;--accent:#946145;--coral:#E0552E;--dark:#1d1622;--cream:#F5ECDD;--kick:#5E7264;--card:#fff;--wa:#25D366;--wahead:#075E54;--wapaper:#ECE5DD;--waout:#DCF8C6;--play:#01875F;}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{overflow-x:hidden}
   body{font-family:'Space Grotesk','Segoe UI',system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
   a{color:inherit}
+  .mono{font-family:'IBM Plex Mono',monospace}
   header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:20px 0}
   .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
   .logo img{height:34px;width:34px;border-radius:9px;display:block}
   .logo b{font-size:21px;font-weight:700}.logo .dot{color:var(--coral)}
-  .btn{display:inline-block;border:none;cursor:pointer;text-decoration:none;font:inherit;font-weight:600;border-radius:14px;padding:13px 22px;max-width:100%}
+  .btn{display:inline-flex;align-items:center;justify-content:center;border:none;cursor:pointer;text-decoration:none;font:inherit;font-weight:600;border-radius:14px;padding:13px 22px;max-width:100%}
   .btn:active{transform:translateY(1px)}
-  .btn-primary{color:#fff;background:linear-gradient(180deg,#F0703E,var(--coral));box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 16px rgba(224,85,46,.28)}
   .btn-ghost{color:var(--ink);background:#fff;border:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.05)}
   .btn-sm{padding:10px 16px;border-radius:12px;font-size:14px}
-  .hero{text-align:center;padding:50px 0 26px}
-  .hero h1{font-size:clamp(28px,6vw,52px);line-height:1.08;letter-spacing:-.5px;max-width:15ch;margin:0 auto}
-  .hero p{font-size:clamp(16px,2.4vw,20px);color:var(--soft);max-width:40ch;margin:18px auto 26px}
-  .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .reassure{margin:16px auto 0;font-size:13.5px;color:var(--soft);max-width:38ch}
-  .short{padding:30px 0 6px}.short h2{text-align:center;font-size:24px;margin-bottom:22px}
+  .btn-play{padding:0;border-radius:13px;background:none;box-shadow:none;line-height:0}
+  .btn-play img{height:58px;width:auto;display:block;filter:drop-shadow(0 3px 9px rgba(0,0,0,.12))}
+  .btn-play:active{transform:translateY(1px)}
+
+  .hero{text-align:center;padding:42px 0 6px}
+  .hero h1{font-size:clamp(29px,6vw,54px);line-height:1.07;letter-spacing:-.6px;max-width:15ch;margin:0 auto}
+  .hero p{font-size:clamp(16px,2.4vw,20px);color:var(--soft);max-width:40ch;margin:18px auto 24px}
+  .cta-row{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
+  .reassure{margin:16px auto 0;font-size:13.5px;color:var(--soft);max-width:40ch}
+
+  /* ===== phone device ===== */
+  .stage{position:relative;display:flex;flex-direction:column;align-items:center;margin:26px auto 6px}
+  .stage::before{content:"";position:absolute;top:6%;left:50%;transform:translateX(-50%);width:min(560px,86%);height:74%;background:radial-gradient(50% 50% at 50% 42%,rgba(224,85,46,.16),rgba(224,85,46,0) 72%);pointer-events:none}
+  .phone{--pw:clamp(264px,82vw,328px);width:var(--pw);position:relative;z-index:1}
+  .phone .frame{position:relative;background:linear-gradient(155deg,#241c2a,#100c14);border-radius:14% / 6.6%;padding:calc(var(--pw)*.035);box-shadow:0 2px 4px rgba(0,0,0,.4),0 30px 60px rgba(40,25,15,.32),inset 0 0 0 1.6px rgba(255,255,255,.07)}
+  .phone .isle{position:absolute;top:calc(var(--pw)*.03);left:50%;transform:translateX(-50%);width:32%;height:calc(var(--pw)*.045);background:#0b0810;border-radius:99px;z-index:6}
+  .phone .screen{position:relative;border-radius:11.5% / 5.5%;overflow:hidden;background:#FBF8F3;aspect-ratio:96/208}
+  /* carousel */
+  .track{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}
+  .track::-webkit-scrollbar{display:none}
+  .slide{flex:0 0 100%;height:100%;scroll-snap-align:center;position:relative;overflow:hidden}
+  .slide>img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+  /* dots + caption */
+  .dots{display:flex;gap:7px;justify-content:center;margin:18px 0 8px}
+  .dots button{width:8px;height:8px;border-radius:50%;border:none;background:var(--line);cursor:pointer;padding:0;transition:width .25s,background .25s}
+  .dots button.on{width:22px;background:var(--coral);border-radius:5px}
+  .cap{text-align:center;font-size:15.5px;color:var(--ink);min-height:24px;font-weight:500;transition:opacity .2s}
+  .cap .sub{display:block;font-size:13px;color:var(--soft);font-weight:400;margin-top:2px}
+
+  /* ===== branded journey frames (built in HTML) ===== */
+  .fill{position:absolute;inset:0;display:flex;flex-direction:column;font-size:calc(var(--pw)*.042)}
+  /* WhatsApp */
+  .wa{background:var(--wapaper)}
+  .wa .wah{background:var(--wahead);color:#fff;display:flex;align-items:center;gap:.6em;padding:1.7em .8em .7em}
+  .wa .wah .av{width:2em;height:2em;border-radius:50%;background:#cfe9c5;color:#075E54;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9em}
+  .wa .wah .nm{font-weight:600;font-size:1.02em;line-height:1.1}.wa .wah .st{font-size:.66em;opacity:.85}
+  .wa .wab{flex:1;padding:1em .8em;display:flex;flex-direction:column;justify-content:flex-end;gap:.6em;background-image:radial-gradient(rgba(0,0,0,.025) 1px,transparent 1px);background-size:14px 14px}
+  .wa .bub{align-self:flex-end;max-width:88%;background:var(--waout);border-radius:.9em .9em .2em .9em;padding:.7em .8em .5em;box-shadow:0 1px 1px rgba(0,0,0,.12);font-size:.92em;color:#0b1f12}
+  .wa .lk{display:flex;align-items:center;gap:.55em;background:rgba(255,255,255,.7);border-radius:.6em;padding:.5em .6em;margin-top:.55em}
+  .wa .lk img{width:1.8em;height:1.8em;border-radius:.4em}
+  .wa .lk b{font-size:.86em;display:block}.wa .lk span{font-size:.74em;color:#5b6b60}
+  .wa .tm{display:block;text-align:right;font-size:.62em;color:#5a7a63;margin-top:.35em}
+  .wa .inp{display:flex;align-items:center;gap:.5em;padding:.6em .7em;background:transparent}
+  .wa .inp .box{flex:1;background:#fff;border-radius:1.4em;padding:.7em 1em;color:#9aa39c;font-size:.82em}
+  .wa .inp .snd{width:2.3em;height:2.3em;border-radius:50%;background:var(--wahead);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1em}
+  /* Google Play */
+  .play{background:#fff;color:#202124;font-family:'Roboto','Space Grotesk',system-ui,sans-serif;padding:1.6em 1.15em 1.1em;gap:.9em}
+  .play .ptop{display:flex;gap:.85em;align-items:center}
+  .play .ico{width:4.2em;height:4.2em;border-radius:1em;box-shadow:0 2px 8px rgba(0,0,0,.12);flex:0 0 auto}
+  .play .pname{font-size:1.5em;font-weight:600;line-height:1.1;color:#202124}
+  .play .pdev{font-size:.86em;color:var(--play);margin-top:.15em}
+  .play .pfree{font-size:.8em;color:#5f6368;margin-top:.1em}
+  .play .meta{display:flex;gap:0;margin:.2em 0}
+  .play .meta div{flex:1;text-align:center;font-size:.78em;color:#5f6368;border-right:1px solid #eee;padding:.2em 0}
+  .play .meta div:last-child{border:none}.play .meta b{display:block;color:#202124;font-size:1.05em}
+  .play .pin{background:var(--play);color:#fff;border:none;border-radius:.6em;padding:.85em;font-size:1em;font-weight:600;width:100%;font-family:inherit}
+  .play .pshots{display:flex;gap:.5em;overflow:hidden;margin-top:.2em}
+  .play .pshots img{height:9em;border-radius:.7em;border:1px solid #eee;flex:0 0 auto}
+  .play .pabout{font-size:.82em;color:#3c4043;line-height:1.5}
+  .play .pabout .k{font-size:.72em;letter-spacing:.04em;text-transform:uppercase;color:#5f6368;display:block;margin-bottom:.2em}
+
+  /* steps strip for the journey carousel */
+  .steps{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:18px auto 6px;max-width:560px}
+  .steps button{font:inherit;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--soft);background:#fff;border:1px solid var(--line);border-radius:30px;padding:7px 13px;cursor:pointer;transition:.2s}
+  .steps button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  /* section shells */
+  .sec{padding:46px 0 8px}
+  .sec h2{text-align:center;font-size:clamp(23px,4vw,30px);letter-spacing:-.3px;max-width:18ch;margin:0 auto}
+  .sec .lead{text-align:center;color:var(--soft);max-width:46ch;margin:12px auto 0;font-size:15.5px}
+
+  .short{padding:40px 0 6px}.short h2{text-align:center;font-size:24px;margin-bottom:22px}
   .deliv{list-style:none;max-width:760px;margin:0 auto;display:grid;gap:14px}
   .deliv li{display:flex;gap:14px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 6px 16px rgba(0,0,0,.045)}
   .deliv .m{flex:0 0 auto;width:11px;height:11px;border-radius:50%;background:var(--coral);margin-top:7px}
   .deliv .t{font-size:15.5px;color:var(--soft)}.deliv b{color:var(--ink)}
-  .steps{background:var(--dark);color:var(--cream);border-radius:24px;padding:36px 30px;margin:40px 0}
-  .steps h2{text-align:center;font-size:25px;margin-bottom:22px}
-  .steps .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-  .step .n{color:var(--coral);font-weight:700;font-size:14px;letter-spacing:2px}
-  .step h4{font-size:17px;margin:6px 0 5px}.step p{font-size:14.5px;color:#cbb9a6}
-  .band{text-align:center;padding:6px 0 48px}
+
+  .steprow{background:var(--dark);color:var(--cream);border-radius:24px;padding:36px 30px;margin:40px 0}
+  .steprow h2{text-align:center;font-size:25px;margin-bottom:22px}
+  .steprow .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  .stp .n{color:var(--coral);font-weight:700;font-size:14px;letter-spacing:2px}
+  .stp h4{font-size:17px;margin:6px 0 5px}.stp p{font-size:14.5px;color:#cbb9a6}
+
+  .trust{padding:8px 0 6px}.trust h2{text-align:center;font-size:24px;margin-bottom:8px}
+  .trust .lead{text-align:center;color:var(--soft);max-width:46ch;margin:0 auto 24px;font-size:15.5px}
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:880px;margin:0 auto}
+  .pillar{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 20px;box-shadow:0 6px 16px rgba(0,0,0,.045)}
+  .pillar .ic{width:38px;height:38px;border-radius:11px;background:var(--cream);display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+  .pillar .ic svg{width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.7}
+  .pillar h4{font-size:16.5px;margin-bottom:6px}.pillar p{font-size:14px;color:var(--soft)}
+
+  .faq{padding:42px 0 8px;max-width:760px;margin:0 auto}
+  .faq h2{text-align:center;font-size:24px;margin-bottom:20px}
+  .faq details{background:#fff;border:1px solid var(--line);border-radius:14px;padding:4px 18px;margin-bottom:11px;box-shadow:0 4px 12px rgba(0,0,0,.04)}
+  .faq summary{cursor:pointer;list-style:none;font-weight:600;font-size:16px;padding:14px 0;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";color:var(--coral);font-size:22px;font-weight:700;line-height:1}
+  .faq details[open] summary::after{content:"–"}
+  .faq .a{font-size:14.5px;color:var(--soft);padding:0 0 16px;line-height:1.6}
+
+  .band{text-align:center;padding:34px 0 50px}.band .reassure{margin-top:14px}
   footer{border-top:1px solid var(--line);padding:26px 0;color:var(--soft);font-size:13.5px;text-align:center}
   footer a{color:var(--accent);text-decoration:none}
-  @media(max-width:760px){.steps .grid{grid-template-columns:1fr}.wrap{padding:0 18px}.steps{padding:30px 22px}}
+  @media(max-width:760px){.steprow .grid{grid-template-columns:1fr}.wrap{padding:0 18px}.steprow{padding:30px 22px}.pillars{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -70,19 +154,42 @@
 
   <header>
     <a class="logo" href="/"><img src="icon-192.png" alt="Sovenn logo"><b>Sovenn<span class="dot">.</span></b></a>
-    <a class="btn btn-ghost btn-sm" href="/app">Explore Sovenn</a>
+    <a class="btn btn-ghost btn-sm" href="/app">Open the app</a>
   </header>
 
+  <!-- HERO -->
   <section class="hero">
     <h1>The people you love are one message away.</h1>
     <p>Sovenn shows you who to reach today and writes the first warm line, so you actually hit send.</p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="/app">Explore Sovenn</a>
-      <a class="btn btn-ghost" href="https://play.google.com/store/apps/details?id=app.sovenn.twa">Get it on Google Play</a>
+      <a class="btn-play" href="https://play.google.com/store/apps/details?id=app.sovenn.twa" aria-label="Get it on Google Play">
+        <img src="gplay.png" alt="Get it on Google Play">
+      </a>
+      <a class="btn btn-ghost" href="/app">Try it in your browser</a>
     </div>
     <div class="reassure">No account. No server. Nothing leaves your phone, and you always tap send.</div>
+
+    <!-- SHOWCASE: one iPhone, auto-advancing carousel of REAL screens -->
+    <div class="stage">
+      <div class="phone" id="showcase">
+        <div class="frame"><div class="isle"></div>
+          <div class="screen">
+            <div class="track">
+              <div class="slide" data-cap="See who to reach today|And why they matter, in one glance."><img src="shots/today.png" alt="Sovenn Today — who to reach today" loading="eager" decoding="async"></div>
+              <div class="slide" data-cap="The first message, already written|In your words. You read it and tap send."><img src="shots/compose.png" alt="A warm message drafted for you" loading="lazy" decoding="async"></div>
+              <div class="slide" data-cap="Your card, ready to share|One tap and they have you, no typing."><img src="shots/mycard.png" alt="Your shareable Sovenn card with QR" loading="lazy" decoding="async"></div>
+              <div class="slide" data-cap="Add anyone in seconds|Paste, scan, or let them fill it in."><img src="shots/add.png" alt="Add someone — effortless ways" loading="lazy" decoding="async"></div>
+              <div class="slide" data-cap="See your people across the world|Every city, quietly on your device."><img src="shots/map.png" alt="A map of where your people are" loading="lazy" decoding="async"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dots" aria-hidden="true"></div>
+      <div class="cap"></div>
+    </div>
   </section>
 
+  <!-- THE SHORT VERSION -->
   <section class="short">
     <h2>The short version</h2>
     <ul class="deliv">
@@ -93,16 +200,82 @@
     </ul>
   </section>
 
-  <section class="steps">
+  <!-- HOW IT WORKS -->
+  <section class="steprow">
     <h2>How it works</h2>
     <div class="grid">
-      <div class="step"><div class="n">01</div><h4>Add the few who matter</h4><p>Paste a name, scan a card, or import. No typing marathons.</p></div>
-      <div class="step"><div class="n">02</div><h4>Get a gentle nudge</h4><p>Sovenn quietly reminds you when it's time, never with guilt.</p></div>
-      <div class="step"><div class="n">03</div><h4>Send in eight seconds</h4><p>Tap the drafted message, edit if you like, and reconnect.</p></div>
+      <div class="stp"><div class="n">01</div><h4>Add the few who matter</h4><p>Paste a name, scan a card, or import. No typing marathons.</p></div>
+      <div class="stp"><div class="n">02</div><h4>Get a gentle nudge</h4><p>Sovenn quietly reminds you when it's time, never with guilt.</p></div>
+      <div class="stp"><div class="n">03</div><h4>Send in eight seconds</h4><p>Tap the drafted message, edit if you like, and reconnect.</p></div>
     </div>
   </section>
 
-  <div class="band"><a class="btn btn-primary" href="/app">Explore Sovenn</a></div>
+  <!-- THE JOURNEY: the warm loop -->
+  <section class="sec">
+    <h2>One hello, and it spreads</h2>
+    <p class="lead">Share your card, and the people you reach can keep their people warm too. Here is the whole loop.</p>
+    <div class="stage">
+      <div class="phone" id="journey">
+        <div class="frame"><div class="isle"></div>
+          <div class="screen">
+            <div class="track">
+              <div class="slide" data-cap="Make your card|A warm, private card that is unmistakably you."><img src="shots/mycard.png" alt="Make your Sovenn card" loading="lazy" decoding="async"></div>
+              <div class="slide" data-cap="Send it on WhatsApp|One tap. It goes from your number, not ours.">
+                <div class="fill wa">
+                  <div class="wah"><span style="font-size:1.2em">&#8249;</span><div class="av">M</div><div><div class="nm">Meera</div><div class="st">online</div></div></div>
+                  <div class="wab"><div class="bub">Hey! I keep the people I care about close on Sovenn. Here is my card so we don't lose touch.
+                    <div class="lk"><img src="icon-192.png" alt=""><div><b>Aarav's card on Sovenn</b><span>sovenn.app/card</span></div></div>
+                    <span class="tm">9:24 &#10003;&#10003;</span>
+                  </div></div>
+                  <div class="inp"><div class="box">Message</div><div class="snd">&#10148;</div></div>
+                </div>
+              </div>
+              <div class="slide" data-cap="They tap and fill it in|Zero typing for you. Their details come back to you."><img src="shots/card.png" alt="They open your card and add themselves" loading="lazy" decoding="async"></div>
+              <div class="slide" data-cap="They get Sovenn, free|Because now they want to keep their people close too.">
+                <div class="fill play">
+                  <div class="ptop"><img class="ico" src="icon-192.png" alt="Sovenn"><div><div class="pname">Sovenn</div><div class="pdev">Sovenn</div><div class="pfree">Free &middot; No ads &middot; No in-app purchases</div></div></div>
+                  <div class="meta"><div><b>Free</b>install</div><div><b>3+</b>rated for</div><div><b>&#9889;</b>private</div></div>
+                  <button class="pin">Install</button>
+                  <div class="pshots"><img src="shots/today.png" alt=""><img src="shots/compose.png" alt=""><img src="shots/mycard.png" alt=""></div>
+                  <div class="pabout"><span class="k">About this app</span>Keep your people warm. Sovenn shows you who to reach and writes the first warm line. No account, no server, nothing leaves your phone.</div>
+                </div>
+              </div>
+              <div class="slide" data-cap="Now they keep their people warm too|And the warmth keeps going."><img src="shots/welcome.png" alt="A new person starts their own Sovenn" loading="lazy" decoding="async"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="steps" id="journeySteps"></div>
+      <div class="cap"></div>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section class="trust">
+    <h2>Why you can trust it with your people</h2>
+    <p class="lead">No testimonials yet, because we would rather earn your trust than borrow it. Here is the honest case instead.</p>
+    <div class="pillars">
+      <div class="pillar"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg></div><h4>Private by architecture</h4><p>No account, no server, no analytics. Your contacts live only on your phone. Open the network tab and watch: nothing leaves.</p></div>
+      <div class="pillar"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg></div><h4>You are always in control</h4><p>Sovenn drafts the message. You read it, change it, and tap send yourself, every single time. It never messages anyone for you.</p></div>
+      <div class="pillar"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></div><h4>Made by one person, in India</h4><p>Built around WhatsApp for the way we actually keep in touch here. A small, honest tool, not a data business.</p></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq">
+    <h2>Honest answers</h2>
+    <details open><summary>Is this just another app that nags me?</summary><div class="a">No. Sovenn shows who is quietly drifting, then steps back. No streaks to protect, no red badges of guilt, no "you are 6 days overdue." When you have reached everyone, it simply says you are all caught up.</div></details>
+    <details><summary>Where does my data go?</summary><div class="a">Nowhere. There is no account and no Sovenn server. Everything stays on your device. The only thing that ever leaves is the message you choose to send, through WhatsApp, by your own tap.</div></details>
+    <details><summary>Is it free?</summary><div class="a">Yes, free to use. Later there may be a small one-time "buy me a chai" thank-you for anyone who wants to support it, but the app and everything that matters stays free.</div></details>
+    <details><summary>Does it work on iPhone?</summary><div class="a">Sovenn runs in any modern mobile browser, so you can open it on iPhone today from the button above. The polished Android app comes first on Google Play, with more to follow.</div></details>
+  </section>
+
+  <div class="band">
+    <a class="btn-play" href="https://play.google.com/store/apps/details?id=app.sovenn.twa" aria-label="Get it on Google Play">
+      <img src="gplay.png" alt="Get it on Google Play">
+    </a>
+    <div class="reassure">Free. Private by design. Reach the people you have been meaning to.</div>
+  </div>
 
   <footer>
     <div>Private by design · sovenn.app</div>
@@ -110,8 +283,47 @@
   </footer>
 
 </div>
+
 <script>
-if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+(function(){
+  var P=new URLSearchParams(location.search);
+  var FORCE=P.has('s')?(Math.max(0,parseInt(P.get('s'),10)||0)):null;   /* ?s=N: jump to slide N, autoplay off (clean captures) */
+  var LABELS=['Make your card','Send on WhatsApp','They fill it in','They get Sovenn','They are in'];
+  function build(rootId, mode){
+    var root=document.getElementById(rootId); if(!root) return;
+    var stage=root.closest('.stage'), track=root.querySelector('.track');
+    var slides=Array.prototype.slice.call(track.querySelectorAll('.slide'));
+    var capEl=stage.querySelector('.cap');
+    var nav=stage.querySelector(mode==='steps'?'.steps':'.dots');
+    var n=slides.length, paused=false, resumeT=null, st=null;
+    for(var i=0;i<n;i++){ (function(i){
+      var b=document.createElement('button');
+      if(mode==='steps'){ b.textContent=(i+1)+' · '+LABELS[i]; } else { b.setAttribute('aria-label','Slide '+(i+1)); }
+      b.addEventListener('click',function(){ jump(i,true); });
+      nav.appendChild(b);
+    })(i); }
+    var btns=Array.prototype.slice.call(nav.children);
+    function idxNow(){ var w=track.clientWidth||1; return Math.max(0,Math.min(n-1,Math.round(track.scrollLeft/w))); }
+    function sync(){ var i=idxNow(); btns.forEach(function(b,j){ b.classList.toggle('on',j===i); });
+      var d=(slides[i].getAttribute('data-cap')||'').split('|'); capEl.innerHTML=d[0]+(d[1]?'<span class="sub">'+d[1]+'</span>':''); }
+    function hold(){ paused=true; clearTimeout(resumeT); resumeT=setTimeout(function(){ paused=false; },6000); }
+    function jump(i,user,instant){ i=(i+n)%n; var x=i*track.clientWidth; if(instant){ track.scrollLeft=x; } else { track.scrollTo({left:x,behavior:'smooth'}); } if(user) hold(); }
+    track.addEventListener('scroll',function(){ clearTimeout(st); st=setTimeout(sync,80); });
+    track.addEventListener('pointerdown',hold);
+    stage.addEventListener('mouseenter',function(){ paused=true; });
+    stage.addEventListener('mouseleave',function(){ paused=false; });
+    window.addEventListener('resize',function(){ track.scrollLeft=idxNow()*track.clientWidth; });
+    if(FORCE!==null){
+      requestAnimationFrame(function(){ jump(Math.min(FORCE,n-1),false,true); setTimeout(sync,40); });
+    } else {
+      requestAnimationFrame(function(){ track.scrollLeft=0; sync(); });
+      setInterval(function(){ if(!paused && document.visibilityState==='visible'){ jump(idxNow()+1); } }, mode==='steps'?3600:3000);
+    }
+  }
+  build('showcase','dots');
+  build('journey','steps');
+  if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+})();
 </script>
 </body>
 </html>
