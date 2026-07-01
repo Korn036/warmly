@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.61.0', BUILT='2026-06-30';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.62.0', BUILT='2026-07-01';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -938,19 +938,25 @@ window.delTemplate=(id)=>{ if(['t_b','t_a','t_r'].indexOf(id)>=0) return; if(!co
 /* ---- My Card: your shareable profile + offline QR (nothing leaves the phone) ---- */
 let _qrT=null;
 function vEsc(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+/* two-mode card: Full shares everything; Connect shares only chosen fields. Default 'full' = byte-identical to before. */
+var CONNECT_DEFAULT={phone:true};
+function shareMode(){ return (DB.me&&DB.me.shareMode==='connect')?'connect':'full'; }
+function fieldOn(k){ if(shareMode()==='full') return true; var sf=(DB.me&&DB.me.shareFields)||{}; return (sf[k]!==undefined)?!!sf[k]:!!CONNECT_DEFAULT[k]; }
+window.setShareMode=function(m){ DB.me=DB.me||{}; DB.me.shareMode=(m==='connect')?'connect':'full'; save(); route(); };
+window.toggleShareField=function(k){ DB.me=DB.me||{}; var sf=DB.me.shareFields=DB.me.shareFields||{}; var cur=(sf[k]!==undefined)?!!sf[k]:!!CONNECT_DEFAULT[k]; sf[k]=!cur; save(); route(); };
 function myVCard(){ const me=DB.me||{}; const L=['BEGIN:VCARD','VERSION:3.0','FN:'+vEsc(me.name||'')];
-  if(me.title) L.push('TITLE:'+vEsc(me.title));
-  if(me.phone) L.push('TEL;TYPE=CELL:'+vEsc(me.phone));
-  if(me.email) L.push('EMAIL:'+vEsc(me.email));
-  if(me.website) L.push('URL:'+_abs(me.website));
-  if(me.linkedin) L.push('URL:'+liUrl(me.linkedin));
-  if(me.instagram) L.push('URL:https://instagram.com/'+_handle(me.instagram));
-  if(me.x) L.push('URL:https://x.com/'+_handle(me.x));
+  if(me.title&&fieldOn('title')) L.push('TITLE:'+vEsc(me.title));
+  if(me.phone&&fieldOn('phone')) L.push('TEL;TYPE=CELL:'+vEsc(me.phone));
+  if(me.email&&fieldOn('email')) L.push('EMAIL:'+vEsc(me.email));
+  if(me.website&&fieldOn('website')) L.push('URL:'+_abs(me.website));
+  if(me.linkedin&&fieldOn('linkedin')) L.push('URL:'+liUrl(me.linkedin));
+  if(me.instagram&&fieldOn('instagram')) L.push('URL:https://instagram.com/'+_handle(me.instagram));
+  if(me.x&&fieldOn('x')) L.push('URL:https://x.com/'+_handle(me.x));
   L.push('END:VCARD'); return L.join('\r\n');
 }
 function vFold(l){ if(l.length<=75) return l; let o='',i=0; while(i<l.length){ o+=(i?'\r\n ':'')+l.slice(i,i+74); i+=74; } return o; }
 function myVCardFull(){ const me=DB.me||{}; let v=myVCard();
-  if(me.photo){ const b=me.photo.replace(/^data:[^,]+,/,''); v=v.replace('END:VCARD','PHOTO;ENCODING=b;TYPE=JPEG:'+b+'\r\nEND:VCARD'); }
+  if(me.photo&&shareMode()==='full'){ const b=me.photo.replace(/^data:[^,]+,/,''); v=v.replace('END:VCARD','PHOTO;ENCODING=b;TYPE=JPEG:'+b+'\r\nEND:VCARD'); }
   return v.split('\r\n').map(vFold).join('\r\n');
 }
 function renderQR(text, el){ if(!el) return; const q=window.QR&&QR.matrix(text);
@@ -1066,8 +1072,8 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
   const foilF=(r.reg==='dark')?{f1:'#A8852A',f2:'#F0D87A',deb:'0 1px 0 rgba(0,0,0,.55),0 -1px 0 rgba(255,255,255,.10)'}:{f1:'#9C7A1E',f2:'#E6C04A',deb:'0 1px 0 rgba(255,255,255,.8),0 -1px 0 rgba(0,0,0,.2)'};
   const lens=(look==='foil')?foilF.f2:r.a1;
   const vars='--base:'+r.base+';--ink:'+r.ink+';--a1:'+r.a1+';--a2:'+r.a2+';--f1:'+foilF.f1+';--f2:'+foilF.f2+';--deb:'+foilF.deb+';--lens:'+lens+';';
-  const pseudo={id:'me',name:me.name,phone:me.phone,email:me.email,linkedin:me.linkedin,instagram:me.instagram,x:me.x,website:me.website};
-  const name=esc(me.name||'Your name'), title=esc(me.title||'tap the pencil to fill your card');
+  const pseudo={id:'me',name:me.name,phone:(fieldOn('phone')?me.phone:''),email:(fieldOn('email')?me.email:''),linkedin:(fieldOn('linkedin')?me.linkedin:''),instagram:(fieldOn('instagram')?me.instagram:''),x:(fieldOn('x')?me.x:''),website:(fieldOn('website')?me.website:'')};
+  const name=esc(me.name||'Your name'), title=(fieldOn('title')?esc(me.title||'tap the pencil to fill your card'):'');
   const editBtn='<button class="mc-edit" onclick="toggleEditCard()" aria-label="edit card"><svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>';
   const pclick='onclick="document.getElementById(\'mephoto\').click()"';
   let card='';
@@ -1078,7 +1084,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
     card='<div class="mycard poster" style="'+vars+'">'+editBtn+inner+'<div class="mc-scrim"></div>'
       +'<div class="mc-nameback">'+name+'</div>'
       +'<div class="mc-brand">'+VENNMARK+'<span>SOVENN</span></div>'
-      +'<div class="mc-foot"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div>'+bizTags(me)
+      +'<div class="mc-foot"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div>'+(fieldOn('interests')?bizTags(me):'')
       +'<div class="mc-row2">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div></div>'
       +'<div class="mc-sheen"></div><div class="mc-grain"></div></div>';
   } else if(look==='foil'){
@@ -1086,7 +1092,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
     card='<div class="mycard foil" style="'+vars+'">'+editBtn+'<div class="mc-paper"></div><div class="mc-grain"></div>'
       +'<div class="mc-idx">'+VENNMARK+'<span>SOVENN &middot; 01</span></div><div class="mc-rule"></div>'
       +'<div class="mc-head">'+pic+'<div class="mc-hd"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div></div></div>'
-      +'<div class="mc-lbl">a few things i love</div>'+bizTags(me)
+      +'<div class="mc-lbl">a few things i love</div>'+(fieldOn('interests')?bizTags(me):'')
       +'<div class="mc-bottom">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div>'
       +'<div class="mc-seal">'+VENNMARK+'</div></div>';
   } else {
@@ -1095,19 +1101,23 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
       +'<div class="mc-brand">'+VENNMARK+'<span>SOVENN</span></div>'
       +'<div class="mc-photo" '+pclick+'>'+pic+'</div>'
       +'<div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div>'
-      +bizTags(me)+socialRow(pseudo,false)
+      +(fieldOn('interests')?bizTags(me):'')+socialRow(pseudo,false)
       +'<div class="mc-qrtile"><div class="mc-qr" id="qrbox"></div><span>scan to<br>save me</span></div>'
       +'<div class="mc-inner"></div></div>';
   }
   let h='<div class="view"><h1 class="title">My Card</h1><p class="muted">Your warm, shareable card. It relights itself with the hour, and stays on this device. Anyone can scan to save you.</p>';
   h+=card;
+  h+='<style>.mc-modes{display:flex;gap:6px;justify-content:center;background:var(--bg-2);border:1px solid var(--line);border-radius:30px;padding:4px;max-width:300px;margin:16px auto 2px}.mc-modes .mc-mode{flex:1;font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink-soft);background:none;border:none;border-radius:24px;padding:9px 8px;cursor:pointer;transition:.18s}.mc-modes .mc-mode.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}.mc-pick{max-width:400px;margin:11px auto 0;display:flex;flex-wrap:wrap;gap:7px;justify-content:center}.mc-pick-h{width:100%;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--green-2);margin-bottom:2px}.mc-tog{font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);background:var(--card);border:1px solid var(--line);border-radius:30px;padding:7px 13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;-webkit-user-select:none;user-select:none}.mc-tog input{display:none}.mc-tog.on{background:var(--green);color:var(--on-accent);border-color:var(--green)}.mc-modes-cap{text-align:center;font-size:12px;color:var(--ink-soft);margin:8px auto 0;max-width:340px;padding:0 16px}</style>';
+  h+='<div class="mc-modes" role="tablist"><button class="mc-mode'+(shareMode()==='full'?' on':'')+'" onclick="setShareMode(\'full\')">Full card</button><button class="mc-mode'+(shareMode()==='connect'?' on':'')+'" onclick="setShareMode(\'connect\')">Connect</button></div>';
+  if(shareMode()==='connect'){ var _pf=[['phone','Phone'],['title','Title'],['email','Email'],['website','Website'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X'],['interests','Interests']].filter(function(f){ return me[f[0]]; }); h+='<div class="mc-pick"><div class="mc-pick-h">Share only what you choose</div>'+(_pf.length?_pf.map(function(f){ return '<label class="mc-tog'+(fieldOn(f[0])?' on':'')+'"><input type="checkbox" '+(fieldOn(f[0])?'checked':'')+' onchange="toggleShareField(\''+f[0]+'\')">'+esc(f[1])+'</label>'; }).join(''):'<span class="mc-modes-cap">Fill your card first to choose which fields to share.</span>')+'</div>'; }
+  else { h+='<div class="mc-modes-cap">Everything on one card. Swap to Connect for a lighter, pick-what-you-share version, great for someone you just met.</div>'; }
   h+='<input type="file" id="mephoto" accept="image/*" style="display:none" onchange="mePhoto(event)">';
   h+='<div class="mc-controls"><div class="mc-looks">'+CARD_LOOKS.map(function(l){ var lbl={poster:'Poster',aurora:'Aurora',foil:'Foil'}[l]; return '<button class="mc-look'+(look===l?' on':'')+'" onclick="setCardLook(\''+l+'\')">'+lbl+'</button>'; }).join('')+'</div>'
     +'<button class="mc-relight" onclick="relightCard()" title="surprise me"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v4h-4"/></svg>Relight</button>'
     +(me.cardRecipe!=null?'<button class="mc-auto" onclick="autoRelight()" title="back to auto: name + time of day">Auto</button>':'')
     +'</div>';
   h+='<div class="muted" style="text-align:center;font-size:12px;margin:-2px 0 12px">Point a phone camera at the card to save me. Test-scan once to confirm.</div>';
-  h+='<div class="btn-row" style="justify-content:center;margin:12px 0 16px"><button class="btn primary" onclick="shareCard()">Share my card</button><button class="btn ghost" onclick="downloadCard()">Download .vcf</button></div>';
+  h+='<div class="btn-row" style="justify-content:center;margin:12px 0 16px"><button class="btn primary" onclick="shareCard()">'+(shareMode()==='connect'?'Share connect card':'Share my card')+'</button><button class="btn ghost" onclick="downloadCard()">Download .vcf</button></div>';
   if(_editCard){
     h+='<div id="cardedit" class="kick">Fill your details</div><div class="card">';
     [['name','Name'],['title','Title / what you do'],['interests','Interests / your vibe (comma separated, e.g. anime, coffee, dogs)'],['phone','Phone (with country code)'],['email','Email'],['linkedin','LinkedIn'],['instagram','Instagram'],['x','X / Twitter'],['website','Website']].forEach(function(f){ h+='<label class="fl">'+f[1]+'</label><input value="'+esc(me[f[0]]||'')+'" oninput="setMe(\''+f[0]+'\',this.value)">'; });
