@@ -49,3 +49,10 @@ tooling/test-results/
 tooling/playwright-report/
 tooling/package-lock.json
 SHA256SUMS
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
