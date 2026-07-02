@@ -323,11 +323,15 @@
         if(typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.ready &&
            typeof ServiceWorkerRegistration !== 'undefined' && ServiceWorkerRegistration.prototype &&
            typeof ServiceWorkerRegistration.prototype.showNotification === 'function'){
-          var to = setTimeout(function(){ done(false); }, 3000); /* don't hang if the SW never becomes ready */
+          /* If the SW never becomes ready (incognito or corporate policy can block registration, so
+             `ready` never resolves), fall back to the page constructor instead of silently giving up.
+             Otherwise the nudge is dead on exactly those devices. `settled` stops a late `ready`
+             resolution from also firing a duplicate. */
+          var to = setTimeout(function(){ if(!settled) viaConstructor(); }, 3000);
           navigator.serviceWorker.ready
-            .then(function(reg){ return reg.showNotification(title, opts); })
+            .then(function(reg){ if(settled) return; return reg.showNotification(title, opts); })
             .then(function(){ clearTimeout(to); done(true); },
-                  function(){ clearTimeout(to); viaConstructor(); });
+                  function(){ clearTimeout(to); if(!settled) viaConstructor(); });
           return;
         }
       } catch(e){}
