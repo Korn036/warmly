@@ -13,6 +13,18 @@ wrangler.jsonc
 #   `wrangler login`/`deploy`. With assets.directory = ".", it MUST be excluded or the
 #   account id + email get served publicly.
 
+# --- Secrets & user data (MUST NOT ever be served publicly) ---
+# A local .env/.dev.vars (holds the worker's GOOGLE_CLIENT_SECRET) or a user's exported
+# contacts backup left in the working tree during a manual `wrangler deploy` would
+# otherwise be fetchable at sovenn.app/<file> — the same leak class as the .wrangler
+# incident. These mirror .gitignore, but WITHOUT its `!*.example` negations: in
+# .assetsignore a negation means "publish it", so we deliberately exclude even the
+# examples from being served.
+.env*
+.dev.vars*
+*.kith
+kith-backup*.json
+
 # --- CI / docs / server / tests: source, not for the browser ---
 .github
 worker

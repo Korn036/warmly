@@ -29,6 +29,8 @@ _*.png
 # internal strategy / launch / naming docs (Sovenn-era) - keep OUT of the public repo
 Sovenn-*.md
 Sovenn-*.pdf
+# whole internal folder (strategy program, brand-core, build-QA, measurement kit) - never commit to this PUBLIC repo
+Sovenn-Internal/
 
 # brand exploration boards (internal design options, not app source)
 Brand-Exploration/
