@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "app.sovenn.twa",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_PLAY_APP_SIGNING_KEY_SHA256"
+        "13:D4:7B:94:3C:2E:22:1B:4D:5D:F0:5C:7B:46:42:21:4D:3A:D0:8D:C2:C8:C7:56:B7:53:1B:94:E8:91:93:BA",
+        "29:D1:74:EE:B5:5E:5E:FC:88:6E:23:8E:99:E3:92:8B:62:73:35:A3:84:2D:03:E0:42:D4:66:54:BB:89:49:58"
       ]
     }
   }
