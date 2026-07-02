@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.62.0', BUILT='2026-07-01';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.63.0', BUILT='2026-07-02';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -89,25 +89,53 @@ function applySkin(k){ var el=document.documentElement;
   try{ var m=document.querySelector('meta[name="theme-color"]'); if(m){ var bg=getComputedStyle(el).getPropertyValue('--bg').trim(); if(bg) m.setAttribute('content',bg); } }catch(e){} }
 function updateThemeBtn(){ var tb=document.getElementById('themeBtn'); if(!tb) return; var cur=localStorage.getItem('warmly.skin')||'stillmorning'; var d=isDarkSkin(cur); tb.innerHTML=d?_SUN:_MOON; tb.title=d?'Light (Still Morning)':'Dark (Lamplight)'; tb.setAttribute('aria-label', tb.title); }
 window.setSkin=function(k){ applySkin(k); localStorage.setItem('warmly.skin',k); updateThemeBtn(); if(window.route) route(); };
+/* Best-effort default WhatsApp country code for a NEW install, so a locally-typed number resolves
+   right out of the box. Was hardcoded '44' (UK), which silently broke every Indian number.
+   Timezone is checked first because many Indian phones report an en-US/en-GB language. User can
+   override in Settings > General; existing users keep whatever they already saved. */
+const _CC_LANG={IN:'91',US:'1',CA:'1',GB:'44',AU:'61',NZ:'64',IE:'353',DE:'49',NL:'31',FR:'33',ES:'34',IT:'39',PT:'351',BE:'32',CH:'41',AT:'43',SE:'46',NO:'47',DK:'45',PL:'48',BR:'55',MX:'52',AE:'971',SA:'966',SG:'65',ZA:'27',NG:'234',PK:'92',BD:'880',LK:'94',NP:'977',ID:'62',PH:'63',MY:'60',JP:'81',KR:'82',CN:'86'};
+const _CC_TZ={'Asia/Kolkata':'91','Asia/Calcutta':'91','Asia/Karachi':'92','Asia/Dhaka':'880','Asia/Colombo':'94','Asia/Kathmandu':'977','Asia/Dubai':'971','Asia/Singapore':'65','Asia/Kuala_Lumpur':'60','Asia/Jakarta':'62','Asia/Manila':'63','Europe/London':'44','Australia/Sydney':'61'};
+function defaultCountry(){ try{
+    var tz=''; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(_){}
+    if(_CC_TZ[tz]) return _CC_TZ[tz];
+    if(/^America\//.test(tz)) return '1';
+    var ls=(navigator.languages&&navigator.languages.length)?navigator.languages:[navigator.language||''];
+    for(var i=0;i<ls.length;i++){ var m=String(ls[i]||'').toUpperCase().match(/[-_]([A-Z]{2})\b/); if(m&&_CC_LANG[m[1]]) return _CC_LANG[m[1]]; }
+  }catch(e){} return '91'; }
 let DB = load();
 function load(){
   try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.contacts) return d; }catch(e){}
-  return { v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:{ myName:'', country:'44', leadDays:1, localTouch:true } };
+  return { v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:{ myName:'', country:defaultCountry(), leadDays:1, localTouch:true } };
 }
 /* change-tracking so devices merge cleanly (newest edit per contact wins) */
-let _snap={};
+let _snap={}, _meSnap='';
 function _csig(c){ const o=Object.assign({},c); delete o.updatedAt; return JSON.stringify(o); }
-function snapInit(){ _snap={}; (DB.contacts||[]).forEach(c=>{ _snap[c.id]=_csig(c); }); }
+function snapInit(){ _snap={}; (DB.contacts||[]).forEach(c=>{ _snap[c.id]=_csig(c); }); _meSnap=DB.me?_csig(DB.me):''; }
 function stampChanges(){ const now=Date.now(), cur={};
   (DB.contacts||[]).forEach(c=>{ cur[c.id]=1; if(_snap[c.id]!==_csig(c)) c.updatedAt=now; });
   DB.deleted=DB.deleted||{}; Object.keys(_snap).forEach(id=>{ if(!cur[id]) DB.deleted[id]=now; });
+  /* stamp My Card only when it actually changed, so it wins merges to other devices without a plain
+     contact edit spuriously marking it newest */
+  if(DB.me){ const s=_csig(DB.me); if(s!==_meSnap) DB.me.updatedAt=now; }
   snapInit();
 }
 /* one quota-guarded write to localStorage; returns false (and logs) on failure. Shared by save() and the sync path so neither can ever report success on a failed write. */
-function persist(){ DB.savedAt=Date.now();
+let _lastSavedAt=(DB&&DB.savedAt)||0;  /* seed from disk so the first write isn't seen as another tab's */
+function persist(){
+  /* MERGE-BEFORE-WRITE: if another tab/window wrote since we last touched disk, fold its changes in
+     first, so a stale in-memory copy can't blindly clobber the other tab's new/edited contacts. */
+  try{ const raw=localStorage.getItem(KEY);
+    if(raw){ const disk=JSON.parse(raw); if(disk&&disk.contacts&&(disk.savedAt||0)!==_lastSavedAt){ DB=mergeDB(DB,disk); snapInit(); } }
+  }catch(e){}
+  DB.savedAt=Date.now(); _lastSavedAt=DB.savedAt;
   try{ localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
   catch(e){ logErr('save', e); return false; }
 }
+/* keep this tab's in-memory DB fresh when ANOTHER tab writes, and re-render — pairs with the
+   merge-before-write above to close the two-window data-loss window */
+window.addEventListener('storage', function(ev){ if(ev.key!==KEY||!ev.newValue) return;
+  try{ const disk=JSON.parse(ev.newValue); if(disk&&disk.contacts){ DB=mergeDB(DB,disk); _lastSavedAt=disk.savedAt||_lastSavedAt; snapInit(); if(window.route) route(); } }catch(e){}
+});
 function save(){ stampChanges();
   if(!persist()){ alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.'); return false; }
   schedulePush(); return true;
@@ -153,7 +181,10 @@ function gCacheTok(r){ if(r&&r.access_token){ _gtok=r.access_token; try{ session
 function gCachedTok(){ try{ const o=JSON.parse(sessionStorage.getItem('warmly.gtok')); if(o&&o.t&&o.exp>Date.now()) return o.t; }catch(e){} return null; }
 function gInitClient(){ if(_gclient) return; _gclient=google.accounts.oauth2.initTokenClient({ client_id:GCLIENT_ID, scope:GSCOPE,
   callback:(r)=>{ gCacheTok(r);
-    if(_gpending){ const p=_gpending; _gpending=null; p(r); } else { syncNow(); } } }); }
+    if(_gpending){ const p=_gpending; _gpending=null; p(r); } else { syncNow(); } },
+  /* GIS can fail WITHOUT calling `callback` (popup/3rd-party-cookie block) — without this the pending
+     promise never settles and every future sync silently no-ops. Always settle + un-wedge. */
+  error_callback:(e)=>{ logErr('gauth', e); _gsyncing=false; if(_gpending){ const p=_gpending; _gpending=null; p(null); } } }); }
 /* ---- Permanent login via the auth Worker (used only when AUTH_WORKER is set; otherwise every branch below falls through to the original in-browser flow unchanged) ---- */
 function gSession(){ try{ return localStorage.getItem('warmly.session')||''; }catch(e){ return ''; } }
 function gReturn(){ if(!AUTH_WORKER||location.hash.indexOf('warmly_session')<0) return false;
@@ -167,7 +198,11 @@ async function gWorkerToken(){ const s=gSession(); if(!s) return null;
     const j=await r.json(); if(j.access_token){ gCacheTok(j); return j; } }catch(e){} return null; }
 function gToken(interactive){ if(!interactive){ const c=gCachedTok(); if(c){ _gtok=c; return Promise.resolve({access_token:c}); } }
   if(AUTH_WORKER){ if(interactive){ window.location.href=AUTH_WORKER+'/auth/start?app='+encodeURIComponent(location.origin+location.pathname); return new Promise(()=>{}); } return gWorkerToken(); }
-  return new Promise(res=>{ gInitClient(); _gpending=res; try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ _gpending=null; res(null); } }); }
+  return new Promise(res=>{ gInitClient();
+    var done=false; function settle(r){ if(done)return; done=true; res(r); }
+    var to=setTimeout(function(){ if(_gpending===fn) _gpending=null; settle(null); }, 15000);  /* never leave sync wedged if GIS neither resolves nor errors */
+    var fn=function(r){ clearTimeout(to); settle(r); }; _gpending=fn;
+    try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ clearTimeout(to); _gpending=null; settle(null); } }); }
 window.gConnect=()=>{ if(AUTH_WORKER){ _gstatus('Opening Google…'); gToken(true); return; } gisReady(async()=>{ _gstatus('Opening Google…'); const r=await gToken(true); if(r&&r.access_token) syncNow(); else _gstatus('Sign-in cancelled'); }); };
 window.gDisconnect=()=>{ if(AUTH_WORKER&&gSession()){ try{ fetch(AUTH_WORKER+'/auth/logout?session='+encodeURIComponent(gSession())); }catch(e){} } _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); sessionStorage.removeItem('warmly.gtok'); localStorage.removeItem('warmly.session'); route(); };
 async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'Authorization':'Bearer '+_gtok},opts.headers||{});
@@ -175,19 +210,41 @@ async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'Aut
   if(r.status===401){ try{ sessionStorage.removeItem('warmly.gtok'); }catch(e){} const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }
   return r; }
 async function gFindFile(){ const r=await gFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+encodeURIComponent("name='warmly.json'")); if(!r.ok) return null; const j=await r.json(); return j.files&&j.files[0]?j.files[0].id:null; }
-async function gDownload(id){ const r=await gFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media'); return r.ok?await r.json():null; }
+async function gDownload(id){ const r=await gFetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media'); if(!r.ok) return null;
+  /* a corrupt/unparseable remote used to throw -> "Sync paused" forever with the upload skipped, so
+     sync stayed dead on every device. Treat unreadable as ABSENT so local re-uploads and self-heals. */
+  try{ return await r.json(); }catch(e){ logErr('sync-remote', e); return null; } }
 async function gUpload(id,data){ const body=JSON.stringify(data);
   if(id) return gFetch('https://www.googleapis.com/upload/drive/v3/files/'+id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});
   const meta={name:'warmly.json',parents:['appDataFolder']}; const form=new FormData();
   form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'})); form.append('file',new Blob([body],{type:'application/json'}));
   return gFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',body:form}); }
+/* union two append-only arrays by a stable per-item key, so accumulated history (notes / messages /
+   call log) is never lost when the same contact was edited on two devices */
+function _mergeArr(a,b,keyOf){ a=Array.isArray(a)?a:[]; b=Array.isArray(b)?b:[];
+  if(!a.length) return b.slice(); if(!b.length) return a.slice();
+  const seen={}, out=[]; a.concat(b).forEach(function(x){ var k; try{ k=keyOf(x); }catch(e){ k=null; }
+    if(k==null){ out.push(x); return; } if(seen[k]) return; seen[k]=1; out.push(x); }); return out; }
+const _TOMB_TTL=90*24*3600*1000;  /* drop deletion tombstones after 90 days so DB.deleted can't grow forever */
 function mergeDB(local,remote){ const out=JSON.parse(JSON.stringify(local)); const byId={};
   (out.contacts||[]).forEach(c=>byId[c.id]=c);
-  (remote.contacts||[]).forEach(rc=>{ if(!rc||typeof rc!=='object'||!rc.id) return; const lc=byId[rc.id]; if(!lc||(rc.updatedAt||0)>(lc.updatedAt||0)) byId[rc.id]=rc; });
+  (remote.contacts||[]).forEach(rc=>{ if(!rc||typeof rc!=='object'||!rc.id) return; const lc=byId[rc.id];
+    if(!lc){ byId[rc.id]=rc; return; }
+    /* newer record wins on scalar fields, but the append-only arrays are UNIONED from both sides so a
+       plain edit on one device can never erase a note/message/call that the other device added */
+    const merged=Object.assign({}, (rc.updatedAt||0)>(lc.updatedAt||0)?rc:lc);
+    merged.notes=_mergeArr(lc.notes,rc.notes,n=>n&&(n.id||((n.date||'')+'|'+(n.text||''))));
+    merged.msgHistory=_mergeArr(lc.msgHistory,rc.msgHistory,m=>m&&(typeof m==='object'?(m.id||((m.at||'')+'|'+(m.text||m.opener||''))):String(m)));
+    merged.log=_mergeArr(lc.log,rc.log,l=>l&&(typeof l==='object'?(l.id||((l.at||l.date||'')+'|'+(l.type||''))):String(l)));
+    byId[rc.id]=merged; });
+  const now=Date.now();
   const del={}; [remote.deleted||{},out.deleted||{}].forEach(m=>Object.keys(m).forEach(id=>{ del[id]=Math.max(del[id]||0,m[id]); }));
   out.contacts=Object.values(byId).filter(c=>{ const t=del[c.id]; return !(t&&t>=(c.updatedAt||0)); });
+  Object.keys(del).forEach(id=>{ if(now-del[id]>_TOMB_TTL) delete del[id]; });
   out.deleted=del;
   if((remote.savedAt||0)>(local.savedAt||0)){ if(remote.templates)out.templates=remote.templates; if(remote.settings)out.settings=Object.assign({},out.settings,remote.settings); }
+  /* My Card is the user's own data and must reach their other devices too: last-write-wins on me.updatedAt */
+  if(remote.me&&(!out.me||(remote.me.updatedAt||0)>((out.me&&out.me.updatedAt)||0))) out.me=remote.me;
   return out; }
 async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus('Syncing…');
   try{ if(!_gfile) _gfile=await gFindFile();
@@ -253,6 +310,8 @@ function callName(c){ if(c&&c.petName&&String(c.petName).trim()) return String(c
 function _handle(s){ return String(s||'').trim().replace(/^@/,'').replace(/^https?:\/\/(www\.)?[^\/]+\//i,'').replace(/[\/?#].*$/,''); }
 function _abs(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u)?u:('https://'+u); }
 function liUrl(u){ return /linkedin\.com/i.test(u)?_abs(u):('https://www.linkedin.com/in/'+_handle(u)); }
+/* only ever let http(s)/mailto/tel reach an href; neutralises javascript:/data: URIs from imported or synced fields */
+function safeUrl(u){ u=String(u==null?'':u).trim(); return /^(https?:|mailto:|tel:)/i.test(u)?u:'#'; }
 function socialLinks(c){ const o=[];
   const wa=c.phone?normalizePhone(c.phone):''; if(wa) o.push(['wa','WhatsApp','https://wa.me/'+wa]);
   if(c.phone) o.push(['call','Call','tel:'+c.phone.replace(/[^\d+]/g,'')]);
@@ -528,7 +587,7 @@ function viewToday(){
   const _mp={morning:'Your morning minute. Keep your people warm.',afternoon:'A quiet minute to keep your people warm.',evening:'Your evening minute. Keep your people warm.'}[DB.settings.dailyMoment]||'Keep your people warm.';
   let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+_mp+'</p>';
   if(!DB.contacts.length){
-    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div><div style="font-weight:600;margin:2px 0 12px;color:var(--ink)">Each day Sovenn shows you who to reach and writes the first message. You always tap send.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button></div></div>';
+    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div><div style="font-weight:600;margin:2px 0 12px;color:var(--ink)">Each day Sovenn shows you who to reach and writes the first message. You always tap send.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button><div class="sub" style="margin-top:16px;color:var(--ink-soft)">New phone, or reinstalled? <a style="color:var(--green-2);cursor:pointer" onclick="go(\'settings\')">Restore from Google Drive or a backup</a>.</div></div></div>';
     return render(h);
   }
   h+='<div class="today-top">';
@@ -593,7 +652,7 @@ function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack
   var show=Math.min(4,n); var html='';
   for(var k=show-1;k>=0;k--){ var isTop=(k===0); var bandBg=isTop?'':(';background:'+DECK_BANDS[Math.min(k,3)]); html+='<div class="dcard hero'+(isTop?' top':' dpeek')+'" style="--k:'+k+';z-index:'+(30-k)+bandBg+'">'+deckInner(items[k])+'</div>'; }
   stack.innerHTML=html;
-  var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent=(n+(n===1?' card left':' cards left'));
+  var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent=(n+(n===1?' person in your deck':' people in your deck'));
   wireDeck();
 }
 function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); if(!card) return; var sx=0,dx=0,drag=false;
@@ -604,10 +663,11 @@ function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); i
     else { card.style.transition='transform .28s ease'; card.style.transform=''; } dx=0; }
   card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
 }
-window.deckAdvance=function(){ var items=window._deck||[]; if(items.length<=1){ renderDeck(); return; }
+window.deckAdvance=function(){ if(window._deckBusy) return;   /* ignore repeat taps/shakes during the 340ms animation (was double-rotating) */
+  var items=window._deck||[]; if(items.length<=1){ renderDeck(); return; }
   var stack=document.getElementById('deckstack'); var cards=stack?[].slice.call(stack.querySelectorAll('.dcard')):[];
   if(!cards.length){ items.push(items.shift()); renderDeck(); return; }
-  var show=cards.length;
+  window._deckBusy=true; var show=cards.length;
   /* cycle: animate the top card tucking down to the BACK of the stack while the rest rise one slot (real-deck feel).
      Colours stay by slot (DECK_BANDS unchanged), so the gradient theme never changes - only the cards rotate. */
   cards.forEach(function(el){ var k=parseInt(el.style.getPropertyValue('--k'),10); if(isNaN(k)) k=0;
@@ -616,7 +676,7 @@ window.deckAdvance=function(){ var items=window._deck||[]; if(items.length<=1){ 
     el.style.setProperty('--k', nk);
     el.style.transform='translateY(calc('+nk+' * 13px)) scale(calc(1 - '+nk+' * 0.045))';
   });
-  setTimeout(function(){ items.push(items.shift()); renderDeck(); }, 340);
+  setTimeout(function(){ items.push(items.shift()); window._deckBusy=false; renderDeck(); }, 340);
 }; /* #10->cycle: swiping rotates the top card to the bottom (no longer destroys it); empty only when the deck is genuinely empty */
 function initDeck(){ renderDeck(); }
 function heroCard(c, label, whenText, actions){
@@ -742,7 +802,7 @@ window.voiceStop=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } }
 window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return;
   const rd=new FileReader();
   rd.onload=()=>{ const img=new Image();
-    img.onload=()=>{ const max=720; let w=img.width,h=img.height; if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
+    img.onload=()=>{ const max=480; let w=img.width,h=img.height;  /* cap scan size: ~half the localStorage/Drive/backup weight per card, no data loss */ if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
       let card=rd.result; try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); card=cv.toDataURL('image/jpeg',0.55); }catch(e){}
       const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:'New card',callName:'',tier:2,cadence:cadenceForTier(2),card:card,review:true};
       DB.contacts.push(c); save(); editContact(c.id);
@@ -796,7 +856,7 @@ function viewPerson(id){
   /* details */
   h+='<div class="card"><div class="kick" style="margin-top:0">Details</div>';
   h+=detailRow('Phone',esc(c.phone||'—')); h+=detailRow('Email',esc(c.email||'—'));
-  h+=detailRow('LinkedIn', c.linkedin?'<a style="color:var(--green-2)" target="_blank" rel="noopener" href="'+esc(c.linkedin)+'">profile ↗</a>':'—');
+  h+=detailRow('LinkedIn', c.linkedin?'<a style="color:var(--green-2)" target="_blank" rel="noopener" href="'+esc(safeUrl(liUrl(c.linkedin)))+'">profile ↗</a>':'—');
   h+=detailRow('Address', c.address?esc(c.address):'—');
   h+=detailRow('How we met', c.howMet?esc(c.howMet):'—');
   h+=detailRow('Work', work?esc(work):'—');
@@ -912,9 +972,21 @@ function renderPreview(){
 window.impSet=(i,k,v)=>{ window._imp[i][k]=v; };
 window.impAll=(v)=>{ window._imp.forEach(r=>r._keep=v); renderPreview(); };
 window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.length){ alert('Tick at least one contact.'); return; }
-  let added=0;
-  keep.forEach(r=>{ DB.contacts.push({ id:uid(), name:r.name, phone:r.phone||'', email:r.email||'', linkedin:r.linkedin||'', context:r.context||'', photo:r.photo||'', tier:r._tier||2, bday:r.bday||null, anniv:null, customDates:[], cadence:r._tier===1?3:r._tier===2?6:null, lastContacted:null, log:[], createdAt:new Date().toISOString() }); added++; });
-  save(); window._imp=null; alert('Imported '+added+' contacts. Set their birthdays/cadence anytime.'); go('people');
+  /* DEDUPE: index the existing book so a re-import updates matches instead of duplicating everyone
+     (the Settings tile promises "merge"); match on normalized phone, else name+email. */
+  const byPhone={}, byNM={};
+  const nmKey=(nm,em)=>((nm||'').trim().toLowerCase()+'|'+(em||'').trim().toLowerCase());
+  DB.contacts.forEach(c=>{ const p=c.phone?normalizePhone(c.phone):''; if(p) byPhone[p]=c; const k=nmKey(c.name,c.email); if(k!=='|') byNM[k]=c; });
+  let added=0, updated=0;
+  keep.forEach(r=>{ const p=r.phone?normalizePhone(r.phone):''; const k=nmKey(r.name,r.email);
+    const hit=(p&&byPhone[p])||(k!=='|'&&byNM[k])||null;
+    if(hit){ ['name','phone','email','linkedin','context','photo','bday'].forEach(f=>{ if(!hit[f]&&r[f]) hit[f]=r[f]; }); updated++; return; }
+    const c={ id:uid(), name:r.name, phone:r.phone||'', email:r.email||'', linkedin:r.linkedin||'', context:r.context||'', photo:r.photo||'', tier:r._tier||2, bday:r.bday||null, anniv:null, customDates:[], cadence:r._tier===1?3:r._tier===2?6:null, lastContacted:null, log:[], createdAt:new Date().toISOString() };
+    DB.contacts.push(c); if(p) byPhone[p]=c; if(k!=='|') byNM[k]=c; added++;
+  });
+  save(); window._imp=null;
+  alert('Imported '+added+(added===1?' contact':' contacts')+(updated?(', updated '+updated+' you already had'):'')+'. Set their birthdays/cadence anytime.');
+  go('today');
 };
 
 /* ---------- templates ---------- */
@@ -1274,8 +1346,12 @@ window.importFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=ne
       try{ localStorage.setItem(UNDO_KEY, JSON.stringify({at:Date.now(), db:DB})); }catch(_){}
       DB={ v:obj.v||1, contacts:obj.contacts,
            templates:(Array.isArray(obj.templates)&&obj.templates.length)?obj.templates:DEFAULT_TEMPLATES.slice(),
-           settings:Object.assign({ myName:'', country:'44', leadDays:1, localTouch:true }, obj.settings||{}),
+           settings:Object.assign({ myName:'', country:defaultCountry(), leadDays:1, localTouch:true }, obj.settings||{}),
            me:obj.me||DB.me, deleted:obj.deleted||{} };
+      /* a restore is the user's explicit "this backup is my truth": stamp every contact fresh and drop
+         their tombstones, so the next Drive sync can't silently re-delete what was just restored. */
+      const _rt=Date.now(); DB.deleted=DB.deleted||{};
+      DB.contacts.forEach(c=>{ c.updatedAt=_rt; if(DB.deleted[c.id]) delete DB.deleted[c.id]; });
       snapInit(); save(); go('today');
       alert('Restored '+DB.contacts.length+' contacts. If that was a mistake, open Settings and tap “Undo last restore”.');
     }catch(e){ logErr('import', e); alert('Could not read that backup (wrong file, wrong passphrase, or not a Sovenn backup).'); }
@@ -1716,6 +1792,9 @@ gReturn();
 if(!location.hash) location.hash='#today';
 snapInit();
 route();
+/* ask the browser to make our storage persistent so Chrome/Android is far less likely to evict the
+   user's whole circle under storage pressure (no account, so this is the only durability lever) */
+try{ if(navigator.storage&&navigator.storage.persist){ navigator.storage.persisted().then(function(p){ if(!p) navigator.storage.persist(); }); } }catch(e){}
 try{ fbBump('opens'); }catch(e){}
 maybeNudge();
 try{ maybeChurnAsk(); }catch(e){}

@@ -303,15 +303,35 @@
     var opts = {};
     if(o.body != null) opts.body = String(o.body);
     if(o.tag != null) opts.tag = String(o.tag); /* tag de-dupes one daily digest */
+    if(o.icon != null) opts.icon = String(o.icon);
     opts.silent = false;
 
+    /* Android Chrome, installed PWAs, and TWAs REQUIRE ServiceWorkerRegistration.showNotification();
+       the page-context `new Notification()` constructor THROWS there (the flagship daily nudge was
+       silently dead on every Play-install device). Prefer the SW path; fall back to the constructor
+       only on desktop where a SW may be absent. Never throw, never hang. */
     return new Promise(function(resolve){
+      var settled = false; function done(v){ if(settled) return; settled = true; resolve(!!v); }
+      function viaConstructor(){
+        try {
+          var n = new N(title, opts); /* constructing shows it; DATA only, no HTML */
+          if(n && typeof n.addEventListener === 'function') n.addEventListener('error', function(){ done(false); });
+          done(true);
+        } catch(e){ done(false); }
+      }
       try {
-        var n = new N(title, opts); /* constructing shows it; DATA only, no HTML */
-        if(n && typeof n.addEventListener === 'function')
-          n.addEventListener('error', function(){ resolve(false); });
-        resolve(true);
-      } catch(e){ resolve(false); } /* e.g. installed PWAs need SW.showNotification */
+        if(typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.ready &&
+           typeof ServiceWorkerRegistration !== 'undefined' && ServiceWorkerRegistration.prototype &&
+           typeof ServiceWorkerRegistration.prototype.showNotification === 'function'){
+          var to = setTimeout(function(){ done(false); }, 3000); /* don't hang if the SW never becomes ready */
+          navigator.serviceWorker.ready
+            .then(function(reg){ return reg.showNotification(title, opts); })
+            .then(function(){ clearTimeout(to); done(true); },
+                  function(){ clearTimeout(to); viaConstructor(); });
+          return;
+        }
+      } catch(e){}
+      viaConstructor();
     });
   }
 

@@ -24,6 +24,8 @@ jobs:
           node-version: 20
       - name: Run window.Sovenn* _selftest() for every module
         run: node tooling/selftest.mjs
+      - name: Repo consistency (VERSION==sw cache, SHELL files exist, manifest/assetlinks valid)
+        run: node tooling/consistency.mjs
 
   smoke:
     name: Headless smoke + XSS-render guard

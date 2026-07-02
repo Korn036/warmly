@@ -50,7 +50,7 @@ export default {
       if (!t.access_token) return new Response('Sign-in could not be completed. Please try again.', { status: 502 });  /* generic error — do not echo Google's raw response */
       if (!allowed.some(o => app === o || app.startsWith(o + '/'))) return new Response('invalid app origin', { status: 400 });
       const session = rand(24);
-      await env.SESSIONS.put('sess:'+session, JSON.stringify({ refresh_token: t.refresh_token || '' }));
+      await env.SESSIONS.put('sess:'+session, JSON.stringify({ refresh_token: t.refresh_token || '' }), { expirationTtl: 7776000 });  /* 90d: a session id is a bearer credential; never let it live forever */
       /* session id only — the app fetches a short-lived access token via /auth/token; no access token ever rides in the URL */
       const frag = '#warmly_session=' + session;
       return Response.redirect(app + frag, 302);
