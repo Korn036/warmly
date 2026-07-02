@@ -8,6 +8,10 @@
 .gitignore
 .assetsignore
 wrangler.jsonc
+.wrangler
+# ^ wrangler creates .wrangler/ (cache/wrangler-account.json, tmp/) in the CWD during
+#   `wrangler login`/`deploy`. With assets.directory = ".", it MUST be excluded or the
+#   account id + email get served publicly.
 
 # --- CI / docs / server / tests: source, not for the browser ---
 .github
