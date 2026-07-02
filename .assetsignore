@@ -1,0 +1,28 @@
+# .assetsignore — files that must NOT be published as public static assets on sovenn.app.
+# Cloudflare Workers Static Assets reads this from the assets directory root (assets.directory = ".").
+# Syntax is .gitignore-style. This protects EVERY deploy path (git pipeline, `wrangler deploy`,
+# manual upload) from serving source, config, internal docs, or local junk.
+
+# --- Version control & deploy config (never serve) ---
+.git
+.gitignore
+.assetsignore
+wrangler.jsonc
+
+# --- CI / docs / server / tests: source, not for the browser ---
+.github
+worker
+tooling
+README.md
+RELEASE-CHECKLIST.md
+
+# --- Private / internal: never publish ---
+Sovenn-Internal
+*.pdf
+*.mp4
+
+# --- Local build junk (belt-and-suspenders; mostly untracked) ---
+node_modules
+*.log
+.DS_Store
+Thumbs.db
