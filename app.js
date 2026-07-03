@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.65.0', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.66.0', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -616,7 +616,7 @@ function route(){
   const v=view||'today';
   if(v==='today' && _lastView!=='today') _shuffleId='reroll';
   _lastView=v;
-  ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, mycard:viewMyCard, import:viewImport, templates:viewTemplates, settings:viewSettings }[v]||viewToday)(arg);
+  ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, mycard:viewMyCard, import:viewImport, templates:viewTemplates, settings:viewSettings, onboard:viewOnboard }[v]||viewToday)(arg);
   if(window.updateBell) updateBell();
   window.scrollTo(0,0);
 }
@@ -644,6 +644,7 @@ function viewToday(){
   deck=deck.slice(0,5); window._deck=deck;  /* #10: a finite, completable deck (max 5) drives return, not an endless list */
   if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><button type="button" class="deck-hint" aria-label="Show the next card" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone &middot; or tap here</button></div></div>';
   else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Everyone is warm and there are no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
+  h+=setupCard();  /* self-ticking "Get set up" checklist sits just under the deck (F3 part B, additive) */
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
@@ -1076,6 +1077,7 @@ window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.
     DB.contacts.push(c); if(p) byPhone[p]=c; if(k!=='|') byNM[k]=c; added++;
   });
   save(); window._imp=null;
+  if(window._obFlow){ go('onboard','circle'); toast('Imported '+added+(added===1?' person':' people')+'. Now pick your inner circle.'); return; }
   go('today');
   toast('Imported '+added+(added===1?' contact':' contacts')+(updated?(', updated '+updated+' you already had'):'')+'. Set their birthdays and cadence anytime.');
 };
@@ -1624,6 +1626,98 @@ function capIcon(k){ const I={
   import:'<rect x="3.5" y="5" width="17" height="14" rx="2.2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16.5c.8-1.9 2.4-3 3.5-3s2.7 1.1 3.5 3M15 10h3M15 13h3"/>',
   type:'<path d="M12 20h8"/><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L7.5 18.3l-3.6 1 1-3.5z"/>'
 }; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(I[k]||I.type)+'</svg>'; }
+/* ===================== First-run onboarding wizard (F3/F4/F5) =====================
+   The approved after-mockup, wired into the real app. Full-screen overlay, hash-routed by step
+   (#onboard/welcome | import | circle). Reuses the existing Import + preview flow and the tier concept
+   (inner circle = tier 1). The user is never trapped: every step offers a skip. */
+function obDots(active){ var s=''; for(var i=1;i<=3;i++){ s+='<i class="'+(i<=active?'on':'')+'"></i>'; } return s; }
+function viewOnboard(step){
+  step = step || 'welcome';
+  if(step==='circle' && (!DB.contacts || !DB.contacts.length)) step='import';  /* nothing to pick yet */
+  var h='<div class="ob"><div class="ob-screen"><div class="ob-wm">Sovenn<span class="dot">.</span></div>';
+  if(step==='welcome'){
+    h+='<div class="ob-dots">'+obDots(1)+'</div>'
+      +'<div class="ob-kicker">Welcome</div>'
+      +'<h1>Let\'s warm up<br>your circle.</h1>'
+      +'<div class="ob-sub">See who to reach today. We write the first line. You just tap send. It takes about a minute to set up.</div>'
+      +'<div class="ob-field"><label for="obName">What should we call you?</label>'
+      +'<input id="obName" type="text" autocomplete="given-name" autocapitalize="words" placeholder="Your first name" value="'+esc(DB.settings.myName||'')+'" onkeydown="if(event.key===\'Enter\')obSaveName()"></div>'
+      +'<div class="ob-grow"></div>'
+      +'<button class="ob-btn primary" onclick="obSaveName()">Continue</button>'
+      +'<div class="ob-fine">No account. No sign-up. Everything stays on your phone.</div>';
+  } else if(step==='import'){
+    h+='<div class="ob-dots">'+obDots(2)+'</div>'
+      +'<div class="ob-kicker">Step 2 of 3</div>'
+      +'<h1>Bring in the<br>people who matter.</h1>'
+      +'<div class="ob-sub">Start with a few. You\'ll pick who\'s closest next, and you can always add more later.</div>'
+      +'<button class="ob-opt hot" onclick="obStartImport()"><span class="ic acc">📇</span><span><h3>Import from your phone</h3><p>One tap. Pick exactly who to keep.</p></span><span class="go">→</span></button>'
+      +'<button class="ob-opt" onclick="obAddByHand()"><span class="ic">✍️</span><span><h3>Paste or add by hand</h3><p>A signature, a bio, or one at a time.</p></span><span class="go">→</span></button>'
+      +'<div class="ob-grow"></div>'
+      +((DB.contacts&&DB.contacts.length)?'<button class="ob-btn primary" onclick="go(\'onboard\',\'circle\')">Continue</button>':'')
+      +'<button class="ob-btn ghost" onclick="obSkip()">I\'ll do this later</button>'
+      +'<div class="ob-fine">The moment your contacts land, we move you straight on. No pop-ups.</div>';
+  } else {
+    var list=DB.contacts.slice(0,40);
+    var chosen=DB.contacts.filter(function(c){ return c.tier===1; }).length;
+    h+='<div class="ob-dots">'+obDots(3)+'</div>'
+      +'<div class="ob-kicker">Step 3 of 3</div>'
+      +'<h1>Who\'s your<br>inner circle?</h1>'
+      +'<div class="ob-sub">Tap the 5 to 10 you\'d hate to lose touch with. We keep them warmest.</div>'
+      +'<div class="ob-people">';
+    list.forEach(function(c){ var sel=(c.tier===1);
+      h+='<button class="ob-person'+(sel?' sel':'')+'" onclick="obTogglePin(\''+c.id+'\')">'
+        +avatarHTML(c,'width:46px;height:46px;border-radius:13px;flex:0 0 auto;font-size:16px;')
+        +'<span class="obp-txt"><span class="nm">'+esc(c.name)+'</span>'+(c.context?'<span class="rel">'+esc(c.context)+'</span>':'')+'</span>'
+        +'<span class="heart">'+(sel?'♥':'♡')+'</span></button>';
+    });
+    h+='</div>'
+      +'<div class="ob-count">'+(chosen?(chosen+' chosen'+(chosen>=5?' · a warm, close circle':'')):'Tap a few hearts to choose')+'</div>'
+      +'<button class="ob-btn primary" onclick="obFinish()">'+(chosen?'Start keeping them warm':'Skip for now')+'</button>';
+  }
+  h+='</div></div>';
+  render(h);
+  if(step==='welcome'){ var n=document.getElementById('obName'); if(n){ try{ n.focus(); }catch(e){} } }
+}
+window.obSaveName=function(){ var n=document.getElementById('obName'); DB.settings.myName=(n?n.value.trim():''); save(); go('onboard','import'); };
+window.obStartImport=function(){ window._obFlow=true; go('import'); };
+window.obAddByHand=function(){ window._obFlow=true; captureHub(); };
+window.obTogglePin=function(id){ var c=DB.contacts.find(function(x){ return x.id===id; }); if(!c) return;
+  c.tier=(c.tier===1)?2:1; if(c.tier===1 && !c.cadence) c.cadence=3; save(); route(); };
+window.obFinish=function(){ DB.settings.onboarded=true; window._obFlow=false; save(); go('today'); toast('You\'re all set. Sovenn will show you who to reach.'); };
+window.obSkip=function(){ DB.settings.onboarded=true; window._obFlow=false; save(); go('today'); };
+/* Get-set-up checklist: additive to the real Today (F3 part B). Self-ticks from real DB state, dismissible,
+   auto-retires when complete. Scoped to users who went through the wizard (DB.settings.onboarded) so an
+   existing user is never surprised by it. "Send your first hello" deep-links compose; "Add a channel" (F5)
+   opens the existing contact editor on a top inner-circle person. */
+function obTopInner(){ var cs=DB.contacts||[]; return cs.find(function(c){ return c.tier===1; })||cs[0]||null; }
+function setupSteps(){
+  var cs=DB.contacts||[];
+  var hasChannel=cs.some(function(c){ return c.photo||c.linkedin||c.instagram||c.x||c.telegram; });
+  return [
+    {t:'Import your contacts',     done:cs.length>0,                                   tag:'',      act:"go('import')"},
+    {t:'Pick your inner circle',   done:cs.some(function(c){ return c.tier===1; }),    tag:'',      act:"go('onboard','circle')"},
+    {t:'Add a photo or a channel', done:hasChannel,                                    tag:'',      act:"obChannelPrompt()"},
+    {t:'Send your first hello',    done:cs.some(function(c){ return c.lastContacted; }),tag:'1 tap', act:"obFirstHello()"}
+  ];
+}
+function setupCard(){
+  if(!DB.settings.onboarded || !DB.contacts || !DB.contacts.length || DB.settings.setupDismissed) return '';
+  var steps=setupSteps(), done=steps.filter(function(s){ return s.done; }).length;
+  if(done>=steps.length) return '';  /* everything done -> quietly retire the checklist */
+  var pct=Math.round(done/steps.length*100), nextTaken=false;
+  var rows=steps.map(function(s){ var isNext=(!s.done && !nextTaken); if(isNext) nextTaken=true;
+    return '<button class="srow'+(s.done?' done':'')+(isNext?' next':'')+'" onclick="'+s.act+'">'
+      +'<span class="tick '+(s.done?'done':'todo')+'">'+(s.done?'✓':'')+'</span>'
+      +'<span class="st">'+s.t+'</span>'
+      +((isNext&&s.tag)?'<span class="stag">'+s.tag+'</span>':'')+'</button>';
+  }).join('');
+  return '<div class="setup"><div class="shead"><b>Get set up</b><span class="prg">'+done+' of '+steps.length+' done</span>'
+    +'<button class="sdz" onclick="setupDismiss()" aria-label="Dismiss the setup checklist">&times;</button></div>'
+    +'<div class="obar"><i style="width:'+pct+'%"></i></div>'+rows+'</div>';
+}
+window.setupDismiss=function(){ DB.settings.setupDismissed=true; save(); route(); };
+window.obChannelPrompt=function(){ var c=obTopInner(); if(c) editContact(c.id); else go('import'); };
+window.obFirstHello=function(){ var c=obTopInner(); if(c) compose(c.id,'reconnect'); else go('import'); };
 window.captureHub=()=>{
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>Add someone</h3>';
   h+='<div class="sub" style="margin:-6px 0 6px">Three effortless ways. You almost never type.</div>';
@@ -1891,7 +1985,7 @@ $('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleN
 { var _ms=$('#menuScrim'); if(_ms) _ms.addEventListener('click',function(){ closeNavMenu(); if(window.closeNotif) closeNotif(); }); var _nm=$('#navMenu'); if(_nm) _nm.addEventListener('click',closeNavMenu); var _bb=$('#bellBtn'); if(_bb) _bb.addEventListener('click',function(e){ e.stopPropagation(); toggleNotif(); }); try{ enableShake(); }catch(e){} }
 applySkin(effectiveSkin());
 gReturn();
-if(!location.hash) location.hash='#today';
+if(!location.hash) location.hash = (DB.settings.onboarded || (DB.contacts && DB.contacts.length)) ? '#today' : '#onboard/welcome';
 snapInit();
 route();
 /* ask the browser to make our storage persistent so Chrome/Android is far less likely to evict the

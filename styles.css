@@ -616,6 +616,67 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .toast{ position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom,0px)); transform:translate(-50%,14px); z-index:9000; max-width:min(92vw,420px); padding:13px 18px; border-radius:15px; background:var(--card); color:var(--ink); border:1px solid var(--line); font-family:var(--serif); font-size:14.5px; line-height:1.4; text-align:center; box-shadow:0 1px 2px rgba(40,30,20,.06), 0 14px 34px rgba(40,30,20,.20); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); opacity:0; transition:opacity .26s ease, transform .26s cubic-bezier(.22,.61,.36,1); pointer-events:none; }
 .toast.in{ opacity:1; transform:translate(-50%,0); pointer-events:auto; cursor:pointer; }
 @media (prefers-reduced-motion:reduce){ .toast{ transition:opacity .2s ease; transform:translate(-50%,0); } }
+
+/* ================= First-run onboarding wizard (F3/F4/F5) =================
+   Ports the approved after-mockup.html into the app, themed via the live CSS vars so it reads on every
+   skin. A full-screen overlay that covers the app chrome; the user is never trapped (each step can skip). */
+.ob{ position:fixed; inset:0; z-index:200; background:var(--bg); color:var(--ink); overflow-y:auto; -webkit-overflow-scrolling:touch; animation:obFade .3s ease; }
+@keyframes obFade{ from{ opacity:0 } to{ opacity:1 } }
+.ob-screen{ min-height:100%; max-width:520px; margin:0 auto; padding:38px 26px calc(30px + env(safe-area-inset-bottom,0px)); display:flex; flex-direction:column; }
+.ob-wm{ font-family:var(--serif); font-weight:700; font-size:21px; letter-spacing:-.02em; }
+.ob-wm .dot{ color:var(--coral,#F2683C); }
+.ob-dots{ display:flex; gap:7px; margin:22px 0 0; }
+.ob-dots i{ width:8px; height:8px; border-radius:50%; background:var(--line); display:block; transition:width .25s, background .25s; }
+.ob-dots i.on{ background:var(--accent); width:22px; border-radius:5px; }
+.ob-kicker{ font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin-top:30px; }
+.ob h1{ font-family:var(--serif); font-size:33px; line-height:1.12; font-weight:700; letter-spacing:-.02em; margin-top:12px; }
+.ob-sub{ font-family:var(--mono); font-size:14.5px; line-height:1.6; color:var(--ink-soft); margin-top:16px; }
+.ob-grow{ flex:1; min-height:22px; }
+.ob-btn{ display:flex; align-items:center; justify-content:center; gap:8px; height:60px; border-radius:16px; font-family:var(--serif); font-weight:600; font-size:17px; border:none; cursor:pointer; width:100%; -webkit-appearance:none; appearance:none; }
+.ob-btn.primary{ background:var(--accent); color:var(--on-accent); box-shadow:0 12px 30px rgba(40,30,20,.16); }
+.ob-btn.coral{ background:var(--coral,#F2683C); color:#fff; box-shadow:0 10px 26px rgba(242,104,60,.34); }
+.ob-btn.ghost{ background:transparent; color:var(--ink-soft); border:none; height:44px; font-size:14px; font-weight:500; }
+.ob-btn[disabled]{ opacity:.45; cursor:default; }
+.ob-fine{ font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); text-align:center; margin-top:14px; line-height:1.5; }
+.ob-field{ margin-top:26px; }
+.ob-field label{ display:block; font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); }
+.ob-field input{ margin-top:10px; width:100%; height:62px; border-radius:16px; background:var(--card); border:1.5px solid var(--line); padding:0 20px; font-family:var(--serif); font-size:19px; color:var(--ink); box-shadow:0 10px 26px rgba(40,30,20,.08); }
+.ob-field input:focus{ outline:none; border-color:var(--accent); }
+.ob-opt{ display:flex; gap:16px; align-items:center; background:var(--card); border-radius:18px; padding:20px; box-shadow:0 12px 30px rgba(40,30,20,.10); margin-top:16px; border:1.5px solid transparent; width:100%; text-align:left; cursor:pointer; }
+.ob-opt.hot{ border-color:var(--accent); }
+.ob-opt .ic{ width:52px; height:52px; border-radius:14px; background:var(--bg-2); display:flex; align-items:center; justify-content:center; font-size:24px; flex:0 0 auto; }
+.ob-opt .ic.acc{ background:var(--accent); }
+.ob-opt h3{ font-family:var(--serif); font-size:19px; font-weight:600; color:var(--ink); }
+.ob-opt p{ font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:4px; line-height:1.45; }
+.ob-opt .go{ margin-left:auto; color:var(--accent); font-size:22px; font-weight:700; }
+.ob-people{ margin-top:6px; }
+.ob-person{ display:flex; gap:14px; align-items:center; background:var(--card); border-radius:16px; padding:11px 14px; box-shadow:0 8px 20px rgba(40,30,20,.07); margin-top:11px; border:1.5px solid transparent; width:100%; text-align:left; cursor:pointer; }
+.ob-person.sel{ border-color:var(--coral,#F2683C); }
+.ob-person .obp-txt{ min-width:0; }
+.ob-person .nm{ display:block; font-family:var(--serif); font-size:16.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ob-person .rel{ display:block; font-family:var(--mono); font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+.ob-person .heart{ margin-left:auto; font-size:23px; width:34px; text-align:center; color:var(--line); flex:0 0 auto; }
+.ob-person.sel .heart{ color:var(--coral,#F2683C); }
+.ob-count{ font-family:var(--mono); font-size:13px; color:var(--ink-soft); text-align:center; margin:18px 0 10px; }
+
+/* Get-set-up checklist - additive to the real Today, self-ticking, dismissible (never blocks) */
+.setup{ background:var(--card); border-radius:20px; box-shadow:0 12px 30px rgba(40,30,20,.10); padding:20px; margin:0 0 12px; border:1px solid var(--line); }
+.setup .shead{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.setup .shead b{ font-family:var(--serif); font-size:18px; font-weight:700; color:var(--ink); }
+.setup .shead .prg{ font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-left:auto; }
+.setup .shead .sdz{ font-family:var(--mono); font-size:16px; line-height:1; color:var(--ink-faint); background:none; border:none; cursor:pointer; padding:2px 4px; }
+.setup .obar{ height:8px; border-radius:5px; background:var(--bg-2); margin:14px 0 14px; overflow:hidden; }
+.setup .obar i{ display:block; height:100%; background:var(--accent); border-radius:5px; transition:width .45s ease; }
+.setup .srow{ display:flex; align-items:center; gap:13px; padding:12px 0; border-top:1px solid var(--line); width:100%; text-align:left; background:none; border-left:0; border-right:0; border-bottom:0; cursor:pointer; }
+.setup .srow:first-of-type{ border-top:none; }
+.setup .srow .tick{ width:26px; height:26px; border-radius:8px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:15px; color:#fff; }
+.setup .srow .tick.done{ background:var(--green-2,#5E7264); }
+.setup .srow .tick.todo{ border:2px solid var(--line); background:transparent; }
+.setup .srow .st{ font-family:var(--serif); font-size:15.5px; color:var(--ink); }
+.setup .srow.done .st{ color:var(--ink-soft); }
+.setup .srow.next{ background:color-mix(in srgb, var(--coral,#F2683C) 9%, var(--card)); margin:2px -10px 0; padding:14px 10px; border-radius:14px; border-top:none; }
+.setup .srow.next .st{ font-weight:600; }
+.setup .srow .stag{ font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--coral,#F2683C); background:color-mix(in srgb,var(--coral,#F2683C) 15%, var(--card)); padding:3px 9px; border-radius:20px; margin-left:auto; flex:0 0 auto; }
 /* notification panel (bell) */
 .notif-panel{ position:fixed; top:58px; right:14px; z-index:41; width:300px; max-width:calc(100vw - 28px); background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 16px 40px rgba(20,14,10,.24); padding:8px; display:none; max-height:72vh; overflow:auto; }
 .notif-panel.open{ display:block; }
