@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.64.0', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.64.1', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -682,7 +682,9 @@ function deckInner(item){ var c=item.c;
     +'<button class="cshare" onclick="event.stopPropagation();shareContact(\''+c.id+'\')" aria-label="Share">'+SHIC+'</button></div>'
     +'<div class="btn-row" style="margin-top:14px">'+item.actions+'</div>';
 }
-var DECK_BANDS=['','linear-gradient(90deg,#FF7A4E,#E8B23A)','linear-gradient(90deg,#B07AC0,#FF7A4E)','linear-gradient(90deg,#E8B23A,#E0552E)'];
+/* the cards behind the top one recede into the CURRENT theme's own shadow tone (never a different hue),
+   so nothing changes colour when a card cycles to the front, it just loses the tint it already had */
+var DECK_BANDS=['','color-mix(in srgb, var(--hero) 90%, var(--hero-ink) 10%)','color-mix(in srgb, var(--hero) 80%, var(--hero-ink) 20%)','color-mix(in srgb, var(--hero) 70%, var(--hero-ink) 30%)'];
 function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack) return; var items=window._deck||[]; var n=items.length;
   /* #10: a bounded deck. Once you have flicked through everyone, end on a dignified "All caught up"
      card that reads "done", never an endless loop. */
@@ -696,10 +698,13 @@ function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack
   var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent=(n+(n===1?' person in your deck':' people in your deck'));
   wireDeck();
 }
-function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); if(!card) return; var sx=0,dx=0,drag=false;
+function wireDeck(){ var card=document.querySelector('#deckstack .dcard.top'); if(!card) return; var sx=0,dx=0,drag=false,raf=null;
+  /* batch the drag to one transform write per animation frame, not one per pointermove (which can fire far
+     faster than the screen refreshes on a real phone) — this was the main source of the janky, un-smooth drag */
+  function paint(){ raf=null; card.style.transform='translateX('+dx+'px) rotate('+(dx*0.05)+'deg)'; }
   card.addEventListener('pointerdown',function(e){ if(e.target.closest('button,a')) return; drag=true; sx=e.clientX; try{card.setPointerCapture(e.pointerId);}catch(_){} card.style.transition='none'; });
-  card.addEventListener('pointermove',function(e){ if(!drag) return; dx=e.clientX-sx; card.style.transform='translateX('+dx+'px) rotate('+(dx*0.05)+'deg)'; });
-  function end(){ if(!drag) return; drag=false;
+  card.addEventListener('pointermove',function(e){ if(!drag) return; dx=e.clientX-sx; if(raf==null) raf=requestAnimationFrame(paint); });
+  function end(){ if(!drag) return; drag=false; if(raf!=null){ cancelAnimationFrame(raf); raf=null; }
     if(Math.abs(dx)>85){ deckAdvance(); }
     else { card.style.transition='transform .28s ease'; card.style.transform=''; } dx=0; }
   card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
@@ -713,9 +718,10 @@ window.deckAdvance=function(){ if(window._deckBusy) return;   /* ignore repeat t
      Colours stay by slot (DECK_BANDS unchanged), so the gradient theme never changes - only the cards rotate. */
   cards.forEach(function(el){ var k=parseInt(el.style.getPropertyValue('--k'),10); if(isNaN(k)) k=0;
     var nk=(k===0)?show:(k-1); if(k===0) el.style.zIndex='0';
-    el.style.transition='transform .36s cubic-bezier(.22,.61,.36,1)';
+    el.style.transition='transform .36s cubic-bezier(.22,.61,.36,1), background .36s ease';
     el.style.setProperty('--k', nk);
     el.style.transform='translateY(calc('+nk+' * 13px)) scale(calc(1 - '+nk+' * 0.045))';
+    el.style.background=DECK_BANDS[Math.min(nk,3)]||'';  /* crossfades in step with the move, so the shade change reads as one continuous motion, not a cut */
   });
   setTimeout(function(){ items.push(items.shift()); window._deckBusy=false; renderDeck(); }, 340);
 }; /* #10->cycle: swiping rotates the top card to the bottom (no longer destroys it); empty only when the deck is genuinely empty */
