@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.63.3', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.64.0', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -19,19 +19,19 @@ const DEFAULT_TEMPLATES=[
    100% on-device, no AI, nothing leaves the phone. {first} becomes the calling name, {me} your name.
    You always edit before sending. The rotation walks through every opener before any repeats. */
 const RECONNECT_OPENERS=[
-  {id:'o1',body:"Hey {first}, you popped into my head today and I realized it's been a while. How have you been, really?"},
+  {id:'o1',deep:true,body:"Hey {first}, you popped into my head today and I realized it's been a while. How have you been, really?"},
   {id:'o2',body:"Hi {first}! We're long overdue a proper catch up. How is everything with you lately?"},
-  {id:'o3',body:"Hey {first}, no reason at all, just thinking of you and hoping life is treating you well. What have you been up to?"},
+  {id:'o3',body:"Hey {first}, you've been on my mind, hoping life is treating you well. What have you been up to?"},
   {id:'o4',body:"{first}! It's been too long. Tell me something good that has happened with you recently."},
   {id:'o5',body:"Hey {first}, I keep meaning to reach out. How are things on your side these days?"},
   {id:'o6',body:"Hi {first}, hope you're doing well. We're overdue a chat, are you free for a quick call sometime this week?"},
-  {id:'o7',body:"Hey {first}, a bit of a random message, but you came to mind and I wanted to say hi. How's life?"},
+  {id:'o7',body:"Hey {first}, you came to mind and I wanted to say hi. How's life?"},
   {id:'o8',body:"{first}, it's been a minute! How have you been keeping? Would love to properly catch up soon."},
   {id:'o9',body:"Hi {first}, hope all is good with you. What's new in your world lately?"},
-  {id:'o10',body:"Hey {first}, thinking of you today and hoping you're well. How are things going?"},
-  {id:'o11',body:"Hey {first}, it struck me that we haven't spoken in too long. How are you, honestly?"},
-  {id:'o12',body:"{first}, I miss our chats. How is everything going with you right now?"},
-  {id:'o13',body:"Hey {first}, just checking in because you matter to me. How have things been lately?"},
+  {id:'o10',deep:true,body:"Hey {first}, thinking of you today and hoping you're well. How are things going?"},
+  {id:'o11',deep:true,body:"Hey {first}, it struck me that we haven't spoken in too long. How are you, honestly?"},
+  {id:'o12',deep:true,body:"{first}, I miss our chats. How is everything going with you right now?"},
+  {id:'o13',deep:true,body:"Hey {first}, just checking in because you matter to me. How have things been lately?"},
   {id:'o14',body:"Hi {first}, hope this finds you well. Any chance you're free for a catch up soon?"}
 ];
 /* Optional subtle local-language touch (Hinglish, German, Dutch), chosen by the contact's phone
@@ -78,17 +78,18 @@ const SKINS=[
   {k:'pressedgarden',n:'Pressed Garden',c:'#5B7355',dark:false},
   {k:'candlelit',n:'Candlelit Hour',c:'#F2A65A',dark:true}
 ];
-const _MOON='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
-const _SUN='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.5 1.5M16.9 16.9l1.5 1.5M18.4 5.6l-1.5 1.5M7.1 16.9l-1.5 1.5"/></svg>';
 function isDarkSkin(k){ var s=SKINS.find(function(x){return x.k===k;}); return !!(s&&s.dark); }
+/* daytime/night split for the "auto" theme; the day/night toggle used to live in the header, moved to
+   Settings > Appearance and set to follow the device clock by default rather than a manual switch */
+function autoSkinForNow(){ var hr=new Date().getHours(); return (hr>=7 && hr<19)?'stillmorning':'lamplight'; }
+function effectiveSkin(){ var k=localStorage.getItem('warmly.skin')||'auto'; return k==='auto'?autoSkinForNow():k; }
 function applySkin(k){ var el=document.documentElement;
   el.classList.remove('skin-hearthstone','skin-letterpress','skin-pressedgarden','skin-hearthglow','skin-candlelit');
   if(isDarkSkin(k)) el.setAttribute('data-theme','dark'); else el.removeAttribute('data-theme');
   if(k && k!=='stillmorning' && k!=='lamplight') el.classList.add('skin-'+k);
   /* keep the Android / TWA status bar colour in step with the active skin (was stuck on light cream) */
   try{ var m=document.querySelector('meta[name="theme-color"]'); if(m){ var bg=getComputedStyle(el).getPropertyValue('--bg').trim(); if(bg) m.setAttribute('content',bg); } }catch(e){} }
-function updateThemeBtn(){ var tb=document.getElementById('themeBtn'); if(!tb) return; var cur=localStorage.getItem('warmly.skin')||'stillmorning'; var d=isDarkSkin(cur); tb.innerHTML=d?_SUN:_MOON; tb.title=d?'Light (Still Morning)':'Dark (Lamplight)'; tb.setAttribute('aria-label', tb.title); }
-window.setSkin=function(k){ applySkin(k); localStorage.setItem('warmly.skin',k); updateThemeBtn(); if(window.route) route(); };
+window.setSkin=function(k){ localStorage.setItem('warmly.skin',k); applySkin(k==='auto'?autoSkinForNow():k); if(window.route) route(); };
 /* Best-effort default WhatsApp country code for a NEW install, so a locally-typed number resolves
    right out of the box. Was hardcoded '44' (UK), which silently broke every Indian number.
    Timezone is checked first because many Indian phones report an en-US/en-GB language. User can
@@ -339,9 +340,37 @@ function socIcon(k){ const I={
 }; return '<svg viewBox="0 0 24 24" fill-rule="evenodd" aria-hidden="true">'+(I[k]||I.web)+'</svg>'; }
 function socialRow(c, withAdd, skip){ let links=socialLinks(c); if(skip) links=links.filter(l=>!['wa','call','mail'].includes(l[0])); if(!links.length && !withAdd) return '';
   let h='<div class="socrow">';
-  links.forEach(([k,label,url])=>{ h+='<a class="soc soc-'+k+'" href="'+esc(url)+'" target="_blank" rel="noopener" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</a>'; });
+  links.forEach(([k,label,url])=>{
+    /* on an actual contact page (withAdd), give Telegram the same drafted-message flow WhatsApp has,
+       and Instagram/LinkedIn/X a copy-the-opener-then-open flow, so every reach channel carries the
+       courage-tool value, not just WhatsApp. On My Card (withAdd false, these are the owner's own
+       links) that would make no sense, so those stay plain link-outs. */
+    if(withAdd && k==='tg') h+='<button type="button" class="soc soc-'+k+'" onclick="compose(\''+c.id+'\',\'reconnect\',\'tg\')" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</button>';
+    else if(withAdd && (k==='ig'||k==='in'||k==='x')) h+='<button type="button" class="soc soc-'+k+'" onclick="reachSocial(\''+c.id+'\',\''+k+'\')" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</button>';
+    else h+='<a class="soc soc-'+k+'" href="'+esc(url)+'" target="_blank" rel="noopener" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</a>';
+  });
   if(withAdd) h+='<button class="soc socadd" onclick="event.stopPropagation();editContact(\''+c.id+'\')" title="add a link" aria-label="add a link">+</button>';
   return h+'</div>';
+}
+/* copy-the-drafted-opener-then-open flow for channels with no pre-fillable compose URL (Instagram DM,
+   LinkedIn, X): the message still comes from the same opener library WhatsApp/Telegram use, so the
+   "brave first line" isn't exclusive to channels that happen to support a text= URL parameter */
+window.reachSocial=(id,channel)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
+  const fr=freshDraft(c,'reconnect'); const txt=fr.text;
+  const url = channel==='ig'?igDmLink(c.instagram) : channel==='in'?liUrl(c.linkedin) : channel==='x'?('https://x.com/'+_handle(c.x)) : '';
+  if(!url) return;
+  try{ navigator.clipboard&&navigator.clipboard.writeText(txt); }catch(e){}
+  window.open(url,'_blank','noopener');
+  _reachSocialConfirm(id,channel,txt);
+};
+function _reachSocialConfirm(id,channel,txt){ const c=DB.contacts.find(x=>x.id===id); if(!c){ closeModal(); return; } const nm=esc(callName(c));
+  const chLabel={ig:'Instagram',in:'LinkedIn',x:'X'}[channel]||'their profile';
+  var h='<button class="x" onclick="closeModal()">&times;</button><h3>Opened '+chLabel+' for '+nm+'</h3>';
+  h+='<div class="note">Your drafted line is copied, paste it into the message box that just opened. If the copy did not work on this device, it is right here to select.</div>';
+  h+='<textarea readonly style="min-height:90px">'+esc(txt)+'</textarea>';
+  h+='<div class="btn-row" style="margin-top:10px"><button class="btn wa block" onclick="markReached(\''+id+'\')">Yes, I sent it</button></div>';
+  h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="closeModal()">Not yet</button></div>';
+  openModal(h);
 }
 /* ---- the Reach hub: every channel, one tap, the hero of a contact's page ---- */
 function reachBar(c){ const id=c.id; const ph=c.phone? String(c.phone).replace(/[^\d+]/g,''):''; const wmsg=c.lastMsg||'';
@@ -444,6 +473,10 @@ function dueToReach(){
 
 /* ---------- deep links (the "automation", human-approved) ---------- */
 function waLink(phone,text){ const p=normalizePhone(phone); return 'https://wa.me/'+p+(text?('?text='+encodeURIComponent(text)):''); }
+function tgLink(handle,text){ return 'https://t.me/'+_handle(handle)+(text?('?text='+encodeURIComponent(text)):''); }
+/* ig.me/m/ opens straight into the DM thread; no server-signed API needed, and Instagram's own
+   page falls back to a web login when the app isn't installed, then continues into the same thread */
+function igDmLink(handle){ return 'https://ig.me/m/'+_handle(handle); }
 function gcalLink(title,date,details,yearly){
   const pad=n=>String(n).padStart(2,'0');
   const s=date.getFullYear()+pad(date.getMonth()+1)+pad(date.getDate());
@@ -472,8 +505,13 @@ function openersFor(c){
 }
 function pickOpener(c, avoidId){
   var src=openersFor(c);
+  /* the first draft someone sees should be the easiest to send; bias toward the lighter, lower-commitment
+     lines (deep:true marks the more emotionally intense ones) and only reach for a deep one 1 time in 5,
+     so the vulnerable lines still surface sometimes without being the default first impression */
+  const wantDeep=Math.random()<0.2;
+  let tierSrc=src.filter(o=>!!o.deep===wantDeep); if(!tierSrc.length) tierSrc=src;
   const hist=(c&&c.msgHistory)||[]; const usedIds=hist.map(m=>m&&m.openerId).filter(Boolean);
-  let pool=src.filter(o=>o.id!==avoidId); if(!pool.length) pool=src.slice();
+  let pool=tierSrc.filter(o=>o.id!==avoidId); if(!pool.length) pool=tierSrc.slice();
   const unused=pool.filter(o=>usedIds.indexOf(o.id)<0); const choose=unused.length?unused:pool;
   return choose[Math.floor(Math.random()*choose.length)];
 }
@@ -570,6 +608,7 @@ window.addEventListener('hashchange',route);
 let _lastView='', _shuffleId=null, _rerollN=0;
 window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
+  if((localStorage.getItem('warmly.skin')||'auto')==='auto') applySkin(autoSkinForNow());  /* re-check on every navigation, not just cold boot, so a session left open across sunset still relights */
   const [view,arg]=location.hash.replace('#','').split('/');
   document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>{ var on=a.dataset.go===(view||'today'); a.classList.toggle('active',on); if(a.parentNode&&a.parentNode.id==='tabs') a.setAttribute('aria-current', on?'page':'false'); });
   if(window.closeNavMenu) closeNavMenu();
@@ -807,13 +846,39 @@ window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.targ
     img.onload=()=>{ const max=480; let w=img.width,h=img.height;  /* cap scan size: ~half the localStorage/Drive/backup weight per card, no data loss */ if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
       let card=rd.result; try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); card=cv.toDataURL('image/jpeg',0.55); }catch(e){}
       /* photo is only a draft until Save; nothing is written to DB.contacts here so backing out leaves no stub behind */
-      editContact('',{customDates:[],tier:2,card:card,review:true});
+      const draft={customDates:[],tier:2,card:card,review:true};
+      editContact('',draft);  /* show the form with the photo right away; OCR fills fields in underneath, never blocks */
+      _ocrFillFromScan(card);
     };
     img.onerror=()=>{ alert('Could not read that photo.'); };
     img.src=rd.result;
   };
   rd.readAsDataURL(f);
 };
+function ensureOCR(){ return window.Tesseract?Promise.resolve():loadScript('ocr-tesseract.min.js'); }
+let _ocrWorker=null;
+function ocrWorker(){ return _ocrWorker || (_ocrWorker=ensureOCR().then(()=>Tesseract.createWorker('eng',1,{workerPath:'ocr-worker.min.js',corePath:'ocr-core.wasm.js',langPath:'.',gzip:true}))); }
+/* reads the scanned photo in the background and fills in whatever it recognises, reusing the same
+   parser "Paste anything" already relies on so there is only one place that understands raw text.
+   Fully best-effort: on any failure, timeout, or if the user has already backed out of the form, it
+   quietly leaves the blank form exactly as it is today, never blocks or breaks the save flow. */
+async function _ocrFillFromScan(card){
+  const status=()=>document.getElementById('ocrStatus');
+  try{
+    const worker=await Promise.race([ ocrWorker(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('ocr load timeout')),20000)) ]);
+    const result=await Promise.race([ worker.recognize(card), new Promise((_,rej)=>setTimeout(()=>rej(new Error('ocr read timeout')),15000)) ]);
+    if(!document.getElementById('e_name')) return;  /* the scan form isn't open any more, nothing to fill */
+    const text=(result&&result.data&&result.data.text)||'';
+    try{ await ensureCapture(); }catch(e){}
+    const p=(window.SovennCapture&&SovennCapture.parse)?SovennCapture.parse(text):quickParse(text);
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el&&v&&!el.value) el.value=v; };
+    set('e_name',p.name); set('e_call',p.callName||firstName(p.name||'')); set('e_phone',p.phone); set('e_email',p.email);
+    set('e_li',p.linkedin); set('e_ig',p.instagram); set('e_x',p.x); set('e_tg',p.telegram); set('e_web',p.website);
+    set('e_loc',p.location); set('e_job',p.jobTitle); set('e_co',p.company);
+    const found=['e_name','e_phone','e_email'].some(fid=>{ const el=document.getElementById(fid); return el&&el.value; });
+    const s=status(); if(s) s.textContent=found?'Filled in what we could read from the photo, check it over before saving.':'Could not make out clean text on that photo. Fill in by hand.';
+  }catch(e){ const s=status(); if(s) s.textContent='Could not read the photo automatically this time. Fill in by hand.'; }
+}
 window.pSearch=v=>{ window._pfilter=Object.assign(window._pfilter||{tier:0},{q:v}); clearTimeout(window._pSearchT); window._pSearchT=setTimeout(function(){ viewPeople(); const i=$('#pq'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } },150); };
 window.pTier=t=>{ window._pfilter=Object.assign(window._pfilter||{q:''},{tier:t,review:false}); viewPeople(); };
 
@@ -1073,7 +1138,8 @@ function _cardHash(s){ s=String(s||''); let h=2166136261>>>0; for(let i=0;i<s.le
 function cardRecipe(){ const me=DB.me||{}; if(me.cardRecipe!=null && RELIGHT[me.cardRecipe]) return RELIGHT[me.cardRecipe];
   const h=_cardHash((me.name||'You')+'|'+(me.title||'')); const hr=new Date().getHours(); const band=hr<10?0:hr<17?1:hr<21?2:3;
   return RELIGHT[(h+band)%RELIGHT.length]; }
-const VENNMARK='<svg class="vmark" viewBox="0 0 120 80" aria-hidden="true"><circle cx="47" cy="40" r="29" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="73" cy="40" r="29" fill="none" stroke="currentColor" stroke-width="7"/><path d="M60 14.5a29 29 0 0 1 0 51 29 29 0 0 1 0-51z" fill="var(--lens,currentColor)"/></svg>';
+/* same mark as icon.svg (the real app icon), redrawn as a currentColor glyph so it adapts across the card looks; was a two-circle Venn shape unrelated to the actual app icon, the inconsistency Karthik flagged */
+const VENNMARK='<svg class="vmark" viewBox="0 0 270 190" aria-hidden="true"><path d="M18 178 C 34 132 70 100 108 74 C 120 60 130 44 140 36 C 148 30 158 28 165 34 C 172 40 174 46 175 52 C 181 54 184 60 179 65 C 185 68 187 74 181 79 C 188 82 189 88 182 92 C 189 96 188 103 180 106 C 196 116 226 140 252 170 C 254 173 252 178 247 178 L 150 178 C 140 168 137 160 135 150 C 128 160 120 170 108 178 Z" fill="currentColor"/></svg>';
 window.setCardLook=(l)=>{ DB.me=DB.me||{}; DB.me.cardLook=l; save(); route(); };
 window.relightCard=()=>{ DB.me=DB.me||{}; const cur=(DB.me.cardRecipe==null?-1:DB.me.cardRecipe); let n=cur; for(let i=0;i<8&&n===cur;i++){ n=Math.floor(Math.random()*RELIGHT.length); } DB.me.cardRecipe=n; save(); route(); };
 window.autoRelight=()=>{ DB.me=DB.me||{}; DB.me.cardRecipe=null; save(); route(); };
@@ -1156,7 +1222,7 @@ function viewMyCard(){ const me=DB.me=DB.me||{};
       ?'<div class="mc-pbg" '+pclick+'><img src="'+esc(me.photo)+'"></div><div class="mc-duo"></div>'
       :'<div class="mc-addphoto" '+pclick+'><div class="ring">+</div><div class="t1">Tap to add your photo</div><div class="t2">the Poster look turns it into a portrait of you</div></div>';
     card='<div class="mycard poster" style="'+vars+'">'+editBtn+inner+'<div class="mc-scrim"></div>'
-      +'<div class="mc-nameback">'+name+'</div>'
+      +(me.photo?'<div class="mc-nameback">'+name+'</div>':'')  /* the ghost watermark and the add-photo prompt both claim the card's centre; only one state is ever showing at a time */
       +'<div class="mc-brand">'+VENNMARK+'<span>SOVENN</span></div>'
       +'<div class="mc-foot"><div class="mc-name">'+name+'</div><div class="mc-title">'+title+'</div>'+(fieldOn('interests')?bizTags(me):'')
       +'<div class="mc-row2">'+socialRow(pseudo,false)+'<div class="mc-qr" id="qrbox"></div></div></div>'
@@ -1204,7 +1270,7 @@ function viewSettings(section){
   const s=DB.settings;
   const connected=localStorage.getItem('warmly.gsync')==='1';
   const swon=localStorage.getItem('warmly.swipe')!=='off';
-  const sk=localStorage.getItem('warmly.skin')||'stillmorning';
+  const sk=localStorage.getItem('warmly.skin')||'auto';
   const back='<a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a>';
   if(section==='general'){
     let h='<div class="view">'+back+'<h1 class="title">General</h1>';
@@ -1230,7 +1296,7 @@ function viewSettings(section){
   }
   if(section==='appearance'){
     let h='<div class="view">'+back+'<h1 class="title">Appearance</h1>';
-    h+='<div class="card"><div class="muted" style="margin-bottom:9px">Still Morning is the default, Lamplight is the dark mode. Try any look, it switches instantly and stays on this device.</div><div class="btn-row">'+SKINS.map(t=>'<button class="btn sm '+(sk===t.k?'primary':'ghost')+'" onclick="setSkin(\''+t.k+'\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+t.c+';box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>'+t.n+'</button>').join('')+'</div></div>';
+    h+='<div class="card"><div class="muted" style="margin-bottom:9px">Auto follows the time on this device, light in the day, Lamplight after dark. Pick a look yourself if you would rather it stayed put. Switches instantly and stays on this device.</div><div class="btn-row"><button class="btn sm '+(sk==='auto'?'primary':'ghost')+'" onclick="setSkin(\'auto\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,#946145 50%,#F5A623 50%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>Auto (follows the time)</button>'+SKINS.map(t=>'<button class="btn sm '+(sk===t.k?'primary':'ghost')+'" onclick="setSkin(\''+t.k+'\')"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:'+t.c+';box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(0,0,0,.2)"></span>'+t.n+'</button>').join('')+'</div></div>';
     return render(h+'</div>');
   }
   if(section==='data'){
@@ -1379,6 +1445,7 @@ window.editContact=(id,draft)=>{ _newContactDraft=id?null:(draft||null);
   const dv=o=>o&&o.m?(o.y?o.y+'-':'')+String(o.m).padStart(2,'0')+'-'+String(o.d).padStart(2,'0'):'';
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+(id?'Edit':'New')+' contact</h3>';
   if(c.card) h+='<img class="card-img" src="'+esc(c.card)+'">';
+  if(c.card && !id) h+='<div class="note" id="ocrStatus">Reading the card&hellip;</div>';
   if(c.review) h+='<div class="note">Quick-added. Fill the details and Save to clear the review flag.</div>';
   h+='<label class="fl">Name &middot; how you find them, e.g. &ldquo;John from school&rdquo;</label><input id="e_name" value="'+esc(c.name||'')+'">';
   h+='<label class="fl">Calling name &middot; used in your messages (required)</label><input id="e_call" value="'+esc(c.callName||firstName(c.name)||'')+'" placeholder="John">';
@@ -1535,13 +1602,14 @@ function capIcon(k){ const I={
 }; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(I[k]||I.type)+'</svg>'; }
 window.captureHub=()=>{
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>Add someone</h3>';
-  h+='<div class="sub" style="margin:-6px 0 14px">Three effortless ways. You almost never type.</div>';
+  h+='<div class="sub" style="margin:-6px 0 6px">Three effortless ways. You almost never type.</div>';
+  h+='<div class="sub" style="margin:0 0 14px;opacity:.75">No server, no tracking. Whatever you add here stays on your device.</div>';
   const row=(cls,k,ti,ds,act)=>'<button class="cap '+cls+'" onclick="closeModal();'+act+'"><span class="capic">'+capIcon(k)+'</span><span class="capt"><span class="ti">'+ti+'</span><span class="ds">'+ds+'</span></span></button>';
   /* #4: the share-their-card hero needs your own number to route replies back; hide it for a
      brand-new user (no number set) so the most prominent action never dead-ends, and promote
      the always-works "Paste anything" into the hero slot instead. */
   const ready=!!String((DB.me&&DB.me.phone)||'').trim();  /* String() so a non-string phone can never throw */
-  if(ready) h+=row('hero','share','Let them share their card','Send a warm link. They fill it in, it comes back to you. Zero typing.','shareRequest()');
+  if(ready) h+=row('hero','share','Let them share their card','They fill it in on their phone, it comes straight back to you. Zero typing, nothing touches a server.','shareRequest()');
   h+=row(ready?'':'hero','paste','Paste anything','A signature, a bio, a line. Sovenn pulls out every detail.','quickAdd()');
   h+=row('','scan','Scan a card','Snap a business card and start from the photo.','fabPick(\'camera\')');
   h+=row('','voice','Speak it','Just say who they are.','voiceAdd()');
@@ -1559,7 +1627,7 @@ window.shareRequest=()=>{ const me=DB.me||{}; const phone=me.phone||'';
 };
 
 let _curMsgMeta={id:null,openerId:null,occasion:null};
-window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
+window.compose=(id,occasion,channel)=>{ channel=channel||'wa'; const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const fr=freshDraft(c,occasion); let draft=fr.text; _curMsgMeta={id:id,openerId:fr.openerId,occasion:occasion};
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>Message '+esc(callName(c))+'</h3>';
   const _last=(c.log||[]).slice(-1)[0]; const _bits=[];
@@ -1574,22 +1642,29 @@ window.compose=(id,occasion)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) r
   h+='<div class="btn-row" style="margin:10px 0">'+(occasion==='reconnect'?'<button class="btn fresh sm" onclick="freshMsg(\''+id+'\')">&#8635; fresh idea</button>':'')+(c.lastMsg?'<button class="btn ghost sm" onclick="useLast(\''+id+'\')">last message</button>':'')+DB.templates.map(t=>'<button class="btn ghost sm" onclick="useTpl(\''+id+'\',\''+t.id+'\')">'+esc(t.name)+'</button>').join('')+'</div>';
   if(occasion==='reconnect') h+='<div class="sub" style="margin:-4px 0 4px;opacity:.75">A fresh nudge, different from last time. Tap "fresh idea" for another.</div>';
   h+='<textarea id="msg" style="min-height:130px">'+esc(draft)+'</textarea>';
-  h+='<div class="note">Opens WhatsApp with this message pre-filled, from <b>your</b> number. You review and tap send yourself. It goes straight to them, nothing passes through us, no server, no copy.</div>';
+  const chName=channel==='tg'?'Telegram':'WhatsApp';
+  h+='<div class="note">Opens '+chName+' with this message pre-filled, from <b>your</b> number. You review and tap send yourself. It goes straight to them, nothing passes through us, no server, no copy.</div>';
   h+='<div class="sub" style="text-align:center;margin:6px 2px 0;opacity:.8">They are likely happier to hear from you than you expect. A short hello is plenty.</div>';
-  const _wa=c.phone?normalizePhone(c.phone):'';
-  h+='<div class="btn-row">'+(_wa?'<button class="btn wa block" onclick="sendWA(\''+id+'\')">Open WhatsApp with this message</button>':'<div class="muted">No usable phone number. Add one with its country code to message on WhatsApp.</div>')+'</div>';
-  if(_wa) h+='<div class="sub" style="text-align:center;margin-top:6px;opacity:.7">Opens a chat with +'+esc(_wa)+'. If that country code looks wrong, edit their number with a leading +.</div>';
+  if(channel==='tg'){
+    h+='<div class="btn-row">'+(c.telegram?'<button class="btn wa block" onclick="sendChannel(\''+id+'\',\'tg\')">Open Telegram with this message</button>':'<div class="muted">No Telegram handle saved for this person.</div>')+'</div>';
+  } else {
+    const _wa=c.phone?normalizePhone(c.phone):'';
+    h+='<div class="btn-row">'+(_wa?'<button class="btn wa block" onclick="sendChannel(\''+id+'\',\'wa\')">Open WhatsApp with this message</button>':'<div class="muted">No usable phone number. Add one with its country code to message on WhatsApp.</div>')+'</div>';
+    if(_wa) h+='<div class="sub" style="text-align:center;margin-top:6px;opacity:.7">Opens a chat with +'+esc(_wa)+'. If that country code looks wrong, edit their number with a leading +.</div>';
+  }
   h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="logToday(\''+id+'\')">Mark as contacted today</button></div>';
   openModal(h);
 };
 window.useTpl=(id,tid)=>{ const c=DB.contacts.find(x=>x.id===id), t=DB.templates.find(x=>x.id===tid), box=$('#msg'); if(!c||!t||!box) return; box.value=fillTemplate(t.body,c); };
-window.sendWA=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const txt=($('#msg').value||'').trim();
-  if(!normalizePhone(c.phone)){ alert('No usable phone number for this person. Add one with its country code first.'); return; }
+window.sendChannel=(id,channel)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return; const txt=($('#msg').value||'').trim();
   if(!txt){ alert('Write a message first.'); return; }
+  let url;
+  if(channel==='tg'){ if(!c.telegram){ alert('No Telegram handle saved for this person.'); return; } url=tgLink(c.telegram,txt); }
+  else { if(!normalizePhone(c.phone)){ alert('No usable phone number for this person. Add one with its country code first.'); return; } url=waLink(c.phone,txt); }
   c.lastMsg=txt; c.msgHistory=c.msgHistory||[]; const meta=(_curMsgMeta.id===id)?_curMsgMeta:{};
-  c.msgHistory.push({text:txt, at:Date.now(), occasion:meta.occasion||'reconnect', openerId:meta.openerId||null});
+  c.msgHistory.push({text:txt, at:Date.now(), occasion:meta.occasion||'reconnect', openerId:meta.openerId||null, channel:channel});
   if(c.msgHistory.length>20) c.msgHistory=c.msgHistory.slice(-20); save();
-  window.open(waLink(c.phone,txt),'_blank','noopener'); _confirmSent(id); };
+  window.open(url,'_blank','noopener'); _confirmSent(id,channel); };
 window.useLast=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(c&&c.lastMsg && $('#msg')) $('#msg').value=c.lastMsg; };
 window.freshMsg=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const fr=freshDraft(c,'reconnect',(_curMsgMeta.id===id?_curMsgMeta.openerId:null));
@@ -1614,9 +1689,10 @@ window.markReached=(id)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return
   try{ const prev=_doReach(c,''); if(save()){ _undoReach={id:id, prev:prev, set:c.lastContacted}; _reachedDone(id); } else { closeModal(); route(); } }
   catch(e){ logErr('markReached',e); closeModal(); route(); } };
 window.undoReach=()=>{ try{ if(_undoReach){ const c=DB.contacts.find(x=>x.id===_undoReach.id); if(c && c.lastContacted===_undoReach.set){ c.lastContacted=_undoReach.prev.lastContacted; if((c.log||[]).length>_undoReach.prev.logLen) c.log.length=_undoReach.prev.logLen; save(); } } }catch(e){ logErr('undoReach',e); } _undoReach=null; closeModal(); route(); };
-function _confirmSent(id){ const c=DB.contacts.find(x=>x.id===id); if(!c){ closeModal(); return; } const nm=esc(callName(c));
+function _confirmSent(id,channel){ channel=channel||'wa'; const c=DB.contacts.find(x=>x.id===id); if(!c){ closeModal(); return; } const nm=esc(callName(c));
+  const chName=channel==='tg'?'Telegram':'WhatsApp';
   var h='<button class="x" onclick="closeModal()">&times;</button><h3>Did your message to '+nm+' send?</h3>';
-  h+='<div class="note">Sovenn cannot peek inside WhatsApp, so just tell us. If you sent it, we will mark '+nm+' as reached so they stop showing as due.</div>';
+  h+='<div class="note">Sovenn cannot peek inside '+chName+', so just tell us. If you sent it, we will mark '+nm+' as reached so they stop showing as due.</div>';
   h+='<div class="btn-row"><button class="btn wa block" onclick="markReached(\''+id+'\')">Yes, I sent it</button></div>';
   h+='<div class="btn-row" style="margin-top:8px"><button class="btn ghost sm" onclick="closeModal()">Not yet</button></div>';
   openModal(h);
@@ -1789,10 +1865,7 @@ function churnAsk(){
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleNavMenu(); });
 { var _ms=$('#menuScrim'); if(_ms) _ms.addEventListener('click',function(){ closeNavMenu(); if(window.closeNotif) closeNotif(); }); var _nm=$('#navMenu'); if(_nm) _nm.addEventListener('click',closeNavMenu); var _bb=$('#bellBtn'); if(_bb) _bb.addEventListener('click',function(e){ e.stopPropagation(); toggleNotif(); }); try{ enableShake(); }catch(e){} }
-const tb=$('#themeBtn');
-applySkin(localStorage.getItem('warmly.skin')||'stillmorning');
-updateThemeBtn();
-tb.addEventListener('click',()=>{ const cur=localStorage.getItem('warmly.skin')||'stillmorning'; setSkin(isDarkSkin(cur)?'stillmorning':'lamplight'); });
+applySkin(effectiveSkin());
 gReturn();
 if(!location.hash) location.hash='#today';
 snapInit();

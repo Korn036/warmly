@@ -2,7 +2,7 @@
    Serve the cached shell instantly for a fast cold start, then refresh it in the
    background so the next open is current. Cache name is bumped each release; the new
    version precaches a fresh SHELL on install, so updates still land promptly. */
-const CACHE = 'sovenn-0.63.3';
+const CACHE = 'sovenn-0.64.0';
 const SHELL = ['./','app','card','gplay.png','app.js','qr.js','capture.js','shuffle.js','memory.js','streak.js','notify.js','styles.css','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','favicon-32.png','favicon-16.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting()));
