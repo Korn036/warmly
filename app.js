@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.63.2', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.63.3', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -652,6 +652,8 @@ function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack
   var show=Math.min(4,n); var html='';
   for(var k=show-1;k>=0;k--){ var isTop=(k===0); var bandBg=isTop?'':(';background:'+DECK_BANDS[Math.min(k,3)]); html+='<div class="dcard hero'+(isTop?' top':' dpeek')+'" style="--k:'+k+';z-index:'+(30-k)+bandBg+'">'+deckInner(items[k])+'</div>'; }
   stack.innerHTML=html;
+  var top=stack.querySelector('.dcard.top');  /* size the stack to the real top card so the swipe/shake hint below it never gets overlapped; peek cards are absolutely positioned and never contribute height on their own */
+  if(top) stack.style.minHeight=Math.max(242,top.offsetHeight)+'px';
   var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent=(n+(n===1?' person in your deck':' people in your deck'));
   wireDeck();
 }
@@ -804,8 +806,8 @@ window.cardCaptured=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.targ
   rd.onload=()=>{ const img=new Image();
     img.onload=()=>{ const max=480; let w=img.width,h=img.height;  /* cap scan size: ~half the localStorage/Drive/backup weight per card, no data loss */ if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
       let card=rd.result; try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); card=cv.toDataURL('image/jpeg',0.55); }catch(e){}
-      const c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:'New card',callName:'',tier:2,cadence:cadenceForTier(2),card:card,review:true};
-      DB.contacts.push(c); save(); editContact(c.id);
+      /* photo is only a draft until Save; nothing is written to DB.contacts here so backing out leaves no stub behind */
+      editContact('',{customDates:[],tier:2,card:card,review:true});
     };
     img.onerror=()=>{ alert('Could not read that photo.'); };
     img.src=rd.result;
@@ -1368,10 +1370,12 @@ window.undoRestore=()=>{ let u=null; try{ u=JSON.parse(localStorage.getItem(UNDO
    MODALS  (edit, compose, calendar, log)
    =================================================================== */
 function openModal(html){ $('#modal').innerHTML=html; $('#modalBg').classList.add('show'); dialogOpen($('#modal')); }
-window.closeModal=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } $('#modalBg').classList.remove('show'); dialogClose(); };
+window.closeModal=()=>{ if(window._rec){ try{ window._rec.stop(); }catch(e){} } _newContactDraft=null; $('#modalBg').classList.remove('show'); dialogClose(); };
 $('#modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
 
-window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,customDates:[]};
+let _newContactDraft=null;  /* unsaved fields (e.g. a scanned card photo) waiting to be copied onto the contact saveContact() creates; cleared on save or modal close so it never leaks into an unrelated add */
+window.editContact=(id,draft)=>{ _newContactDraft=id?null:(draft||null);
+  const c=id?DB.contacts.find(x=>x.id===id):(draft||{tier:2,customDates:[]});
   const dv=o=>o&&o.m?(o.y?o.y+'-':'')+String(o.m).padStart(2,'0')+'-'+String(o.d).padStart(2,'0'):'';
   let h='<button class="x" onclick="closeModal()">&times;</button><h3>'+(id?'Edit':'New')+' contact</h3>';
   if(c.card) h+='<img class="card-img" src="'+esc(c.card)+'">';
@@ -1396,7 +1400,8 @@ window.editContact=(id)=>{ const c=id?DB.contacts.find(x=>x.id===id):{tier:2,cus
 };
 window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   let c=id?DB.contacts.find(x=>x.id===id):null;
-  if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; DB.contacts.push(c); }
+  if(!c){ c={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString()}; if(_newContactDraft&&_newContactDraft.card) c.card=_newContactDraft.card; DB.contacts.push(c); }
+  _newContactDraft=null;
   c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.petName=g('e_pet'); c.style=g('e_style'); c.review=false; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li'); c.instagram=g('e_ig'); c.x=g('e_x'); c.telegram=g('e_tg'); c.website=g('e_web');
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; if(!id && !c.cadence) c.cadence=cadenceForTier(c.tier); c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
