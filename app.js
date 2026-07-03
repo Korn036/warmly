@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.64.1', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.65.0', BUILT='2026-07-03';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -682,9 +682,12 @@ function deckInner(item){ var c=item.c;
     +'<button class="cshare" onclick="event.stopPropagation();shareContact(\''+c.id+'\')" aria-label="Share">'+SHIC+'</button></div>'
     +'<div class="btn-row" style="margin-top:14px">'+item.actions+'</div>';
 }
-/* the cards behind the top one recede into the CURRENT theme's own shadow tone (never a different hue),
-   so nothing changes colour when a card cycles to the front, it just loses the tint it already had */
-var DECK_BANDS=['','color-mix(in srgb, var(--hero) 90%, var(--hero-ink) 10%)','color-mix(in srgb, var(--hero) 80%, var(--hero-ink) 20%)','color-mix(in srgb, var(--hero) 70%, var(--hero-ink) 30%)'];
+/* Warm stacked-deck peek bands - the brand signature the testers remember (orange -> gold -> purple ->
+   deep orange). Fixed warm gradients, NOT theme-mixed, so the warmth reads on every skin. Index 0 is ''
+   because the TOP card never wears a band: it always shows the clean --hero, so a card reaching the front
+   simply sheds its slot tint. Colours belong to slots, not to people (restored from v0.50-v0.63; the
+   v0.64.1 theme-mix at 5d0da55 had flattened these to near-identical beige). */
+var DECK_BANDS=['','linear-gradient(90deg,#FF7A4E,#E8B23A)','linear-gradient(90deg,#B07AC0,#FF7A4E)','linear-gradient(90deg,#E8B23A,#E0552E)'];
 function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack) return; var items=window._deck||[]; var n=items.length;
   /* #10: a bounded deck. Once you have flicked through everyone, end on a dignified "All caught up"
      card that reads "done", never an endless loop. */
@@ -693,8 +696,9 @@ function renderDeck(){ var stack=document.getElementById('deckstack'); if(!stack
   var show=Math.min(4,n); var html='';
   for(var k=show-1;k>=0;k--){ var isTop=(k===0); var bandBg=isTop?'':(';background:'+DECK_BANDS[Math.min(k,3)]); html+='<div class="dcard hero'+(isTop?' top':' dpeek')+'" style="--k:'+k+';z-index:'+(30-k)+bandBg+'">'+deckInner(items[k])+'</div>'; }
   stack.innerHTML=html;
-  var top=stack.querySelector('.dcard.top');  /* size the stack to the real top card so the swipe/shake hint below it never gets overlapped; peek cards are absolutely positioned and never contribute height on their own */
-  if(top) stack.style.minHeight=Math.max(242,top.offsetHeight)+'px';
+  /* F1: the deck height is now fixed in CSS (.deckstack has a set height; every .dcard is height:100%),
+     so short and long names render identical-height cards. No per-render offsetHeight read, no jump,
+     and nothing below the deck shifts as you swipe through people. */
   var cnt=document.getElementById('deckcount'); if(cnt) cnt.textContent=(n+(n===1?' person in your deck':' people in your deck'));
   wireDeck();
 }
@@ -1044,6 +1048,20 @@ function renderPreview(){
 }
 window.impSet=(i,k,v)=>{ window._imp[i][k]=v; };
 window.impAll=(v)=>{ window._imp.forEach(r=>r._keep=v); renderPreview(); };
+/* Soft, non-blocking confirmation toast - replaces a jarring OS alert() at happy moments (e.g. a finished
+   import). Slides up from the bottom, auto-dismisses, tap to dismiss early. Theme-aware via CSS vars,
+   respects the safe-area inset and reduced-motion. textContent only (no HTML) so it can never inject. */
+window.toast=function(msg,ms){
+  try{
+    var old=document.getElementById('toast'); if(old) old.remove();
+    var t=document.createElement('div'); t.id='toast'; t.className='toast'; t.setAttribute('role','status'); t.textContent=msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function(){ t.classList.add('in'); });
+    var to; function close(){ if(to) clearTimeout(to); t.classList.remove('in'); setTimeout(function(){ if(t.parentNode) t.remove(); },260); }
+    t.addEventListener('click',close);
+    to=setTimeout(close, ms||2800);
+  }catch(e){ /* a confirmation must never break the flow */ }
+};
 window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.length){ alert('Tick at least one contact.'); return; }
   /* DEDUPE: index the existing book so a re-import updates matches instead of duplicating everyone
      (the Settings tile promises "merge"); match on normalized phone, else name+email. */
@@ -1058,8 +1076,8 @@ window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.
     DB.contacts.push(c); if(p) byPhone[p]=c; if(k!=='|') byNM[k]=c; added++;
   });
   save(); window._imp=null;
-  alert('Imported '+added+(added===1?' contact':' contacts')+(updated?(', updated '+updated+' you already had'):'')+'. Set their birthdays/cadence anytime.');
   go('today');
+  toast('Imported '+added+(added===1?' contact':' contacts')+(updated?(', updated '+updated+' you already had'):'')+'. Set their birthdays and cadence anytime.');
 };
 
 /* ---------- templates ---------- */

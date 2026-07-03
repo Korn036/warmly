@@ -595,20 +595,27 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .bell .nb{ min-width:16px; height:16px; font-size:9.5px; top:-4px; right:-4px; }
 /* Today swipe deck (a pack of cards) */
 .deckwrap{ margin-bottom:16px; }
-.deckstack{ position:relative; min-height:242px; }
-.deckstack .dcard{ position:absolute; left:0; right:0; top:0; margin:0; transform-origin:50% 100%; transition:transform .3s ease, opacity .25s, background .32s ease; touch-action:pan-y; will-change:transform; transform:translateY(calc(var(--k,0)*13px)) scale(calc(1 - var(--k,0)*0.045)); box-shadow:0 10px 24px rgba(60,40,22,.14); }
+.deckstack{ position:relative; height:254px; }
+.deckstack .dcard{ position:absolute; left:0; right:0; top:0; height:100%; margin:0; transform-origin:50% 100%; transition:transform .3s ease, opacity .25s, background .32s ease; touch-action:pan-y; will-change:transform; transform:translateY(calc(var(--k,0)*13px)) scale(calc(1 - var(--k,0)*0.045)); box-shadow:0 10px 24px rgba(60,40,22,.14); }
 .deckstack .dcard.top{ cursor:grab; box-shadow:0 16px 34px rgba(60,40,22,.22); }
 .deckstack .dcard.top:active{ cursor:grabbing; }
-/* deck "pack of cards": cards behind the top one recede into the theme's own shadow tone (never a different
-   hue), and are locked to the container's height (which JS sizes to the top card's real content) so the
-   stack reads as one calm deck. Only .dpeek gets height:100%, the top card must stay free to size itself
-   to its own content, or the container has nothing real to measure. */
+/* deck "pack of cards": the stack has a FIXED height and every .dcard (top + peeks) is height:100%, so all
+   cards are identical height - a long 2-line name can never make the card grow or the layout below it jump
+   (F1). Cards behind the top recede into warm slot bands (DECK_BANDS in app.js), never a theme-mixed beige. */
 .deckstack .dcard.dpeek{ height:100%; box-shadow:0 9px 20px rgba(150,90,40,.22); overflow:hidden; }
 .deckstack .dcard.dpeek > *{ visibility:hidden; }
+/* F1: clamp the deck card's name + subline to a fixed 2-line footprint so no name length changes the card
+   height. Scoped to deck cards only - the People-page hero and the "All caught up" card are untouched. */
+.deckstack .dcard .nm{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.16; }
+.deckstack .dcard .sub{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .deckbar{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-top:13px; padding:0 4px; }
 .deckbar .deck-hint{ min-width:0; }
 .deckcount{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); }
 .deck-hint{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); cursor:pointer; background:none; border:none; padding:0; -webkit-appearance:none; appearance:none; }
+/* Soft confirmation toast (driven by window.toast in app.js). Premium, theme-aware via CSS vars, never blocks. */
+.toast{ position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom,0px)); transform:translate(-50%,14px); z-index:9000; max-width:min(92vw,420px); padding:13px 18px; border-radius:15px; background:var(--card); color:var(--ink); border:1px solid var(--line); font-family:var(--serif); font-size:14.5px; line-height:1.4; text-align:center; box-shadow:0 1px 2px rgba(40,30,20,.06), 0 14px 34px rgba(40,30,20,.20); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); opacity:0; transition:opacity .26s ease, transform .26s cubic-bezier(.22,.61,.36,1); pointer-events:none; }
+.toast.in{ opacity:1; transform:translate(-50%,0); pointer-events:auto; cursor:pointer; }
+@media (prefers-reduced-motion:reduce){ .toast{ transition:opacity .2s ease; transform:translate(-50%,0); } }
 /* notification panel (bell) */
 .notif-panel{ position:fixed; top:58px; right:14px; z-index:41; width:300px; max-width:calc(100vw - 28px); background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 16px 40px rgba(20,14,10,.24); padding:8px; display:none; max-height:72vh; overflow:auto; }
 .notif-panel.open{ display:block; }
