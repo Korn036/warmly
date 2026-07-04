@@ -4,20 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Sovenn · reach the people you've been meaning to</title>
-<meta name="description" content="Sovenn shows you who to reach and writes the first warm line, so you actually hit send. No account, no server, no tracking. Your contacts stay on your device, with optional backup to your own Google Drive.">
+<meta name="description" content="Sovenn is a private contacts app that remembers who matters, nudges you before friendships drift, and drafts the first warm message. No account. No server. Free.">
 <link rel="canonical" href="https://sovenn.app/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Sovenn">
 <meta property="og:url" content="https://sovenn.app/">
 <meta property="og:title" content="Sovenn · the people you love are one message away">
-<meta property="og:description" content="Sovenn shows you who to reach today and writes the first warm line, so you actually hit send. Private by design: no account, no server, and your contacts stay on your device unless you choose your own Google Drive backup.">
+<meta property="og:description" content="Sovenn is a private contacts app that remembers who matters, nudges you before friendships drift, and drafts the first warm message. No account. No server. Free.">
 <meta property="og:image" content="https://sovenn.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Sovenn · keep your people warm">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Sovenn · the people you love are one message away">
-<meta name="twitter:description" content="Reach the people you've been meaning to. Private by design: no account, no server, your contacts stay on your device (or your own Google Drive if you choose).">
+<meta name="twitter:description" content="Sovenn is a private contacts app that remembers who matters, nudges you before friendships drift, and drafts the first warm message. No account. No server. Free.">
 <meta name="theme-color" content="#FBF8F3">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,6 +52,25 @@
   .hero p{font-size:clamp(16px,2.4vw,20px);color:var(--soft);max-width:40ch;margin:18px auto 24px}
   .cta-row{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
   .reassure{margin:16px auto 0;font-size:13.5px;color:var(--soft);max-width:40ch}
+  .v-eyebrow{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(11.5px,1.3vw,13px);line-height:1;letter-spacing:.18em;text-transform:uppercase;color:var(--kick);text-align:center;margin:0 0 16px;display:flex;align-items:center;justify-content:center;gap:12px}
+  .v-eyebrow::before,.v-eyebrow::after{content:"";width:22px;height:1px;background:linear-gradient(90deg,transparent,var(--kick) 60%,transparent);opacity:.6}
+  .btn-primary{color:#fff;background:linear-gradient(180deg,#ea6a46,#E0552E);box-shadow:0 8px 20px rgba(224,85,46,.26),0 2px 5px rgba(224,85,46,.30),inset 0 1px 0 rgba(255,255,255,.28)}
+  .btn-primary:hover{filter:brightness(1.03)}
+  .stores{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:14px auto 0}
+  .store{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:9px 14px;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .store svg{width:19px;height:19px;flex:0 0 auto;fill:var(--soft)}
+  .store .nm{font-size:13px;font-weight:600;color:var(--ink);line-height:1.15;display:block}
+  .store .soon{display:block;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);margin-top:2px}
+  .v-beta{display:inline-flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px 22px 12px 16px;border-radius:999px;font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:clamp(13px,1.6vw,14.5px);line-height:1.45;color:var(--ink);text-decoration:none;background:linear-gradient(180deg,#FBF5EA,var(--cream));border:1px solid #d1bcab;box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 1px 2px rgba(43,36,29,.05),0 8px 20px -12px rgba(43,36,29,.35);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;max-width:min(92vw,500px);text-align:left;cursor:pointer}
+  .v-beta:hover,.v-beta:focus-visible{transform:translateY(-1px);border-color:#c3a793;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),0 2px 4px rgba(43,36,29,.06),0 12px 26px -12px rgba(148,97,69,.45)}
+  .v-beta:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .v-beta:active{transform:translateY(0)}
+  .v-beta-dot{width:7px;height:7px;border-radius:50%;background:var(--kick);flex:0 0 auto;margin-top:7px;animation:v-pulse 2.4s ease-out infinite}
+  @keyframes v-pulse{0%{box-shadow:0 0 0 0 rgba(94,114,100,.45)}70%{box-shadow:0 0 0 6px rgba(94,114,100,0)}100%{box-shadow:0 0 0 0 rgba(94,114,100,0)}}
+  .v-beta-strong{font-weight:700}
+  .v-beta-arrow{display:inline-block;color:var(--accent);transition:transform .18s ease}
+  .v-beta:hover .v-beta-arrow{transform:translateX(3px)}
+  @media(prefers-reduced-motion:reduce){.v-beta-dot{animation:none}.v-beta,.v-beta-arrow{transition:none}}
 
   /* ===== phone device ===== */
   .stage{position:relative;display:flex;flex-direction:column;align-items:center;margin:26px auto 6px}
@@ -147,6 +166,12 @@
   footer{border-top:1px solid var(--line);padding:26px 0;color:var(--soft);font-size:13.5px;text-align:center}
   footer a{color:var(--accent);text-decoration:none}
   @media(max-width:760px){.steprow .grid{grid-template-columns:1fr}.wrap{padding:0 18px}.steprow{padding:30px 22px}.pillars{grid-template-columns:1fr}}
+
+  /* batch 2: closed-beta section + illustrative play-card caption */
+  .play .pnote{font-family:'IBM Plex Mono',monospace;font-size:.58em;text-transform:uppercase;letter-spacing:.1em;color:#5f6368;text-align:center;margin-bottom:.15em}
+  .betacard{max-width:640px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:20px;padding:30px 28px;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,.05)}
+  .betacard .betaline{color:var(--soft);font-size:15.5px;max-width:46ch;margin:0 auto 20px}
+  .betacard .v-eyebrow{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -159,15 +184,18 @@
 
   <!-- HERO -->
   <section class="hero">
+    <p class="v-eyebrow">A private keep-in-touch app</p>
     <h1>The people you love are one message away.</h1>
-    <p>Sovenn shows you who to reach today and writes the first warm line, so you actually hit send.</p>
+    <p>Sovenn is a private contacts app. It remembers who matters, nudges you before you drift apart, and drafts the first message in your own words. You always tap send.</p>
     <div class="cta-row">
-      <a class="btn-play" href="https://play.google.com/store/apps/details?id=app.sovenn.twa" aria-label="Get it on Google Play">
-        <img src="gplay.png" alt="Get it on Google Play">
-      </a>
-      <a class="btn btn-ghost" href="/app">Try it in your browser</a>
+      <a class="btn btn-primary" href="/app">Try it in your browser</a>
     </div>
-    <div class="reassure">No account. No Sovenn server. Your contacts stay on your phone, and you always tap send.</div>
+    <div class="stores">
+      <div class="store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l15 9-15 9z"/></svg><div><span class="nm">Google Play</span><span class="soon">Coming soon</span></div></div>
+      <div class="store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.7 2.2 1.1 0 1.5-.7 2.8-.7 1.3 0 1.6.7 2.8.7 1.2 0 1.9-1.1 2.6-2.1.8-1.2 1.2-2.3 1.2-2.4-.1 0-2.3-.9-2.4-3.6z"/><path d="M14.3 6.1c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 1.9-.5 2.5-1.2z"/></svg><div><span class="nm">App Store</span><span class="soon">Coming soon</span></div></div>
+    </div>
+    <a href="#beta" class="v-beta"><span class="v-beta-dot" aria-hidden="true"></span><span class="v-beta-text">In closed beta now. Join the testers if you want to try the <strong class="v-beta-strong">Android app</strong>.<span class="v-beta-arrow" aria-hidden="true">&nbsp;&rarr;</span></span></a>
+    <div class="reassure">Nothing to install. Works on iPhone and Android.<br>No account. No Sovenn server. Your contacts stay on your phone.</div>
 
     <!-- SHOWCASE: one iPhone, auto-advancing carousel of REAL screens -->
     <div class="stage">
@@ -193,10 +221,10 @@
   <section class="short">
     <h2>The short version</h2>
     <ul class="deliv">
-      <li><span class="m"></span><span class="t"><b>Who it's for.</b> People who keep meaning to text a friend, a cousin, an old teammate, and then six months slip by.</span></li>
-      <li><span class="m"></span><span class="t"><b>What makes it different.</b> It writes the brave first line for you, in your own words. No account and no server, so your people stay on your device, backed up only to your own Google Drive if you choose.</span></li>
-      <li><span class="m"></span><span class="t"><b>Why we made it.</b> To make staying close feel light again, in the few seconds you already have, without the guilt.</span></li>
-      <li><span class="m"></span><span class="t"><b>Where it lives.</b> Nowhere in particular, and everywhere at once. You send it yourself, in your own words, from your phone.</span></li>
+      <li><span class="m"></span><span class="t"><b>For people who keep meaning to text back.</b> A friend, a cousin, an old teammate, and then six months slip by.</span></li>
+      <li><span class="m"></span><span class="t"><b>It writes the brave first line for you, in your own words.</b> It never sends anything itself; you read it, edit it, and tap send.</span></li>
+      <li><span class="m"></span><span class="t"><b>Made to keep staying close light.</b> A few seconds you already have, without the guilt.</span></li>
+      <li><span class="m"></span><span class="t"><b>It lives on your phone.</b> No account, no Sovenn server; your people stay on your device, backed up only to your own Google Drive if you choose.</span></li>
     </ul>
   </section>
 
@@ -212,8 +240,8 @@
 
   <!-- THE JOURNEY: the warm loop -->
   <section class="sec">
-    <h2>One hello, and it spreads</h2>
-    <p class="lead">Share your card, and the people you reach can keep their people warm too. Here is the whole loop.</p>
+    <h2>Share your card. They add themselves.</h2>
+    <p class="lead">Every Sovenn comes with a personal card and QR code. Send it once, and the people you reach can save your details in seconds, and start keeping their own people warm too.</p>
     <div class="stage">
       <div class="phone" id="journey">
         <div class="frame"><div class="isle"></div>
@@ -231,11 +259,12 @@
                 </div>
               </div>
               <div class="slide" data-cap="They tap and fill it in|Zero typing for you. Their details come back to you."><img src="shots/card.png" alt="They open your card and add themselves" loading="lazy" decoding="async"></div>
-              <div class="slide" data-cap="They get Sovenn, free|Because now they want to keep their people close too.">
+              <div class="slide" data-cap="And you never type a contact again.">
                 <div class="fill play">
+                  <div class="pnote">What they see when they open your card</div>
                   <div class="ptop"><img class="ico" src="icon-192.png" alt="Sovenn"><div><div class="pname">Sovenn</div><div class="pdev">Sovenn</div><div class="pfree">Free &middot; No ads &middot; No in-app purchases</div></div></div>
                   <div class="meta"><div><b>Free</b>install</div><div><b>3+</b>rated for</div><div><b>&#9889;</b>private</div></div>
-                  <button class="pin">Install</button>
+                  <div class="pin" aria-hidden="true" style="text-align:center">Install</div>
                   <div class="pshots"><img src="shots/today.png" alt=""><img src="shots/compose.png" alt=""><img src="shots/mycard.png" alt=""></div>
                   <div class="pabout"><span class="k">About this app</span>Keep your people warm. Sovenn shows you who to reach and writes the first warm line. No account, no Sovenn server; your contacts stay on your phone.</div>
                 </div>
@@ -261,19 +290,30 @@
     </div>
   </section>
 
+  <!-- CLOSED BETA -->
+  <section class="sec" id="beta">
+    <div class="betacard">
+      <p class="v-eyebrow">Closed beta</p>
+      <p class="betaline">Sovenn is in closed testing on Google Play right now. Leave your name and the Gmail you use on the Play Store, and we will add you.</p>
+      <a class="btn btn-primary" href="https://tally.so/r/Y5y0ed" target="_blank" rel="noopener">Join the beta</a>
+    </div>
+  </section>
+
   <!-- FAQ -->
   <section class="faq">
     <h2>Honest answers</h2>
     <details open><summary>Is this just another app that nags me?</summary><div class="a">No. Sovenn shows who is quietly drifting, then steps back. No streaks to protect, no red badges of guilt, no "you are 6 days overdue." When you have reached everyone, it simply says you are all caught up.</div></details>
+    <details><summary>Does it work on iPhone?</summary><div class="a">Sovenn runs in any modern mobile browser, so you can open it on iPhone today from the button above. The polished Android app comes first on Google Play, with more to follow.</div></details>
     <details><summary>Where does my data go?</summary><div class="a">Onto your device, and nowhere else unless you say so. There is no account and no Sovenn server. Your contacts live on your device, with optional backup to your own Google Drive. The only other thing that ever leaves is the message you choose to send, through WhatsApp, by your own tap.</div></details>
     <details><summary>Is it free?</summary><div class="a">Yes, free to use. Later there may be a small one-time "buy me a chai" thank-you for anyone who wants to support it, but the app and everything that matters stays free.</div></details>
-    <details><summary>Does it work on iPhone?</summary><div class="a">Sovenn runs in any modern mobile browser, so you can open it on iPhone today from the button above. The polished Android app comes first on Google Play, with more to follow.</div></details>
   </section>
 
   <div class="band">
-    <a class="btn-play" href="https://play.google.com/store/apps/details?id=app.sovenn.twa" aria-label="Get it on Google Play">
-      <img src="gplay.png" alt="Get it on Google Play">
-    </a>
+    <a class="btn btn-primary" href="/app">Try it in your browser</a>
+    <div class="stores">
+      <div class="store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3l15 9-15 9z"/></svg><div><span class="nm">Google Play</span><span class="soon">Coming soon</span></div></div>
+      <div class="store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.7 2.2 1.1 0 1.5-.7 2.8-.7 1.3 0 1.6.7 2.8.7 1.2 0 1.9-1.1 2.6-2.1.8-1.2 1.2-2.3 1.2-2.4-.1 0-2.3-.9-2.4-3.6z"/><path d="M14.3 6.1c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 1.9-.5 2.5-1.2z"/></svg><div><span class="nm">App Store</span><span class="soon">Coming soon</span></div></div>
+    </div>
     <div class="reassure">Free. Private by design. Reach the people you have been meaning to.</div>
   </div>
 
