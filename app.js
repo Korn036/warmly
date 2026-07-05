@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.66.1', BUILT='2026-07-04';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.66.2', BUILT='2026-07-05';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -82,7 +82,7 @@ function isDarkSkin(k){ var s=SKINS.find(function(x){return x.k===k;}); return !
 /* daytime/night split for the "auto" theme; the day/night toggle used to live in the header, moved to
    Settings > Appearance and set to follow the device clock by default rather than a manual switch */
 function autoSkinForNow(){ var hr=new Date().getHours(); return (hr>=7 && hr<19)?'stillmorning':'lamplight'; }
-function effectiveSkin(){ var k=localStorage.getItem('warmly.skin')||'auto'; return k==='auto'?autoSkinForNow():k; }
+function effectiveSkin(){ var k=localStorage.getItem('warmly.skin')||'stillmorning'; return k==='auto'?autoSkinForNow():k; }
 function applySkin(k){ var el=document.documentElement;
   el.classList.remove('skin-hearthstone','skin-letterpress','skin-pressedgarden','skin-hearthglow','skin-candlelit');
   if(isDarkSkin(k)) el.setAttribute('data-theme','dark'); else el.removeAttribute('data-theme');
@@ -608,7 +608,7 @@ window.addEventListener('hashchange',route);
 let _lastView='', _shuffleId=null, _rerollN=0;
 window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
-  if((localStorage.getItem('warmly.skin')||'auto')==='auto') applySkin(autoSkinForNow());  /* re-check on every navigation, not just cold boot, so a session left open across sunset still relights */
+  if((localStorage.getItem('warmly.skin')||'stillmorning')==='auto') applySkin(autoSkinForNow());  /* re-check on every navigation, not just cold boot, so a session left open across sunset still relights */
   const [view,arg]=location.hash.replace('#','').split('/');
   document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>{ var on=a.dataset.go===(view||'today'); a.classList.toggle('active',on); if(a.parentNode&&a.parentNode.id==='tabs') a.setAttribute('aria-current', on?'page':'false'); });
   if(window.closeNavMenu) closeNavMenu();
@@ -1296,7 +1296,7 @@ function viewSettings(section){
   const s=DB.settings;
   const connected=localStorage.getItem('warmly.gsync')==='1';
   const swon=localStorage.getItem('warmly.swipe')!=='off';
-  const sk=localStorage.getItem('warmly.skin')||'auto';
+  const sk=localStorage.getItem('warmly.skin')||'stillmorning';
   const back='<a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a>';
   if(section==='general'){
     let h='<div class="view">'+back+'<h1 class="title">General</h1>';
