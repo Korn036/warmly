@@ -706,5 +706,9 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
   .icon-btn.menu{ display:block; }
   .topbar .wrap{ gap:10px; }
   .tabs{ flex:0; }
+  /* SOV-UX-005: at this width .tabs is position:fixed (the slide-down drawer, out of flow),
+     so nothing stretches to push the bell+menu group right; restore the right-align that the
+     base .tbtns{ margin-left:0 } (line ~589) removes. Only affects <=680px (Android TWA). */
+  .tbtns{ margin-left:auto; }
   .three{ grid-template-columns:1fr 1fr 1fr; gap:6px; }
 }

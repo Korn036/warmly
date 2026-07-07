@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.66.2', BUILT='2026-07-05';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.67.0', BUILT='2026-07-07';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -1346,6 +1346,11 @@ function viewSettings(section){
     h+='<div class="muted" style="margin-top:18px;font-size:12.5px">Sovenn v'+VERSION+', built '+BUILT+', '+DB.contacts.length+' contacts, all local, no tracking.</div>';
     return render(h+'</div>');
   }
+  if(section==='updates'){
+    let h='<div class="view">'+back+'<h1 class="title">Updates &amp; versions</h1>';
+    h+='<div class="card"><div class="nm" style="font-size:15px">You\'re on Sovenn v'+VERSION+'</div><div class="sub" style="margin-top:5px">Built '+BUILT+'. Sovenn updates itself, just close and reopen the app to get the latest. Check here any time to confirm the version you\'re running.</div></div>';
+    return render(h+'</div>');
+  }
   /* MAIN: phone-style grouped list + a search that finds any feature */
   const cats=[
     ['general','General','Name, country, reminders, daily moment','name country reminder daily moment lead days general me','#946145','&#9685;',false],
@@ -1355,7 +1360,8 @@ function viewSettings(section){
     ['appearance','Appearance','Themes, light and dark','theme dark light still morning lamplight appearance skin','#8A5A99','&#9680;',false],
     ['data','Sync and backup','Google Drive sync, export, restore','sync backup google drive export restore json encrypted','#0E3B2E','&#8645;',false],
     ['lock','App lock','A passcode for this device','lock passcode pin security face id biometric','#C9756B','&#9632;',false],
-    ['about','About and data','Diagnostics, version, erase','about version diagnostics error log erase wipe danger','#6A655B','i',false]
+    ['about','About and data','Diagnostics, version, erase','about version diagnostics error log erase wipe danger','#6A655B','i',false],
+    ['updates','Updates and versions','The version you\'re running','updates version build changelog whats new release notes current','#5A6E7A','&#8635;',false]
   ];
   let h='<div class="view"><h1 class="title">Settings</h1>';
   h+='<input id="setSearch" placeholder="Search settings" oninput="settingsFilter()" autocomplete="off" style="margin-bottom:12px">';
@@ -1979,7 +1985,8 @@ function churnAsk(){
   h+='<div class="btn-row" style="flex-wrap:wrap;gap:8px;margin-top:6px">'+chips.map(function(x){ return '<button class="btn ghost sm" onclick="churnPick(\''+x[0]+'\')">'+x[1]+'</button>'; }).join('')+'</div>';
   openModal(h);
 }
-(function(){ const bv=document.getElementById('brandVer'); if(bv) bv.textContent='v'+VERSION; })();
+/* SOV-UX-001: version moved out of the header into Settings > Updates & versions.
+   #brandVer stays empty and is hidden by the .brand .ver:empty rule in styles.css. */
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
 $('#menuBtn').addEventListener('click',function(e){ e.stopPropagation(); toggleNavMenu(); });
 { var _ms=$('#menuScrim'); if(_ms) _ms.addEventListener('click',function(){ closeNavMenu(); if(window.closeNotif) closeNotif(); }); var _nm=$('#navMenu'); if(_nm) _nm.addEventListener('click',closeNavMenu); var _bb=$('#bellBtn'); if(_bb) _bb.addEventListener('click',function(e){ e.stopPropagation(); toggleNotif(); }); try{ enableShake(); }catch(e){} }
