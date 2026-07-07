@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.67.0', BUILT='2026-07-07';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.68.0', BUILT='2026-07-07';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -272,6 +272,19 @@ function schedulePush(){ if(localStorage.getItem('warmly.gsync')!=='1'||!_gtok) 
 function gBoot(){ if(localStorage.getItem('warmly.gsync')!=='1') return; const c=gCachedTok(); if(c){ _gtok=c; syncNow(); return; }
   if(AUTH_WORKER){ gToken(false).then(r=>{ if(r&&r.access_token) syncNow(); else _gstatus('Tap Sign in to resume sync'); }); return; }
   gisReady(async()=>{ const r=await gToken(false); if(r&&r.access_token) syncNow(); else _gstatus('Tap Sign in to resume sync'); }); }
+
+/* ===== Google Contacts sync (People API) — one-shot import pull, isolated from the Drive scope/token above.
+   No refresh, no persistence: the token lives in memory for this import only, then is discarded. ===== */
+const GCONTACT_SCOPE='https://www.googleapis.com/auth/contacts.readonly';
+let _gcClient=null,_gcPending=null;
+function gInitContactClient(){ if(_gcClient) return; _gcClient=google.accounts.oauth2.initTokenClient({ client_id:GCLIENT_ID, scope:GCONTACT_SCOPE,
+  callback:(r)=>{ if(_gcPending){ const p=_gcPending; _gcPending=null; p(r); } },
+  error_callback:(e)=>{ logErr('gcontacts-auth', e); if(_gcPending){ const p=_gcPending; _gcPending=null; p(null); } } }); }
+function gContactToken(){ return new Promise(res=>{ gisReady(()=>{ gInitContactClient();
+  var done=false; function settle(r){ if(done)return; done=true; res(r); }
+  var to=setTimeout(function(){ if(_gcPending===fn) _gcPending=null; settle(null); }, 15000);  /* never leave the sync button wedged if GIS neither resolves nor errors */
+  var fn=function(r){ clearTimeout(to); settle(r); }; _gcPending=fn;
+  try{ _gcClient.requestAccessToken({prompt:'consent'}); }catch(e){ clearTimeout(to); _gcPending=null; settle(null); } }); }); }
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -1003,15 +1016,20 @@ window.delRemind=(id,i)=>patch(id,c=>{ (c.customDates||[]).splice(i,1); });
 
 /* ---------- import ---------- */
 function viewImport(){
-  let h='<div class="view"><a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a><h1 class="title">Import contacts</h1><p class="muted">Bring people in from your phone, a Google CSV, or a vCard. Everything stays on this device, and you pick exactly who to keep.</p>';
+  let h='<div class="view"><a class="btn ghost sm" onclick="go(\'settings\')">&lsaquo; Settings</a><h1 class="title">Import contacts</h1><p class="muted">Bring people in, then pick exactly who to keep. Everything else stays on this device.</p>';
   const hasPicker = !!(navigator.contacts && navigator.contacts.select);
+  h+='<div class="card" style="text-align:center;padding:24px"><button class="btn primary block" id="gcSyncBtn" onclick="syncGoogleContacts()">Sync your Google contacts</button>'
+    +'<div class="muted" style="margin-top:10px;font-size:12.5px">Reads name, phone and email from your Google account &mdash; nothing else, and Sovenn&rsquo;s server never sees any of it. You still choose exactly who to keep on the next screen.</div></div>';
   if(hasPicker){
-    h+='<div class="card" style="text-align:center;padding:24px"><button class="btn primary block" onclick="pickContacts()">Import from this phone&rsquo;s contacts</button><div class="muted" style="margin-top:10px;font-size:12.5px">Opens your address book (including SIM contacts saved to the phone) so you can pick who to add. Nothing is read until you choose.</div></div>';
-  } else {
+    h+='<div class="card" style="text-align:center;padding:18px;margin-top:10px"><button class="btn ghost block" onclick="pickContacts()">Or import from this phone&rsquo;s contacts</button><div class="muted" style="margin-top:8px;font-size:12.5px">Fine for a handful of people. For a full address book, Google sync above is easier &mdash; the phone picker has no select-all.</div></div>';
+  }
+  h+='<details class="card" style="margin-top:10px;padding:16px"><summary style="cursor:pointer;font-weight:600">Other ways to add contacts</summary><div style="margin-top:12px">';
+  if(!hasPicker){
     h+='<div class="note">On iPhone, browsers can&rsquo;t read your address book directly (Apple blocks it for privacy) and the SIM isn&rsquo;t reachable from the web. Quickest route: open <b>iCloud.com &rarr; Contacts</b> &rarr; select all &rarr; <b>Export vCard</b>, then drop that <b>.vcf</b> below. (Or use the iOS <b>Shortcuts</b> app to export contacts to a file.)</div>';
   }
-  h+='<div class="card" style="text-align:center;padding:30px"><input type="file" id="file" accept=".csv,.vcf,.vcard,text/csv,text/vcard" onchange="onFile(event)" style="display:none"><button class="'+(hasPicker?'btn ghost':'btn primary')+'" onclick="document.getElementById(\'file\').click()">Choose a file (CSV or vCard)</button>'
-    +'<div class="muted" style="margin-top:12px">In Google Contacts: Export &rarr; Google CSV. On iPhone: export a .vcf as above.</div></div>';
+  h+='<div class="muted" style="font-size:12.5px;margin-bottom:10px"><b>Getting a CSV from Google Contacts instead:</b><br>1&#41; Open <a href="https://contacts.google.com/export" target="_blank" rel="noopener">contacts.google.com/export</a><br>2&#41; Select who to export, choose <b>Google CSV</b><br>3&#41; Download the file, then choose it below.</div>';
+  h+='<div style="text-align:center;padding:14px 0"><input type="file" id="file" accept=".csv,.vcf,.vcard,text/csv,text/vcard" onchange="onFile(event)" style="display:none"><button class="btn ghost" onclick="document.getElementById(\'file\').click()">Choose a file (CSV or vCard)</button></div>';
+  h+='</div></details>';
   h+='<div id="preview"></div></div>'; render(h);
 }
 window.onFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader();
@@ -1035,20 +1053,49 @@ window.pickContacts=async()=>{
     const pv=document.getElementById('preview'); if(pv) pv.scrollIntoView({behavior:'smooth'});
   }catch(e){ /* user cancelled the picker */ }
 };
+window.syncGoogleContacts=async()=>{
+  const btn=document.getElementById('gcSyncBtn'); if(btn){ btn.disabled=true; btn.textContent='Opening Google…'; }
+  try{
+    const r=await gContactToken();
+    if(!r||!r.access_token){ if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return; }
+    if(btn) btn.textContent='Fetching contacts…';
+    let rows=[], pageToken='';
+    do{
+      const u='https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,emailAddresses&pageSize=1000'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
+      const res=await fetch(u,{headers:{'Authorization':'Bearer '+r.access_token}});
+      if(!res.ok){ logErr('gcontacts-fetch', res.status); break; }
+      const j=await res.json();
+      (j.connections||[]).forEach(function(p){
+        const name=(p.names&&p.names[0]&&p.names[0].displayName)||'';
+        const phone=(p.phoneNumbers&&p.phoneNumbers[0]&&p.phoneNumbers[0].value)||'';
+        const email=(p.emailAddresses&&p.emailAddresses[0]&&p.emailAddresses[0].value)||'';
+        if(name||phone) rows.push({ name:name||phone, phone:phone, email:email, photo:'', bday:null, context:'' });
+      });
+      pageToken=j.nextPageToken||'';
+    } while(pageToken);
+    if(!rows.length){ alert('No contacts found in this Google account.'); if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return; }
+    window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r));
+    renderPreview();
+    const pv2=document.getElementById('preview'); if(pv2) pv2.scrollIntoView({behavior:'smooth'});
+  }catch(e){ logErr('gcontacts-sync', e); alert('Could not reach Google. Try again, or use a file import below.'); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } }
+};
 function renderPreview(){
   const rows=window._imp||[]; const box=$('#preview');
   if(!rows.length){ box.innerHTML='<div class="empty">Could not read any contacts from that file. Try a Google CSV or a .vcf.</div>'; return; }
   let h='<div class="kick">Found '+rows.length+' contacts · tick who to keep, set how close</div>';
   h+='<div class="note">Tip: only import people you actually want to stay warm with. You can always add more later.</div>';
+  h+='<div class="row" style="margin:8px 0"><input type="text" id="impq" placeholder="Search by name or phone…" oninput="impFilter()" style="flex:1;min-width:0"></div>';
   h+='<div class="row between" style="margin:8px 0"><button class="btn ghost sm" onclick="impAll(true)">Select all</button><button class="btn ghost sm" onclick="impAll(false)">None</button><button class="btn primary sm" onclick="doImport()">Import selected</button></div>';
   h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th></th><th>Name</th><th>Phone</th><th>Birthday</th><th>Closeness</th></tr></thead><tbody>';
-  rows.forEach((r,i)=>{ h+='<tr><td><input type="checkbox" '+(r._keep?'checked':'')+' onchange="impSet('+i+',\'_keep\',this.checked)"></td>'
+  rows.forEach((r,i)=>{ h+='<tr data-kw="'+esc(((r.name||'')+' '+(r.phone||'')).toLowerCase())+'"><td><input type="checkbox" '+(r._keep?'checked':'')+' onchange="impSet('+i+',\'_keep\',this.checked)"></td>'
     +'<td>'+esc(r.name)+'</td><td>'+esc(r.phone||'—')+'</td><td>'+(r.bday?(MONTHS[r.bday.m]+' '+r.bday.d):'—')+'</td>'
     +'<td><select onchange="impSet('+i+',\'_tier\',+this.value)"><option value="1"'+(r._tier===1?' selected':'')+'>inner</option><option value="2"'+(r._tier===2?' selected':'')+'>warm</option><option value="3"'+(r._tier===3?' selected':'')+'>loose</option></select></td></tr>'; });
   h+='</tbody></table></div>'; box.innerHTML=h;
 }
 window.impSet=(i,k,v)=>{ window._imp[i][k]=v; };
 window.impAll=(v)=>{ window._imp.forEach(r=>r._keep=v); renderPreview(); };
+window.impFilter=function(){ var el=document.getElementById('impq'); if(!el) return; var q=(el.value||'').toLowerCase().trim(); var trs=document.querySelectorAll('#preview [data-kw]'); for(var i=0;i<trs.length;i++){ var tr=trs[i]; tr.style.display=(!q||tr.getAttribute('data-kw').indexOf(q)>=0)?'':'none'; } };
 /* Soft, non-blocking confirmation toast - replaces a jarring OS alert() at happy moments (e.g. a finished
    import). Slides up from the bottom, auto-dismisses, tap to dismiss early. Theme-aware via CSS vars,
    respects the safe-area inset and reduced-motion. textContent only (no HTML) so it can never inject. */
