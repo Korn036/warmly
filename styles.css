@@ -698,17 +698,16 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
 .vtext{ font-family:var(--mono); font-size:12px; flex:1; }
 @media (prefers-reduced-motion:reduce){ .vbars i{ animation:none; height:12px; } }
 
-/* mobile */
+/* mobile: primary nav (Today/People) stays inline + visible in the top bar as prominent pills.
+   The old off-screen slide-down drawer (position:fixed; translateY(-150%)) was a dead regression -
+   nothing in app.js ever added .tabs.open, so on phones Today/People were pushed off the top of the
+   screen and unreachable. Secondary destinations (Map/My Card/Import/Settings) stay in the ☰ menu. */
 @media(max-width:680px){
-  .tabs{ position:fixed; inset:60px 0 auto 0; flex-direction:column; background:var(--bg); border-bottom:1px solid var(--line); padding:8px 14px 14px; transform:translateY(-150%); transition:transform .25s; z-index:25; }
-  .tabs.open{ transform:none; }
-  .tabs a{ padding:13px 10px; border-bottom:1px solid var(--line); border-radius:8px; font-size:13px; }
-  .icon-btn.menu{ display:block; }
+  .tabs{ position:static; transform:none; flex-direction:row; background:none; border:none; box-shadow:none; padding:0; margin-left:6px; flex:1 1 auto; min-width:0; gap:5px; z-index:auto; }
+  .tabs a{ flex:0 0 auto; padding:8px 15px; border:none; border-radius:30px; font-size:13px; font-weight:600; letter-spacing:.01em; text-transform:capitalize; background:color-mix(in srgb,var(--ink) 6%,transparent); color:var(--ink-soft); }
+  .tabs a.active{ background:var(--green); color:var(--on-accent); }
+  .icon-btn.menu{ display:flex; }
   .topbar .wrap{ gap:10px; }
-  .tabs{ flex:0; }
-  /* SOV-UX-005: at this width .tabs is position:fixed (the slide-down drawer, out of flow),
-     so nothing stretches to push the bell+menu group right; restore the right-align that the
-     base .tbtns{ margin-left:0 } (line ~589) removes. Only affects <=680px (Android TWA). */
   .tbtns{ margin-left:auto; }
   .three{ grid-template-columns:1fr 1fr 1fr; gap:6px; }
 }
