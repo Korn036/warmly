@@ -53,7 +53,7 @@ It prints your Worker URL, e.g. `https://warmly-auth.<subdomain>.workers.dev`.
 4. Do step 1 above (redirect URI) and step 6 (send the URL).
 
 ## Security notes
-- The **refresh token** stays in Cloudflare KV; the browser only ever holds a short access token. The session id itself is an **HttpOnly cookie** set by this Worker — page JS never sees it, so it is not readable by localStorage inspection or an XSS bug.
+- The **refresh token** stays in Cloudflare KV; the browser only ever holds a short access token. The session id itself is an **HttpOnly cookie** set by this Worker: page JS never sees it, so it is not readable by localStorage inspection or an XSS bug.
 - Access is limited to the **`drive.appdata`** scope — even a stolen session can only touch Warmly's own hidden file, never your wider Drive.
 - `ALLOWED_ORIGINS` restricts which sites may call the token endpoint (your CORS lock).
 - **Deployment requirement (read before deploying):** the session cookie is `SameSite=Strict`, which only travels on requests where the Worker and the app share a registrable domain (e.g. `auth.sovenn.app` calling into `sovenn.app`, or the Worker mounted on a `sovenn.app/auth/*` route). Deploying this Worker on a bare `*.workers.dev` host while the app lives on `sovenn.app`/`karthikonteddu.com` means the browser will silently refuse to send the cookie back on the app's cross-site `/auth/token` calls, and sign-in will appear to just not work. Put the Worker on a same-site route/subdomain before flipping `AUTH_WORKER` on in `app.js`.

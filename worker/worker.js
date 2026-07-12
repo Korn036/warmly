@@ -31,7 +31,7 @@ const json = (obj, status, extra) => new Response(JSON.stringify(obj), { status:
    sent on unrelated requests). Max-Age matches the KV session TTL so the cookie and the server-side
    record expire together.
    IMPORTANT DEPLOYMENT REQUIREMENT: SameSite=Strict cookies are only sent by the browser on
-   SAME-SITE requests (same registrable domain, subdomains OK — e.g. auth.sovenn.app <-> sovenn.app).
+   SAME-SITE requests (same registrable domain, subdomains OK, e.g. auth.sovenn.app <-> sovenn.app).
    If this Worker is ever deployed on a different site than the app (e.g. a bare *.workers.dev host
    while the app lives on sovenn.app), the browser will NOT attach this cookie to the app's
    cross-site fetch('/auth/token', {credentials:'include'}) calls and sign-in will silently fail.
@@ -82,7 +82,7 @@ export default {
       const session = rand(24);
       await env.SESSIONS.put('sess:'+session, JSON.stringify({ refresh_token: t.refresh_token || '' }), { expirationTtl: SESSION_MAX_AGE });  /* 90d: a session id is a bearer credential; never let it live forever */
       /* session id rides home as an HttpOnly cookie, never in the URL (fragment/query) and never
-         touched by page JS — the app never sees it, so a future XSS bug can't read or replay it */
+         touched by page JS: the app never sees it, so a future XSS bug can't read or replay it */
       return new Response(null, { status: 302, headers: { 'Location': app, 'Set-Cookie': setSessionCookie(session) } });
     }
 

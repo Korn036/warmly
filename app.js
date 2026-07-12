@@ -7,7 +7,7 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.69.0', BUILT='2026-07-08';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.69.1', BUILT='2026-07-12';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -193,7 +193,7 @@ function gInitClient(){ if(_gclient) return; _gclient=google.accounts.oauth2.ini
    /auth/logout is made with credentials:'include' so the browser attaches that cookie for us;
    this file never reads, stores, or forwards the session id as a value. */
 function gReturn(){ if(!AUTH_WORKER||location.hash.indexOf('warmly_session')<0) return false;
-  /* Legacy fragment format from before the HttpOnly-cookie session model — the Worker no longer
+  /* Legacy fragment format from before the HttpOnly-cookie session model; the Worker no longer
      emits this, but strip it defensively (e.g. a stale bookmark) so no token-shaped value lingers
      in the address bar / browser history. */
   try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}

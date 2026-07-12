@@ -4,7 +4,7 @@ compatibility_date = "2024-11-01"
 
 # Public values (safe to commit). The CLIENT SECRET is NOT here — it is set
 # separately as an encrypted secret (see README, step 4).
-# PRODUCTION origins only — no dev/localhost entries belong here (a production config file
+# PRODUCTION origins only: no dev/localhost entries belong here (a production config file
 # should not carry a dev-only origin as a copy-paste risk). For local testing, override
 # ALLOWED_ORIGINS via a gitignored `.dev.vars` file or `wrangler dev --var ALLOWED_ORIGINS:...`
 # instead of committing http://localhost:8000 to this file.
