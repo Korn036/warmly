@@ -186,16 +186,20 @@ function gInitClient(){ if(_gclient) return; _gclient=google.accounts.oauth2.ini
   /* GIS can fail WITHOUT calling `callback` (popup/3rd-party-cookie block) — without this the pending
      promise never settles and every future sync silently no-ops. Always settle + un-wedge. */
   error_callback:(e)=>{ logErr('gauth', e); _gsyncing=false; if(_gpending){ const p=_gpending; _gpending=null; p(null); } } }); }
-/* ---- Permanent login via the auth Worker (used only when AUTH_WORKER is set; otherwise every branch below falls through to the original in-browser flow unchanged) ---- */
-function gSession(){ try{ return localStorage.getItem('warmly.session')||''; }catch(e){ return ''; } }
+/* ---- Permanent login via the auth Worker (used only when AUTH_WORKER is set; otherwise every branch below falls through to the original in-browser flow unchanged) ----
+   The session id itself is never held by page JS: the Worker sets it as an HttpOnly, Secure,
+   SameSite=Strict cookie scoped to its own /auth/* path, so it is invisible to localStorage,
+   document.cookie, and any XSS that might land in this file. Every request to /auth/token and
+   /auth/logout is made with credentials:'include' so the browser attaches that cookie for us;
+   this file never reads, stores, or forwards the session id as a value. */
 function gReturn(){ if(!AUTH_WORKER||location.hash.indexOf('warmly_session')<0) return false;
-  const p=new URLSearchParams(location.hash.slice(1)); const s=p.get('warmly_session'), at=p.get('access_token');
-  if(s){ try{ localStorage.setItem('warmly.session',s); }catch(e){} }
-  if(at) gCacheTok({access_token:at, expires_in:parseInt(p.get('expires_in')||'3600',10)});
-  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}  /* strip the tokens out of the address bar */
-  return !!s; }
-async function gWorkerToken(){ const s=gSession(); if(!s) return null;
-  try{ const r=await fetch(AUTH_WORKER+'/auth/token?session='+encodeURIComponent(s)); if(!r.ok) return null;
+  /* Legacy fragment format from before the HttpOnly-cookie session model — the Worker no longer
+     emits this, but strip it defensively (e.g. a stale bookmark) so no token-shaped value lingers
+     in the address bar / browser history. */
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  return true; }
+async function gWorkerToken(){
+  try{ const r=await fetch(AUTH_WORKER+'/auth/token', {credentials:'include'}); if(!r.ok) return null;
     const j=await r.json(); if(j.access_token){ gCacheTok(j); return j; } }catch(e){} return null; }
 function gToken(interactive){ if(!interactive){ const c=gCachedTok(); if(c){ _gtok=c; return Promise.resolve({access_token:c}); } }
   if(AUTH_WORKER){ if(interactive){ window.location.href=AUTH_WORKER+'/auth/start?app='+encodeURIComponent(location.origin+location.pathname); return new Promise(()=>{}); } return gWorkerToken(); }
@@ -205,7 +209,7 @@ function gToken(interactive){ if(!interactive){ const c=gCachedTok(); if(c){ _gt
     var fn=function(r){ clearTimeout(to); settle(r); }; _gpending=fn;
     try{ _gclient.requestAccessToken({prompt:interactive?'consent':''}); }catch(e){ clearTimeout(to); _gpending=null; settle(null); } }); }
 window.gConnect=()=>{ if(AUTH_WORKER){ _gstatus('Opening Google…'); gToken(true); return; } gisReady(async()=>{ _gstatus('Opening Google…'); const r=await gToken(true); if(r&&r.access_token) syncNow(); else _gstatus('Sign-in cancelled'); }); };
-window.gDisconnect=()=>{ if(AUTH_WORKER&&gSession()){ try{ fetch(AUTH_WORKER+'/auth/logout?session='+encodeURIComponent(gSession())); }catch(e){} } _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); sessionStorage.removeItem('warmly.gtok'); localStorage.removeItem('warmly.session'); route(); };
+window.gDisconnect=()=>{ if(AUTH_WORKER){ try{ fetch(AUTH_WORKER+'/auth/logout', {credentials:'include'}); }catch(e){} } _gtok=null; _gfile=null; localStorage.removeItem('warmly.gsync'); sessionStorage.removeItem('warmly.gtok'); localStorage.removeItem('warmly.session'); route(); };
 async function gFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({'Authorization':'Bearer '+_gtok},opts.headers||{});
   let r=await fetch(url,opts);
   if(r.status===401){ try{ sessionStorage.removeItem('warmly.gtok'); }catch(e){} const t=await gToken(false); if(t&&t.access_token){ opts.headers['Authorization']='Bearer '+_gtok; r=await fetch(url,opts); } }

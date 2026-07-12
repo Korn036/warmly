@@ -17,9 +17,39 @@ const SCOPE     = 'https://www.googleapis.com/auth/drive.appdata';
 function rand(n){ const a=new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b=>b.toString(16).padStart(2,'0')).join(''); }
 function corsHeaders(origin, allowed){
   const ok = allowed.includes(origin);
-  return { 'Access-Control-Allow-Origin': ok ? origin : 'null', 'Access-Control-Allow-Methods':'GET,POST,OPTIONS', 'Access-Control-Allow-Headers':'content-type', 'Vary':'Origin' };
+  /* Allow-Credentials is required because /auth/token and /auth/logout are now called with
+     credentials:'include' so the HttpOnly session cookie rides along; it is safe to pair with
+     Allow-Origin here because we always echo a SPECIFIC allow-listed origin, never '*'. */
+  return { 'Access-Control-Allow-Origin': ok ? origin : 'null', 'Access-Control-Allow-Methods':'GET,POST,OPTIONS', 'Access-Control-Allow-Headers':'content-type', 'Access-Control-Allow-Credentials':'true', 'Vary':'Origin' };
 }
 const json = (obj, status, extra) => new Response(JSON.stringify(obj), { status: status||200, headers: { 'Content-Type':'application/json', ...(extra||{}) } });
+
+/* ---- Session cookie helpers ----
+   The session id is a bearer credential (see worker-level comment above), so it must never be
+   readable by page JS: HttpOnly keeps it out of `document.cookie`/localStorage/XSS reach, Secure
+   keeps it off plaintext HTTP, and Path scopes it to only the /auth/* routes that need it (never
+   sent on unrelated requests). Max-Age matches the KV session TTL so the cookie and the server-side
+   record expire together.
+   IMPORTANT DEPLOYMENT REQUIREMENT: SameSite=Strict cookies are only sent by the browser on
+   SAME-SITE requests (same registrable domain, subdomains OK — e.g. auth.sovenn.app <-> sovenn.app).
+   If this Worker is ever deployed on a different site than the app (e.g. a bare *.workers.dev host
+   while the app lives on sovenn.app), the browser will NOT attach this cookie to the app's
+   cross-site fetch('/auth/token', {credentials:'include'}) calls and sign-in will silently fail.
+   Deploy the Worker on a route/subdomain that shares a registrable domain with the app before
+   turning AUTH_WORKER on. */
+const SESSION_COOKIE = 'warmly_session';
+const SESSION_MAX_AGE = 7776000; // 90d, matches the KV expirationTtl below
+function setSessionCookie(session){
+  return `${SESSION_COOKIE}=${session}; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=${SESSION_MAX_AGE}`;
+}
+function clearSessionCookie(){
+  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=0`;
+}
+function readSessionCookie(req){
+  const raw = req.headers.get('Cookie') || '';
+  const m = raw.match(new RegExp('(?:^|;\\s*)' + SESSION_COOKIE + '=([^;]+)'));
+  return m ? decodeURIComponent(m[1]) : '';
+}
 
 export default {
   async fetch(req, env){
@@ -50,16 +80,16 @@ export default {
       if (!t.access_token) return new Response('Sign-in could not be completed. Please try again.', { status: 502 });  /* generic error — do not echo Google's raw response */
       if (!allowed.some(o => app === o || app.startsWith(o + '/'))) return new Response('invalid app origin', { status: 400 });
       const session = rand(24);
-      await env.SESSIONS.put('sess:'+session, JSON.stringify({ refresh_token: t.refresh_token || '' }), { expirationTtl: 7776000 });  /* 90d: a session id is a bearer credential; never let it live forever */
-      /* session id only — the app fetches a short-lived access token via /auth/token; no access token ever rides in the URL */
-      const frag = '#warmly_session=' + session;
-      return Response.redirect(app + frag, 302);
+      await env.SESSIONS.put('sess:'+session, JSON.stringify({ refresh_token: t.refresh_token || '' }), { expirationTtl: SESSION_MAX_AGE });  /* 90d: a session id is a bearer credential; never let it live forever */
+      /* session id rides home as an HttpOnly cookie, never in the URL (fragment/query) and never
+         touched by page JS — the app never sees it, so a future XSS bug can't read or replay it */
+      return new Response(null, { status: 302, headers: { 'Location': app, 'Set-Cookie': setSessionCookie(session) } });
     }
 
     /* 3) TOKEN — the app asks for a fresh access token, silently, forever */
     if (url.pathname === '/auth/token') {
       const h = corsHeaders(origin, allowed);
-      const session = url.searchParams.get('session');
+      const session = readSessionCookie(req);
       const raw = session ? await env.SESSIONS.get('sess:'+session) : null;
       if (!raw) return json({ error:'no_session' }, 401, h);
       const { refresh_token } = JSON.parse(raw);
@@ -72,10 +102,10 @@ export default {
 
     /* 4) LOGOUT — forget the stored refresh token */
     if (url.pathname === '/auth/logout') {
-      if (!allowed.includes(origin)) return new Response('forbidden', { status: 403 });   /* block cross-site (CSRF) logout via <img>/<link> */
-      const session = url.searchParams.get('session');
+      if (!allowed.includes(origin)) return new Response('forbidden', { status: 403 });   /* block cross-site (CSRF) logout via <img>/<link>; SameSite=Strict cookie + this Origin check is belt-and-braces */
+      const session = readSessionCookie(req);
       if (session) await env.SESSIONS.delete('sess:'+session);
-      return new Response('ok', { headers: corsHeaders(origin, allowed) });
+      return new Response('ok', { headers: { ...corsHeaders(origin, allowed), 'Set-Cookie': clearSessionCookie() } });
     }
 
     return new Response('Sovenn auth worker is running.', { headers: { 'Content-Type':'text/plain' } });
