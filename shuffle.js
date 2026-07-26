@@ -40,6 +40,8 @@
      pick(contacts, opts)      -> [{ contact, score, reason, factors }] best-first
      score(contact, opts)      -> { score, reason, factors }
      reasonFor(contact, today) -> short warm "why now" string
+     hasRealReason(contact, today) -> bool, true only when reasonFor's answer is a
+       genuine signal (event/overdue/gap), not the generic tier fallback
      daysBetween(aISO, bISO)   -> integer day delta (b - a), or null
      addMonths(iso, n)         -> "YYYY-MM-DD" with month-end clamp
      _selftest()               -> { pass, results }  (no app/DOM/net/model)
@@ -62,7 +64,13 @@
     recency:   0.10,           /* gentle pull per day since last contact */
     recencyCap:120,            /* cap recency contribution */
     neverCad:  22,             /* nudge for cadence set but never contacted */
-    rotation:  9               /* daily-stable jitter span (tie-breaker) */
+    rotation:  9,              /* daily-stable jitter span (tie-breaker) */
+    dirAlpha:  3,              /* directory-mode: A-first tie-break span, kept under the
+                                   weakest in-window event score so a real date always wins */
+    dirReal:   6                /* directory-mode: flat band bonus added once hasRealReason()
+                                   is true. Strictly greater than dirAlpha's max span (3) so
+                                   the real-reason band and the no-signal band can never
+                                   interleave, regardless of name (review correction) */
   };
 
   /* ---- safe primitives (never throw) ---- */
@@ -143,6 +151,19 @@
     return (h >>> 0) / 4294967296;  /* [0,1) */
   }
 
+  /* ---- directory mode: stable A-first rank derived from a name, no rotation/Date ---- */
+  /* same name -> same value always; earlier alphabetically -> closer to 1. Ranks on the
+     first two letters as a base-26 pair so the output genuinely spans [0,1] (a name
+     starting "Aa" -> ~1, "Zz" -> ~0); non-letters clamp into the a-z range instead of
+     blowing up the scale, and a missing name pins to 0, below every real name. */
+  function alphaUnit(name){
+    var s = str(name).toLowerCase();
+    var c0 = s.length > 0 ? clampN(s.charCodeAt(0) - 97, 0, 25) : 26;
+    var c1 = s.length > 1 ? clampN(s.charCodeAt(1) - 97, 0, 25) : 0;
+    var v = c0 * 26 + c1;
+    return 1 - clampN(v / 676, 0, 1);
+  }
+
   /* ---- collect this contact's nearest upcoming date within the window ---- */
   function nearestEvent(c, todayISO){
     var best = null; /* { kind, label, days } */
@@ -195,11 +216,29 @@
     return 'a good moment to reconnect';
   }
 
+  /* ---- true only when reasonFor found a genuine signal (event, overdue cadence, or a
+     real gap in touch), not the generic tier-based fallback. Mirrors reasonFor's first
+     three branches so a caller can show the "why now" line without ever showing filler. */
+  function hasRealReason(c, todayISO){
+    c = c || {};
+    if(nearestEvent(c, todayISO)) return true;
+    if(c.cadence != null && num(c.cadence) > 0){
+      if(!c.lastContacted) return true;
+      var over = daysBetween(addMonths(c.lastContacted, c.cadence), todayISO);
+      if(over != null && over > 0) return true;
+    }
+    if(c.lastContacted){
+      var since = daysBetween(c.lastContacted, todayISO);
+      if(since != null && since >= 14) return true;
+    }
+    return false;
+  }
+
   /* ---- the core scorer: each factor can lead when it genuinely matters ---- */
   function score(c, opts){
     c = c || {}; opts = opts || {};
     var todayISO = str(opts.today);
-    var f = { tier: 0, overdue: 0, event: 0, recency: 0, rotation: 0, timeOfDay: 0, avoid: 0 };
+    var f = { tier: 0, overdue: 0, event: 0, recency: 0, rotation: 0, timeOfDay: 0, avoid: 0, real: 0 };
 
     if(opts.mode === 'serendipity'){
       /* VARIETY-first: rotation dominates so the WHOLE list (incl. loose ties) cycles
@@ -211,6 +250,50 @@
       if(opts.avoidId != null && str(c.id) === str(opts.avoidId)) f.avoid = -1000;
       var stot = f.rotation + f.recency + f.avoid;
       return { score: Math.round(stot * 100) / 100, reason: reasonFor(c, todayISO), factors: f };
+    }
+
+    if(opts.mode === 'directory'){
+      /* DIRECTORY-first: browsing the whole list, where most contacts sit at
+         tier 3 so W.tier's 30-point spread goes flat and cannot drive order.
+         Overdue and an imminent date still lead when real, recency still
+         pulls up drift; what is left is broken by a stable A-first rank on
+         the name instead of the day-rotating jitter, so a set with nothing
+         else going on still reads as a sensible, repeatable order. Never
+         reads or writes a tier here beyond that already-flat baseline. */
+      if(c.cadence != null && num(c.cadence) > 0){
+        if(!c.lastContacted){
+          f.overdue = W.neverCad;
+        } else {
+          var dOver = daysBetween(addMonths(c.lastContacted, c.cadence), todayISO);
+          if(dOver != null && dOver > 0) f.overdue = clampN(dOver, 0, W.overdueCap) * W.overdue;
+        }
+      }
+
+      var dEv = nearestEvent(c, todayISO);
+      if(dEv){
+        var dCloseness = (W.eventWindow - dEv.days + 1) / (W.eventWindow + 1);
+        var dKindBoost = dEv.kind === 'birthday' ? 1 : dEv.kind === 'anniversary' ? 0.95 : 0.8;
+        f.event = W.eventNear * dCloseness * dKindBoost;
+      }
+
+      if(c.lastContacted){
+        var dSince = daysBetween(c.lastContacted, todayISO);
+        if(dSince != null && dSince > 0) f.recency = clampN(dSince, 0, W.recencyCap) * W.recency;
+      }
+
+      f.rotation = alphaUnit(c.name) * W.dirAlpha; /* stable A-first tie-break, not day rotation */
+
+      /* band bonus (review correction): a genuine reason must ALWAYS outrank a
+         no-signal contact, regardless of name. hasRealReason mirrors reasonFor's
+         first three branches, so this is exactly "does the row get a reason line".
+         dirReal is picked strictly greater than dirAlpha's max span, so the two
+         bands can never interleave; within a band, the other factors still order. */
+      if(hasRealReason(c, todayISO)) f.real = W.dirReal;
+
+      if(opts.avoidId != null && str(c.id) === str(opts.avoidId)) f.avoid = -100;
+
+      var dtot = f.overdue + f.event + f.recency + f.rotation + f.real + f.avoid;
+      return { score: Math.round(dtot * 100) / 100, reason: reasonFor(c, todayISO), factors: f };
     }
 
     var tier = Math.round(num(c.tier));        /* closer ties get a standing baseline */
@@ -346,6 +429,98 @@
     ok('reason-safe-default', typeof rd === 'string' && rd.length > 0, rd);
     ok('limit-respected', pick(roster, { today: T, seed: 1, limit: 3 }).length === 3, pick(roster, { today: T, seed: 1, limit: 3 }).length);
 
+    /* directory mode: an all-tier-3, no-signal roster still gets a real order
+       (A-first on name), not the input order and not a coin-flip */
+    var dirRoster = [
+      { id: 'd1', tier: 3, name: 'Dana' },
+      { id: 'a1', tier: 3, name: 'Amir' },
+      { id: 'e1', tier: 3, name: 'Elan' },
+      { id: 'c1', tier: 3, name: 'Chen' },
+      { id: 'b1', tier: 3, name: 'Bella' }
+    ];
+    var dirInput = dirRoster.map(function(c){ return c.id; }).join(',');
+    var dirOrder = pick(dirRoster, { today: T, seed: 1, limit: 5, mode: 'directory' }).map(ids).join(',');
+    ok('directory-alpha-orders-flat-tier3', dirOrder === 'a1,b1,c1,d1,e1' && dirOrder !== dirInput, [dirOrder, dirInput]);
+
+    /* directory order comes from the name, not the day: two different seeds agree */
+    var dirSeedA = pick(dirRoster, { today: T, seed: 1, limit: 5, mode: 'directory' }).map(ids).join(',');
+    var dirSeedB = pick(dirRoster, { today: T, seed: 77, limit: 5, mode: 'directory' }).map(ids).join(',');
+    ok('directory-stable-across-seeds', dirSeedA === dirSeedB, [dirSeedA, dirSeedB]);
+
+    /* alphaUnit must genuinely span [0,1] so dirAlpha's points are not squeezed into
+       a sliver by the letter-code math; the fresh-roster-per-case rule applies since
+       an earlier bug here hid behind roster reuse */
+    var alphaFirst = score({ id: 'af', tier: 3, name: 'Aaron' }, { today: T, mode: 'directory' }).score;
+    var alphaLast = score({ id: 'al', tier: 3, name: 'Zylas' }, { today: T, mode: 'directory' }).score;
+    var alphaSpread = alphaFirst - alphaLast;
+    ok('directory-alpha-spans-full-weight', alphaSpread > W.dirAlpha * 0.9, [alphaFirst, alphaLast, alphaSpread, W.dirAlpha]);
+
+    /* a genuine upcoming birthday must outrank a merely-early alphabetical name with
+       no signal at all, worst case: the birthday contact gets the weakest possible
+       alpha (a Z name) and still has to win on the event score alone */
+    var sBdayLateAlpha = score({ id: 'bl', tier: 3, name: 'Zara', bday: { m: 7, d: 1 } }, { today: T, mode: 'directory' }).score; /* birthday in 6 days */
+    var sFlatEarlyAlpha = score({ id: 'fe', tier: 3, name: 'Aaron' }, { today: T, mode: 'directory' }).score;
+    ok('directory-birthday-outranks-alpha', sBdayLateAlpha > sFlatEarlyAlpha, [sBdayLateAlpha, sFlatEarlyAlpha]);
+
+    /* hasRealReason: true for a genuine signal, false for the generic tier fallback */
+    ok('has-real-reason-true-for-event', hasRealReason({ id: 'hr1', tier: 3, bday: { m: 6, d: 28 } }, T) === true, hasRealReason({ id: 'hr1', tier: 3, bday: { m: 6, d: 28 } }, T));
+    ok('has-real-reason-false-for-fallback', hasRealReason({ id: 'hr2', tier: 3 }, T) === false, hasRealReason({ id: 'hr2', tier: 3 }, T));
+
+    /* same all-tier-3, no-signal roster under DEFAULT mode has nothing but the
+       daily rotation jitter to go on, so its order is arbitrary day to day;
+       this is the flat/degenerate case directory mode exists to fix */
+    var defSeedA = pick(dirRoster, { today: T, seed: 1, limit: 5 }).map(ids).join(',');
+    var defSeedB = pick(dirRoster, { today: T, seed: 77, limit: 5 }).map(ids).join(',');
+    ok('default-flat-varies-by-seed-tier3', defSeedA !== defSeedB, [defSeedA, defSeedB]);
+
+    /* directory mode never mutates a contact it is handed (fresh objects,
+       never touched by an earlier case, so a mutating bug has nowhere to hide) */
+    var mutRoster = [
+      { id: 'm1', tier: 3, name: 'Fay', cadence: 2, lastContacted: '2026-03-01', bday: { m: 6, d: 27 } },
+      { id: 'm2', tier: 3, name: 'Gus' }
+    ];
+    var mutSnapshot = JSON.stringify(mutRoster);
+    score(mutRoster[0], { today: T, mode: 'directory' });
+    pick(mutRoster, { today: T, seed: 1, limit: 2, mode: 'directory' });
+    var dirUnmutated = JSON.stringify(mutRoster) === mutSnapshot;
+    ok('directory-no-mutation', dirUnmutated, dirUnmutated);
+
+    /* regression guard: adding mode:'directory' must not shift default-mode ranking */
+    var regRoster = [
+      { id: 'r1', tier: 1, name: 'Rae' },
+      { id: 'r2', tier: 2, cadence: 2, lastContacted: '2026-03-01', name: 'Nia' },
+      { id: 'r3', tier: 3, bday: { m: 6, d: 27 }, name: 'Oz' },
+      { id: 'r4', tier: 3, name: 'Kip' },
+      { id: 'r5', tier: 2, lastContacted: '2025-01-01', name: 'Wren' }
+    ];
+    var regOrder = pick(regRoster, { today: T, seed: 42, limit: 5 }).map(ids).join(',');
+    ok('default-order-unchanged-by-directory-addition', regOrder === 'r2,r3,r5,r1,r4', regOrder);
+
+    /* CORRECTION 2 (review): directory-mode banding. A real reason must ALWAYS
+       outrank a no-signal contact, regardless of name. Every case below uses a
+       fresh object, never a shared roster (an earlier bug here hid behind
+       roster reuse). */
+
+    /* band invariant at the alphabetical extremes: the weakest possible real
+       reason (since exactly 14, the hasRealReason threshold) on the worst
+       possible name ("Zzz") still outranks the strongest possible no-signal
+       contact (since 13, just under the threshold, best possible name "Aaa"). */
+    var bandRealWorstName = score({ id: 'bz1', tier: 3, name: 'Zzz', lastContacted: '2026-06-11' }, { today: T, mode: 'directory' }).score; /* since=14 */
+    var bandNoSigBestName = score({ id: 'ba1', tier: 3, name: 'Aaa', lastContacted: '2026-06-12' }, { today: T, mode: 'directory' }).score; /* since=13 */
+    ok('directory-real-reason-always-outranks-no-signal', bandRealWorstName > bandNoSigBestName, [bandRealWorstName, bandNoSigBestName]);
+
+    /* within the signal band, a stronger signal still leads: a birthday 6 days
+       out outranks a 20-day recency gap, same name so rotation cannot decide it */
+    var bandBday = score({ id: 'bb1', tier: 3, name: 'Mid', bday: { m: 7, d: 1 } }, { today: T, mode: 'directory' }).score; /* birthday in 6 days */
+    var bandGap20 = score({ id: 'bg1', tier: 3, name: 'Mid', lastContacted: '2026-06-05' }, { today: T, mode: 'directory' }).score; /* since=20 */
+    ok('directory-signal-band-birthday-outranks-recency-gap', bandBday > bandGap20, [bandBday, bandGap20]);
+
+    /* within the no-signal band, A-first ordering still holds once neither
+       contact has a real reason at all */
+    var bandNoSigA = score({ id: 'na1', tier: 3, name: 'Apple' }, { today: T, mode: 'directory' }).score;
+    var bandNoSigB = score({ id: 'nb1', tier: 3, name: 'Banana' }, { today: T, mode: 'directory' }).score;
+    ok('directory-no-signal-band-alpha-still-orders', bandNoSigA > bandNoSigB, [bandNoSigA, bandNoSigB]);
+
     var pass = R.every(function(x){ return x.pass; });
     return { pass: pass, results: R };
   }
@@ -354,6 +529,7 @@
     pick: pick,
     score: score,
     reasonFor: reasonFor,
+    hasRealReason: hasRealReason,
     daysBetween: daysBetween,
     addMonths: addMonths,
     _selftest: _selftest,

@@ -1784,6 +1784,41 @@ function capIcon(k){ const I={
    (#onboard/welcome | import | circle). Reuses the existing Import + preview flow and the tier concept
    (inner circle = tier 1). The user is never trapped: every step offers a skip. */
 function obDots(active){ var s=''; for(var i=1;i<=3;i++){ s+='<i class="'+(i<=active?'on':'')+'"></i>'; } return s; }
+/* Search-first inner-circle picker (Phase 2 Unit B): filters the FULL directory, no cap, so contact 500
+   is as reachable as contact 1. Only renders what obTogglePin can act on, never sets a tier itself.
+   Empty query shows a short starting list (SovennShuffle directory mode); typing ranks the matches the
+   same way instead of raw import order. Each row's sub-line, in priority order: a genuine SovennShuffle
+   reason (review correction: this is the only case marked with the extra "why" class, for testability);
+   else the user's own context note (a fact they entered, e.g. "college" or "gym", often the only way
+   to tell two same-first-name people apart in a big directory, so it is not filler); else nothing. */
+function obSpotListHTML(q){
+  q=(q||'').trim();
+  var ql=q.toLowerCase();
+  var list=DB.contacts.filter(function(c){ return !ql||(c.name||'').toLowerCase().indexOf(ql)>=0||(c.context||'').toLowerCase().indexOf(ql)>=0||(c.location||'').toLowerCase().indexOf(ql)>=0||(c.company||'').toLowerCase().indexOf(ql)>=0; });
+  if(!list.length) return '<div class="ob-count" style="margin:16px 0 4px">No matches.</div>';
+  var reasons={};
+  if(window.SovennShuffle && SovennShuffle.pick){
+    try{
+      var _today=todayISO();
+      var _picked=SovennShuffle.pick(list, { today:_today, mode:'directory', limit:(q?list.length:6) });
+      list=_picked.map(function(p){ return p.contact; });
+      _picked.forEach(function(p){
+        var real=false; try{ real=!!(SovennShuffle.hasRealReason && SovennShuffle.hasRealReason(p.contact,_today)); }catch(e){}
+        if(real) reasons[p.contact.id]=p.reason;
+      });
+    }catch(e){ if(window.logErr) logErr('obSpot',e); }
+  }
+  if(!q) list=list.slice(0,6);
+  return list.map(function(c){ var sel=(c.tier===1);
+    /* sub-line priority: a real ranking reason ("why", styled + tested distinctly) beats the
+       user's own context note, which beats showing nothing at all. */
+    var sub=reasons[c.id]?'<span class="rel why">'+esc(reasons[c.id])+'</span>':(c.context?'<span class="rel">'+esc(c.context)+'</span>':'');
+    return '<button class="ob-person'+(sel?' sel':'')+'" onclick="obTogglePin(\''+c.id+'\')">'
+      +avatarHTML(c,'width:46px;height:46px;border-radius:13px;flex:0 0 auto;font-size:16px;')
+      +'<span class="obp-txt"><span class="nm">'+esc(c.name)+'</span>'+sub+'</span>'
+      +'<span class="heart">'+(sel?'♥':'♡')+'</span></button>';
+  }).join('');
+}
 function viewOnboard(step){
   step = step || 'welcome';
   if(step==='circle' && (!DB.contacts || !DB.contacts.length)) step='import';  /* nothing to pick yet */
@@ -1810,21 +1845,15 @@ function viewOnboard(step){
       +'<button class="ob-btn ghost" onclick="obSkip()">I\'ll do this later</button>'
       +'<div class="ob-fine">The moment your contacts land, we move you straight on. No pop-ups.</div>';
   } else {
-    var list=DB.contacts.slice(0,40);
+    var q=(window._obSpotQ||'').trim();
     var chosen=DB.contacts.filter(function(c){ return c.tier===1; }).length;
     h+='<div class="ob-dots">'+obDots(3)+'</div>'
       +'<div class="ob-kicker">Step 3 of 3</div>'
       +'<h1>Who\'s your<br>inner circle?</h1>'
-      +'<div class="ob-sub">Tap the 5 to 10 you\'d hate to lose touch with. We keep them warmest.</div>'
-      +'<div class="ob-people">';
-    list.forEach(function(c){ var sel=(c.tier===1);
-      h+='<button class="ob-person'+(sel?' sel':'')+'" onclick="obTogglePin(\''+c.id+'\')">'
-        +avatarHTML(c,'width:46px;height:46px;border-radius:13px;flex:0 0 auto;font-size:16px;')
-        +'<span class="obp-txt"><span class="nm">'+esc(c.name)+'</span>'+(c.context?'<span class="rel">'+esc(c.context)+'</span>':'')+'</span>'
-        +'<span class="heart">'+(sel?'♥':'♡')+'</span></button>';
-    });
-    h+='</div>'
-      +'<div class="ob-count">'+(chosen?(chosen+' chosen'+(chosen>=5?' · a warm, close circle':'')):'Tap a few hearts to choose')+'</div>'
+      +'<div class="ob-sub">Search anyone, or start with a name below.</div>'
+      +'<div class="ob-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="obSpotQ" type="text" placeholder="search '+DB.contacts.length+' people" autocomplete="off" autocapitalize="words" value="'+esc(q)+'" oninput="obSpotFilter(this.value)"></div>'
+      +'<div class="ob-people" id="obSpotList">'+obSpotListHTML(q)+'</div>'
+      +'<div class="ob-count">'+(chosen?(chosen+' chosen'+(chosen>=5?' · a warm, close circle':'')):'Search above to choose')+'</div>'
       +'<button class="ob-btn primary" onclick="obFinish()">'+(chosen?'Start keeping them warm':'Skip for now')+'</button>';
   }
   h+='</div></div>';
@@ -1836,6 +1865,15 @@ window.obStartImport=function(){ window._obFlow=true; go('import'); };
 window.obAddByHand=function(){ window._obFlow=true; captureHub(); };
 window.obTogglePin=function(id){ var c=DB.contacts.find(function(x){ return x.id===id; }); if(!c) return;
   c.tier=(c.tier===1)?2:1; if(c.tier===1 && !c.cadence) c.cadence=3; save(); route(); };
+/* Debounced like pSearch: the query is captured immediately so a re-render (e.g. after obTogglePin)
+   never loses it, but the actual list rebuild waits 150ms so fast typing doesn't thrash the DOM. */
+window.obSpotFilter=function(q){
+  window._obSpotQ=q;
+  clearTimeout(window._obSpotT);
+  window._obSpotT=setTimeout(function(){
+    var el=document.getElementById('obSpotList'); if(el) el.innerHTML=obSpotListHTML((q||'').trim());
+  },150);
+};
 window.obFinish=function(){ DB.settings.onboarded=true; window._obFlow=false; save(); go('today'); toast('You\'re all set. Sovenn will show you who to reach.'); };
 window.obSkip=function(){ DB.settings.onboarded=true; window._obFlow=false; save(); go('today'); };
 /* Get-set-up checklist: additive to the real Today (F3 part B). Self-ticks from real DB state, dismissible,
