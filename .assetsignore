@@ -36,6 +36,8 @@ RELEASE-CHECKLIST.md
 Sovenn-Internal
 *.pdf
 *.mp4
+launch-film
+marketing
 
 # --- Local build junk (belt-and-suspenders; mostly untracked) ---
 node_modules

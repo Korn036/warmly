@@ -6,8 +6,8 @@
 
 /* ---------- storage ---------- */
 const KEY='kith.v1';
-const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo';
-const VERSION='0.69.1', BUILT='2026-07-12';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo', BDAY_TOAST_KEY='sovenn.bdayToastSeen';
+const VERSION='0.69.2', BUILT='2026-07-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -143,7 +143,7 @@ function save(){ stampChanges();
 }
 /* ---- privacy-respecting LOCAL diagnostics: errors stay on the device (capped ring buffer); the user can copy them into beta feedback. NO network, ever. ---- */
 function logErr(where, e){ try{
-    const msg=(e&&(e.message||(e.reason&&e.reason.message)))||String((e&&e.reason)||e||'');
+    const msg=(e&&(e.message||(e.reason&&e.reason.message)||e.type))||String((e&&e.reason)||e||'');
     const rec={ t:new Date().toISOString(), v:VERSION, where:where||'', msg:String(msg).slice(0,300) };
     let arr=[]; try{ arr=JSON.parse(localStorage.getItem(ERR_KEY))||[]; }catch(_){}
     arr.push(rec); if(arr.length>30) arr=arr.slice(-30);
@@ -283,12 +283,15 @@ const GCONTACT_SCOPE='https://www.googleapis.com/auth/contacts.readonly';
 let _gcClient=null,_gcPending=null;
 function gInitContactClient(){ if(_gcClient) return; _gcClient=google.accounts.oauth2.initTokenClient({ client_id:GCLIENT_ID, scope:GCONTACT_SCOPE,
   callback:(r)=>{ if(_gcPending){ const p=_gcPending; _gcPending=null; p(r); } },
-  error_callback:(e)=>{ logErr('gcontacts-auth', e); if(_gcPending){ const p=_gcPending; _gcPending=null; p(null); } } }); }
+  /* GIS gives the real reason via e.type: 'popup_failed_to_open' (browser blocked it) or 'popup_closed'
+     (closed before an OAuth response came back); anything else is reported as 'unknown'. Pass the reason
+     through instead of a bare null so the caller can tell the user what actually happened. */
+  error_callback:(e)=>{ logErr('gcontacts-auth', e); if(_gcPending){ const p=_gcPending; _gcPending=null; p({error:(e&&e.type)||'unknown'}); } } }); }
 function gContactToken(){ return new Promise(res=>{ gisReady(()=>{ gInitContactClient();
   var done=false; function settle(r){ if(done)return; done=true; res(r); }
-  var to=setTimeout(function(){ if(_gcPending===fn) _gcPending=null; settle(null); }, 15000);  /* never leave the sync button wedged if GIS neither resolves nor errors */
+  var to=setTimeout(function(){ if(_gcPending===fn) _gcPending=null; settle({error:'timeout'}); }, 15000);  /* never leave the sync button wedged if GIS neither resolves nor errors */
   var fn=function(r){ clearTimeout(to); settle(r); }; _gcPending=fn;
-  try{ _gcClient.requestAccessToken({prompt:'consent'}); }catch(e){ clearTimeout(to); _gcPending=null; settle(null); } }); }); }
+  try{ _gcClient.requestAccessToken({prompt:'consent'}); }catch(e){ clearTimeout(to); _gcPending=null; settle({error:'unknown'}); } }); }); }
 
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
@@ -330,10 +333,12 @@ function _abs(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u)?u:('htt
 function liUrl(u){ return /linkedin\.com/i.test(u)?_abs(u):('https://www.linkedin.com/in/'+_handle(u)); }
 /* only ever let http(s)/mailto/tel reach an href; neutralises javascript:/data: URIs from imported or synced fields */
 function safeUrl(u){ u=String(u==null?'':u).trim(); return /^(https?:|mailto:|tel:)/i.test(u)?u:'#'; }
+/* an imported or synced address can smuggle mailto header fields (?cc= ?bcc= ?subject= ?body=), which would quietly pre-fill a hidden recipient the moment the user taps Email; cut anything after the '?' and only let a plain single address through */
+function mailUrl(e){ e=String(e==null?'':e).trim().split('?')[0].trim(); return /^[^\s@<>"']+@[^\s@<>"']+$/.test(e)?('mailto:'+e):''; }
 function socialLinks(c){ const o=[];
   const wa=c.phone?normalizePhone(c.phone):''; if(wa) o.push(['wa','WhatsApp','https://wa.me/'+wa]);
   if(c.phone) o.push(['call','Call','tel:'+c.phone.replace(/[^\d+]/g,'')]);
-  if(c.email) o.push(['mail','Email','mailto:'+c.email]);
+  if(c.email){ const me=mailUrl(c.email); if(me) o.push(['mail','Email',me]); }
   if(c.linkedin) o.push(['in','LinkedIn',liUrl(c.linkedin)]);
   if(c.instagram) o.push(['ig','Instagram','https://instagram.com/'+_handle(c.instagram)]);
   if(c.x) o.push(['x','X','https://x.com/'+_handle(c.x)]);
@@ -390,12 +395,12 @@ function _reachSocialConfirm(id,channel,txt){ const c=DB.contacts.find(x=>x.id==
   openModal(h);
 }
 /* ---- the Reach hub: every channel, one tap, the hero of a contact's page ---- */
-function reachBar(c){ const id=c.id; const ph=c.phone? String(c.phone).replace(/[^\d+]/g,''):''; const wmsg=c.lastMsg||'';
+function reachBar(c){ const id=c.id; const ph=c.phone? String(c.phone).replace(/[^\d+]/g,''):''; const wmsg=c.lastMsg||''; const mail=mailUrl(c.email);
   const items=[
     ['call','Call', ph?('tel:'+ph):'', ph],
     ['text','Text', ph?('sms:'+ph+(wmsg?('?body='+encodeURIComponent(wmsg)):'')):'', ph],
     ['wa','WhatsApp','', ph],
-    ['mail','Email', c.email?('mailto:'+c.email):'', c.email]
+    ['mail','Email', mail, mail?c.email:'']
   ];
   let h='<div class="reach-label">Reach '+esc(callName(c))+' &middot; one tap, any way</div><div class="reach">';
   items.forEach(([k,label,href,on])=>{
@@ -1035,10 +1040,12 @@ function viewImport(){
   h+='<div style="text-align:center;padding:14px 0"><input type="file" id="file" accept=".csv,.vcf,.vcard,text/csv,text/vcard" onchange="onFile(event)" style="display:none"><button class="btn ghost" onclick="document.getElementById(\'file\').click()">Choose a file (CSV or vCard)</button></div>';
   h+='</div></details>';
   h+='<div id="preview"></div></div>'; render(h);
+  try{ if(!localStorage.getItem(BDAY_TOAST_KEY)){ toast('Google sync now brings in birthdays too, so you will not miss one.'); localStorage.setItem(BDAY_TOAST_KEY,'1'); } }catch(e){}
 }
+let _impPartial=null;  /* set when a Google sync loop breaks early (D2): {count} of rows that DID arrive, so the preview can show an honest incomplete-list banner instead of pretending the partial rows are everything */
 window.onFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=()=>{ const text=rd.result; const rows = /vcard|vcf/i.test(f.name)? parseVCF(text) : parseCSV(text);
-    window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview(); };
+    _impPartial=null; window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview(); };
   rd.readAsText(f);
 };
 /* downsize a contact-photo Blob (from the picker icon) to a small on-device JPEG data URI */
@@ -1053,31 +1060,50 @@ window.pickContacts=async()=>{
     let rows=await Promise.all(sel.map(async function(c){ var photo=''; try{ if(c.icon&&c.icon[0]) photo=await blobToAvatar(c.icon[0]); }catch(e){} return { name:(c.name&&c.name[0])||((c.tel&&c.tel[0])||''), phone:(c.tel&&c.tel[0])||'', email:(c.email&&c.email[0])||'', photo:photo, bday:null, context:'' }; }));
     rows=rows.filter(function(r){ return r.name||r.phone; });
     if(!rows.length){ alert('No usable contacts were selected.'); return; }
-    window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview();
+    _impPartial=null; window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview();
     const pv=document.getElementById('preview'); if(pv) pv.scrollIntoView({behavior:'smooth'});
   }catch(e){ /* user cancelled the picker */ }
 };
+/* Google's birthday date has month/day but the year is very often absent (never given, or shared
+   without one); keep the app's {y,m,d} shape with y:null rather than inventing a year. No usable
+   month/day at all -> null, same as any other contact with no birthday. */
+function gcBday(p){ const b=p.birthdays&&p.birthdays[0]&&p.birthdays[0].date; if(!b||!b.month||!b.day) return null; return {y:b.year||null,m:b.month,d:b.day}; }
 window.syncGoogleContacts=async()=>{
   const btn=document.getElementById('gcSyncBtn'); if(btn){ btn.disabled=true; btn.textContent='Opening Google…'; }
   try{
     const r=await gContactToken();
-    if(!r||!r.access_token){ if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return; }
+    if(!r||!r.access_token){
+      /* D1: the three failure modes used to be indistinguishable and silent. Now each one says what happened and what to do. */
+      const reason=(r&&r.error)||'unknown';
+      if(reason==='popup_closed') alert('Sign-in was closed before it finished. Tap the button to try again.');
+      else if(reason==='popup_failed_to_open') alert('Your browser blocked Google’s sign-in window. Allow pop-ups for this site, then tap the button again.');
+      else if(reason==='timeout') alert('Google didn’t respond in time. Check your connection, then try again.');
+      else alert('Google sign-in didn’t work. Try again, or use a file import below.');
+      if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return;
+    }
     if(btn) btn.textContent='Fetching contacts…';
-    let rows=[], pageToken='';
+    let rows=[], pageToken='', broke=false;
     do{
-      const u='https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,emailAddresses&pageSize=1000'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
-      const res=await fetch(u,{headers:{'Authorization':'Bearer '+r.access_token}});
-      if(!res.ok){ logErr('gcontacts-fetch', res.status); break; }
-      const j=await res.json();
+      const u='https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,emailAddresses,birthdays&pageSize=1000'+(pageToken?'&pageToken='+encodeURIComponent(pageToken):'');
+      let res, j;
+      try{
+        res=await fetch(u,{headers:{'Authorization':'Bearer '+r.access_token}});
+        if(!res.ok){ logErr('gcontacts-fetch', res.status); broke=true; break; }  /* D2: note the break, don't just discard what already arrived */
+        j=await res.json();
+      }catch(e){ logErr('gcontacts-fetch', e); broke=true; break; }  /* D2: a dropped connection (fetch rejects) or a truncated body (res.json() throws) must land on the SAME partial-preserving path as !res.ok, not the outer catch that discards every row already fetched */
       (j.connections||[]).forEach(function(p){
         const name=(p.names&&p.names[0]&&p.names[0].displayName)||'';
         const phone=(p.phoneNumbers&&p.phoneNumbers[0]&&p.phoneNumbers[0].value)||'';
         const email=(p.emailAddresses&&p.emailAddresses[0]&&p.emailAddresses[0].value)||'';
-        if(name||phone) rows.push({ name:name||phone, phone:phone, email:email, photo:'', bday:null, context:'' });
+        if(name||phone) rows.push({ name:name||phone, phone:phone, email:email, photo:'', bday:gcBday(p), context:'' });
       });
       pageToken=j.nextPageToken||'';
     } while(pageToken);
-    if(!rows.length){ alert('No contacts found in this Google account.'); if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return; }
+    if(!rows.length){
+      alert(broke?'Google stopped responding before any contacts came through. Try again.':'No contacts found in this Google account.');
+      if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return;
+    }
+    _impPartial=broke?{count:rows.length}:null;  /* D2: rows still get shown, just honestly labelled incomplete */
     window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r));
     renderPreview();
     const pv2=document.getElementById('preview'); if(pv2) pv2.scrollIntoView({behavior:'smooth'});
@@ -1087,13 +1113,15 @@ window.syncGoogleContacts=async()=>{
 function renderPreview(){
   const rows=window._imp||[]; const box=$('#preview');
   if(!rows.length){ box.innerHTML='<div class="empty">Could not read any contacts from that file. Try a Google CSV or a .vcf.</div>'; return; }
-  let h='<div class="kick">Found '+rows.length+' contacts · tick who to keep, set how close</div>';
+  let h='';
+  if(_impPartial) h+='<div class="note" style="border-color:var(--rose);color:var(--rose)">Only '+_impPartial.count+' contact'+(_impPartial.count===1?'':'s')+' came through before Google stopped responding, so this list is incomplete. <a style="text-decoration:underline;cursor:pointer" onclick="syncGoogleContacts()">Retry the sync</a></div>';
+  h+='<div class="kick">Found '+rows.length+' contacts · tick who to keep, set how close</div>';
   h+='<div class="note">Tip: only import people you actually want to stay warm with. You can always add more later.</div>';
   h+='<div class="row" style="margin:8px 0"><input type="text" id="impq" placeholder="Search by name or phone…" oninput="impFilter()" style="flex:1;min-width:0"></div>';
   h+='<div class="row between" style="margin:8px 0"><button class="btn ghost sm" onclick="impAll(true)">Select all</button><button class="btn ghost sm" onclick="impAll(false)">None</button><button class="btn primary sm" onclick="doImport()">Import selected</button></div>';
   h+='<div style="overflow-x:auto"><table class="tbl"><thead><tr><th></th><th>Name</th><th>Phone</th><th>Birthday</th><th>Closeness</th></tr></thead><tbody>';
   rows.forEach((r,i)=>{ h+='<tr data-kw="'+esc(((r.name||'')+' '+(r.phone||'')).toLowerCase())+'"><td><input type="checkbox" '+(r._keep?'checked':'')+' onchange="impSet('+i+',\'_keep\',this.checked)"></td>'
-    +'<td>'+esc(r.name)+'</td><td>'+esc(r.phone||'—')+'</td><td>'+(r.bday?(MONTHS[r.bday.m]+' '+r.bday.d):'—')+'</td>'
+    +'<td>'+esc(r.name)+'</td><td>'+esc(r.phone||'—')+'</td><td>'+esc(r.bday?(MONTHS[r.bday.m]+' '+r.bday.d):'—')+'</td>'
     +'<td><select onchange="impSet('+i+',\'_tier\',+this.value)"><option value="1"'+(r._tier===1?' selected':'')+'>inner</option><option value="2"'+(r._tier===2?' selected':'')+'>warm</option><option value="3"'+(r._tier===3?' selected':'')+'>loose</option></select></td></tr>'; });
   h+='</tbody></table></div>'; box.innerHTML=h;
 }
