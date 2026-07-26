@@ -7,6 +7,10 @@
 /* ---------- storage ---------- */
 const KEY='kith.v1';
 const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo', BDAY_TOAST_KEY='sovenn.bdayToastSeen';
+/* Phase 1b tidy-undo. Deliberately a SEPARATE localStorage key, not a field on DB: an undo is a
+   this-device affordance, and anything inside DB rides mergeDB() to every other device. Same
+   reasoning as UNDO_KEY above. */
+const RETIER_KEY='sovenn.retierUndo';
 const VERSION='0.69.2', BUILT='2026-07-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
@@ -1419,6 +1423,26 @@ function viewSettings(section){
       +(localStorage.getItem(UNDO_KEY)?'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="undoRestore()">Undo last restore</button></div>':'')+'</div>';
     return render(h+'</div>');
   }
+  if(section==='retier'){
+    /* PREVIEW FIRST: the count and the actual names, before anything is written. Rendering this
+       screen must never mutate a single record -- the only write path is a tap on doRetier(). */
+    const cand=retierCandidates(), un=retierUndoRec();
+    let h='<div class="view">'+back+'<h1 class="title">Tidy your keep-warm list</h1>';
+    h+='<div class="card"><div class="muted">People imported before Sovenn stopped putting whole address books on keep-warm may be asking for check-ins you never actually chose. This moves them into your directory: they stay in Sovenn with every detail intact, they just stop coming due. Anyone you put on keep-warm deliberately will move too, so read the list first.</div></div>';
+    if(!cand.length){
+      h+='<div class="card"><div class="nm" style="font-size:15px">Nothing to tidy</div><div class="sub" style="margin-top:5px">No one is on keep-warm right now.</div></div>';
+    }else{
+      h+='<div class="kick">'+cand.length+(cand.length===1?' person':' people')+' would move</div><div class="card" style="padding:0">';
+      cand.slice(0,50).forEach(function(c,i){
+        h+='<div style="padding:11px 14px;'+(i?'border-top:.5px solid var(--line);':'')+'"><span class="nm" style="font-size:15px">'+esc(c.name||'Unnamed')+'</span>'
+          +(c.cadence?'<span class="sub" style="display:block">asks every '+esc(c.cadence)+' months</span>':'')+'</div>';
+      });
+      if(cand.length>50) h+='<div class="sub" style="padding:11px 14px;border-top:.5px solid var(--line)">and '+(cand.length-50)+' more</div>';
+      h+='</div><div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="doRetier()">Move '+cand.length+' into my directory</button></div>';
+    }
+    if(un) h+='<div class="kick">Changed your mind?</div><div class="card"><div class="muted">Your last tidy moved '+un.prev.length+'. This puts them back exactly as they were.</div><div class="btn-row" style="margin-top:12px"><button class="btn ghost sm" onclick="undoRetier()">Undo tidy</button></div></div>';
+    return render(h+'</div>');
+  }
   if(section==='lock'){ return render('<div class="view">'+back+'<h1 class="title">App lock</h1>'+lockSection()+'</div>'); }
   if(section==='about'){
     let h='<div class="view">'+back+'<h1 class="title">About &amp; data</h1>';
@@ -1438,6 +1462,7 @@ function viewSettings(section){
   const cats=[
     ['general','General','Name, country, reminders, daily moment','name country reminder daily moment lead days general me','#946145','&#9685;',false],
     ['import','Add people','Import and merge your contacts','import contacts csv vcard duplicates phone add people merge','#2E8C6A','+',true],
+    ['retier','Tidy keep-warm','Move an imported pile into your directory','tidy keep warm tier directory import pile cadence obligation declutter overwhelm too many reminders','#7A6A55','&#8681;',false],
     ['messages','Messages','Templates and local-language touch','templates message local language hinglish reconnect tone','#3C6E91','&#9998;',false],
     ['calendar','Calendar','Add your dates to Google Calendar','calendar google ics birthday anniversary export reminder','#D99A2B','&#9635;',false],
     ['appearance','Appearance','Themes, light and dark','theme dark light still morning lamplight appearance skin','#8A5A99','&#9680;',false],
@@ -1466,6 +1491,45 @@ window.toggleNotify=async()=>{ DB.settings=DB.settings||{};
   if(p==='granted'){ DB.settings.notify=true; save(); route(); try{ maybeNudge(); }catch(e){} }
   else { DB.settings.notify=false; save(); route(); alert(p==='denied'?'Notifications are blocked for Sovenn. Turn them on in your browser or phone settings, then try again.':'This browser cannot show notifications yet. On Android, add Sovenn to your home screen first, then turn this on.'); } };
 window.wipe=()=>{ if(confirm('Erase ALL contacts and notes on this device? Export a backup first if unsure.')){ DB={ v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:DB.settings, me:DB.me, deleted:DB.deleted||{} }; save(); go('today'); } };
+
+/* ---------- Phase 1b: opt-in tidy of an accidental keep-warm pile ----------
+   For testers who imported before Phase 1 made imports land in the directory. Phase 1 is strictly
+   forward-only, so an existing pile is never fixed automatically; this is the ONLY sanctioned way
+   a stored record changes tier in bulk, and it runs from a deliberate tap and nothing else. Never
+   on load, never on upgrade, never as a side effect. Previewed, confirmed, reversible once. */
+function retierCandidates(){ return (DB.contacts||[]).filter(c=>c&&c.tier===2); }
+function retierUndoRec(){ try{ const u=JSON.parse(localStorage.getItem(RETIER_KEY)); return (u&&Array.isArray(u.prev)&&u.prev.length)?u:null; }catch(e){ return null; } }
+
+window.doRetier=()=>{
+  const list=retierCandidates();
+  if(!list.length){ alert('Nothing to tidy: no one is on keep-warm right now.'); return; }
+  if(!confirm('Move '+list.length+(list.length===1?' person':' people')+' from keep-warm into your directory? They stay in Sovenn with every detail, they just stop coming due for a check-in. You can undo this once, right after, from this screen.')) return;
+  /* snapshot BEFORE mutating: undo must restore the exact prior tier AND cadence per person */
+  const prev=list.map(c=>({ id:c.id, tier:c.tier, cadence:(c.cadence==null?null:c.cadence) }));
+  try{ localStorage.setItem(RETIER_KEY, JSON.stringify({ at:Date.now(), prev:prev })); }catch(_){}
+  /* Batch-mutate, then ONE save(). Deliberately NOT setTier() in a loop, for two reasons:
+     (a) setTier() ends in route(), so a 2000-contact pile would trigger 2000 full re-renders;
+     (b) setTier() only writes cadence when cadence is already null, so a keep-warm contact would
+     keep its 6-month obligation while displaying as directory -- the exact thing this tool exists
+     to remove. Persistence still runs through save() alone, so stampChanges() stamps updatedAt on
+     every changed record and the Drive-merge story is unchanged. */
+  list.forEach(c=>{ c.tier=3; c.cadence=null; });
+  const ok=save(); route();
+  if(ok) alert('Moved '+prev.length+(prev.length===1?' person':' people')+' into your directory. Nothing was deleted. If that was a mistake, tap "Undo tidy" on this screen.');
+};
+
+window.undoRetier=()=>{
+  const u=retierUndoRec();
+  if(!u){ alert('Nothing to undo.'); return; }
+  if(!confirm('Put '+u.prev.length+(u.prev.length===1?' person':' people')+' back on keep-warm?')) return;
+  let back=0;
+  u.prev.forEach(p=>{ const c=DB.contacts.find(x=>x.id===p.id); if(c){ c.tier=p.tier; c.cadence=p.cadence; back++; } });
+  const ok=save();
+  if(ok){ try{ localStorage.removeItem(RETIER_KEY); }catch(e){} }
+  route();
+  if(ok) alert(back===u.prev.length ? ('Put '+back+(back===1?' person':' people')+' back the way they were.')
+                                     : ('Put '+back+' of '+u.prev.length+' back. The others are no longer on this device.'));
+};
 function download(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
 window.exportJSON=()=>download('sovenn-backup.json', new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}));
 /* ---- Google Calendar export (.ics): the keystone. Your calendar is your source of truth. ---- */

@@ -91,6 +91,80 @@ test('FORWARD-ONLY: importing does not re-tier people already in the book', asyn
   expect([b.tier, b.cadence], 'an existing keep-warm tie must survive an import untouched').toEqual([2, 6]);
 });
 
+// ---------------------------------------------------------------------------
+// Phase 1b: the opt-in tidy tool. The escape hatch that makes Phase 1's
+// forward-only rule survivable for testers who already have a keep-warm pile.
+// ---------------------------------------------------------------------------
+
+const PILE = () => ([
+  { id: 'p1', name: 'Warm One', tier: 2, cadence: 6, log: [], customDates: [] },
+  { id: 'p2', name: 'Warm Two', tier: 2, cadence: 6, log: [], customDates: [] },
+  { id: 'k1', name: 'Real Inner', tier: 1, cadence: 3, log: [], customDates: [] },
+  { id: 'd1', name: 'Already Directory', tier: 3, cadence: null, log: [], customDates: [] },
+]);
+
+async function openTidy(page, contacts) {
+  await page.goto('/app.html#settings/retier');
+  await page.evaluate((cs) => { DB.contacts = cs; route(); }, contacts);
+}
+
+test('1b: the preview counts only keep-warm people, and changes nothing by rendering', async ({ page }) => {
+  await openTidy(page, PILE());
+  await expect(page.locator('.kick').first()).toHaveText('2 people would move');
+  await expect(page.getByRole('button', { name: /Move 2 into my directory/ })).toBeVisible();
+  const tiers = await page.evaluate(() => DB.contacts.map(c => c.tier));
+  expect(tiers, 'merely opening the preview must never write').toEqual([2, 2, 1, 3]);
+});
+
+test('1b: declining the confirm changes nothing at all', async ({ page }) => {
+  await openTidy(page, PILE());
+  page.on('dialog', d => d.dismiss());
+  await page.getByRole('button', { name: /Move 2 into my directory/ }).click();
+  const state = await page.evaluate(() => DB.contacts.map(c => [c.tier, c.cadence]));
+  expect(state, 'a dismissed confirm must be a no-op').toEqual([[2, 6], [2, 6], [1, 3], [3, null]]);
+  expect(await page.evaluate(() => localStorage.getItem('sovenn.retierUndo')), 'no undo record either').toBeNull();
+});
+
+test('1b: confirming moves the pile to tier 3 with no cadence, and spares other tiers', async ({ page }) => {
+  await openTidy(page, PILE());
+  page.on('dialog', d => d.accept());
+  await page.getByRole('button', { name: /Move 2 into my directory/ }).click();
+  const state = await page.evaluate(() => DB.contacts.map(c => [c.id, c.tier, c.cadence]));
+  expect(state).toEqual([
+    ['p1', 3, null],           // moved, and the 6-month obligation is actually gone
+    ['p2', 3, null],
+    ['k1', 1, 3],              // a real inner-circle tie is untouched
+    ['d1', 3, null],           // already-directory is untouched
+  ]);
+});
+
+test('1b: undo restores the exact prior tier AND cadence', async ({ page }) => {
+  await openTidy(page, PILE());
+  page.on('dialog', d => d.accept());
+  await page.getByRole('button', { name: /Move 2 into my directory/ }).click();
+  await page.getByRole('button', { name: /Undo tidy/ }).click();
+  const state = await page.evaluate(() => DB.contacts.map(c => [c.id, c.tier, c.cadence]));
+  expect(state, 'undo must be exact, not a guess from cadenceForTier()').toEqual([
+    ['p1', 2, 6], ['p2', 2, 6], ['k1', 1, 3], ['d1', 3, null],
+  ]);
+  expect(await page.evaluate(() => localStorage.getItem('sovenn.retierUndo')), 'a spent undo is cleared').toBeNull();
+});
+
+test('1b: the undo record stays out of DB so it never syncs to another device', async ({ page }) => {
+  await openTidy(page, PILE());
+  page.on('dialog', d => d.accept());
+  await page.getByRole('button', { name: /Move 2 into my directory/ }).click();
+  const leaked = await page.evaluate(() => Object.keys(DB).filter(k => /retier|undo/i.test(k)));
+  expect(leaked, 'an undo is a this-device affordance; in DB it would ride mergeDB() everywhere').toEqual([]);
+  expect(await page.evaluate(() => !!localStorage.getItem('sovenn.retierUndo')), 'it lives in its own key').toBe(true);
+});
+
+test('1b: with nothing on keep-warm the tool offers no action', async ({ page }) => {
+  await openTidy(page, [{ id: 'd1', name: 'Only Directory', tier: 3, cadence: null, log: [], customDates: [] }]);
+  await expect(page.getByText('Nothing to tidy')).toBeVisible();
+  await expect(page.getByRole('button', { name: /into my directory/ })).toHaveCount(0);
+});
+
 test('FORWARD-ONLY: re-importing someone you already have does not demote them', async ({ page }) => {
   // the dedupe path (match on normalized phone) updates blank fields in place; it must
   // never write tier, or a routine re-sync would silently strip a real cadence
