@@ -1045,7 +1045,7 @@ function viewImport(){
 let _impPartial=null;  /* set when a Google sync loop breaks early (D2): {count} of rows that DID arrive, so the preview can show an honest incomplete-list banner instead of pretending the partial rows are everything */
 window.onFile=(ev)=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader();
   rd.onload=()=>{ const text=rd.result; const rows = /vcard|vcf/i.test(f.name)? parseVCF(text) : parseCSV(text);
-    _impPartial=null; window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview(); };
+    _impPartial=null; window._imp=rows.map(r=>Object.assign({_keep:true,_tier:3},r)); renderPreview(); };
   rd.readAsText(f);
 };
 /* downsize a contact-photo Blob (from the picker icon) to a small on-device JPEG data URI */
@@ -1060,7 +1060,7 @@ window.pickContacts=async()=>{
     let rows=await Promise.all(sel.map(async function(c){ var photo=''; try{ if(c.icon&&c.icon[0]) photo=await blobToAvatar(c.icon[0]); }catch(e){} return { name:(c.name&&c.name[0])||((c.tel&&c.tel[0])||''), phone:(c.tel&&c.tel[0])||'', email:(c.email&&c.email[0])||'', photo:photo, bday:null, context:'' }; }));
     rows=rows.filter(function(r){ return r.name||r.phone; });
     if(!rows.length){ alert('No usable contacts were selected.'); return; }
-    _impPartial=null; window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r)); renderPreview();
+    _impPartial=null; window._imp=rows.map(r=>Object.assign({_keep:true,_tier:3},r)); renderPreview();
     const pv=document.getElementById('preview'); if(pv) pv.scrollIntoView({behavior:'smooth'});
   }catch(e){ /* user cancelled the picker */ }
 };
@@ -1104,7 +1104,7 @@ window.syncGoogleContacts=async()=>{
       if(btn){ btn.disabled=false; btn.textContent='Sync your Google contacts'; } return;
     }
     _impPartial=broke?{count:rows.length}:null;  /* D2: rows still get shown, just honestly labelled incomplete */
-    window._imp=rows.map(r=>Object.assign({_keep:true,_tier:2},r));
+    window._imp=rows.map(r=>Object.assign({_keep:true,_tier:3},r));
     renderPreview();
     const pv2=document.getElementById('preview'); if(pv2) pv2.scrollIntoView({behavior:'smooth'});
   }catch(e){ logErr('gcontacts-sync', e); alert('Could not reach Google. Try again, or use a file import below.'); }
@@ -1152,7 +1152,11 @@ window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.
   keep.forEach(r=>{ const p=r.phone?normalizePhone(r.phone):''; const k=nmKey(r.name,r.email);
     const hit=(p&&byPhone[p])||(k!=='|'&&byNM[k])||null;
     if(hit){ ['name','phone','email','linkedin','context','photo','bday'].forEach(f=>{ if(!hit[f]&&r[f]) hit[f]=r[f]; }); updated++; return; }
-    const c={ id:uid(), name:r.name, phone:r.phone||'', email:r.email||'', linkedin:r.linkedin||'', context:r.context||'', photo:r.photo||'', tier:r._tier||2, bday:r.bday||null, anniv:null, customDates:[], cadence:r._tier===1?3:r._tier===2?6:null, lastContacted:null, log:[], createdAt:new Date().toISOString() };
+    /* TIER-3 INVARIANT: a bulk import never creates an obligation. Imported people land in the
+       directory (tier 3, cadence null); only a deliberate choice promotes someone to a tier that
+       carries a cadence. Forward-only: this governs NEW rows at import time and never re-tiers
+       anything already in DB.contacts. Single-entry paths (scan/manual/quick-add) stay tier 2. */
+    const c={ id:uid(), name:r.name, phone:r.phone||'', email:r.email||'', linkedin:r.linkedin||'', context:r.context||'', photo:r.photo||'', tier:r._tier||3, bday:r.bday||null, anniv:null, customDates:[], cadence:r._tier===1?3:r._tier===2?6:null, lastContacted:null, log:[], createdAt:new Date().toISOString() };
     DB.contacts.push(c); if(p) byPhone[p]=c; if(k!=='|') byNM[k]=c; added++;
   });
   save(); window._imp=null;
