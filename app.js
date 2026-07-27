@@ -1822,6 +1822,7 @@ function obSpotListHTML(q){
 function viewOnboard(step){
   step = step || 'welcome';
   if(step==='circle' && (!DB.contacts || !DB.contacts.length)) step='import';  /* nothing to pick yet */
+  if(step==='hello' && (!DB.contacts || !DB.contacts.length)) step='import';  /* nothing to say hello to yet */
   var h='<div class="ob"><div class="ob-screen"><div class="ob-wm">Sovenn<span class="dot">.</span></div>';
   if(step==='welcome'){
     h+='<div class="ob-dots">'+obDots(1)+'</div>'
@@ -1844,6 +1845,29 @@ function viewOnboard(step){
       +((DB.contacts&&DB.contacts.length)?'<button class="ob-btn primary" onclick="go(\'onboard\',\'circle\')">Continue</button>':'')
       +'<button class="ob-btn ghost" onclick="obSkip()">I\'ll do this later</button>'
       +'<div class="ob-fine">The moment your contacts land, we move you straight on. No pop-ups.</div>';
+  } else if(step==='hello'){
+    /* C4, the first-hello graft (Phase 3): reuses obTopInner() for who, and the same freshDraft() +
+       sendChannel()/_confirmSent() mechanic compose() already uses for drafting and sending, so this
+       step never invents a second drafting or sending path. Reads only: it never sets or changes a
+       tier itself (obTogglePin on the previous step is still the only place a tier gets written). */
+    var hc=obTopInner();
+    var _fr=freshDraft(hc,'reconnect'); var _draft=_fr.text;
+    _curMsgMeta={id:hc.id,openerId:_fr.openerId,occasion:'reconnect'};
+    var _reason=''; if(window.SovennShuffle && SovennShuffle.hasRealReason){
+      try{ if(SovennShuffle.hasRealReason(hc,todayISO())) _reason=SovennShuffle.reasonFor(hc,todayISO()); }catch(e){}
+    }
+    var _tierLabel={1:'inner circle',2:'keep warm',3:'loose tie'}[hc.tier||3];
+    var _wa=hc.phone?normalizePhone(hc.phone):'';
+    h+='<div class="ob-kicker">One last thing</div>'
+      +'<h1>Say hello to '+esc(callName(hc))+'.</h1>'
+      +'<div class="ob-sub">'+(_reason?esc(_reason.charAt(0).toUpperCase()+_reason.slice(1))+'. ':'')+'Here\'s a first line, change anything.</div>'
+      +'<div class="card" style="margin-top:18px"><div class="row">'+avatarHTML(hc)
+      +'<div class="grow"><div class="nm">'+esc(hc.name)+'</div><div class="sub">'+_tierLabel+(_reason?' · '+esc(_reason):'')+'</div></div></div>'
+      +'<textarea id="msg" style="margin-top:12px;min-height:120px">'+esc(_draft)+'</textarea></div>'
+      +'<div class="ob-grow"></div>'
+      +(_wa?'<button class="ob-btn primary" onclick="obHelloSend()">Send on WhatsApp</button>':'<div class="muted" style="text-align:center">No usable phone number. Add one with its country code to message on WhatsApp.</div>')
+      +'<button class="ob-btn ghost" onclick="go(\'onboard\',\'circle\')">Pick someone else</button>'
+      +'<button class="ob-btn ghost" onclick="obFinish()">Not now</button>';
   } else {
     var q=(window._obSpotQ||'').trim();
     var chosen=DB.contacts.filter(function(c){ return c.tier===1; }).length;
@@ -1854,7 +1878,7 @@ function viewOnboard(step){
       +'<div class="ob-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="obSpotQ" type="text" placeholder="search '+DB.contacts.length+' people" autocomplete="off" autocapitalize="words" value="'+esc(q)+'" oninput="obSpotFilter(this.value)"></div>'
       +'<div class="ob-people" id="obSpotList">'+obSpotListHTML(q)+'</div>'
       +'<div class="ob-count">'+(chosen?(chosen+' chosen'+(chosen>=5?' · a warm, close circle':'')):'Search above to choose')+'</div>'
-      +'<button class="ob-btn primary" onclick="obFinish()">'+(chosen?'Start keeping them warm':'Skip for now')+'</button>';
+      +'<button class="ob-btn primary" onclick="go(\'onboard\',\'hello\')">'+(chosen?'Start keeping them warm':'Skip for now')+'</button>';
   }
   h+='</div></div>';
   render(h);
@@ -1876,6 +1900,15 @@ window.obSpotFilter=function(q){
 };
 window.obFinish=function(){ DB.settings.onboarded=true; window._obFlow=false; save(); go('today'); toast('You\'re all set. Sovenn will show you who to reach.'); };
 window.obSkip=function(){ DB.settings.onboarded=true; window._obFlow=false; save(); go('today'); };
+/* C4's "Send on WhatsApp": finishes onboarding first (same fields obFinish sets), then hands off to the
+   existing sendChannel()/_confirmSent() flow untouched, so the reached-today confirm modal that already
+   exists for every other send in the app lands on top of Today instead of back inside the wizard. */
+window.obHelloSend=function(){
+  var c=obTopInner(); if(!c) return;
+  DB.settings.onboarded=true; window._obFlow=false; save();
+  go('today');
+  sendChannel(c.id,'wa');
+};
 /* Get-set-up checklist: additive to the real Today (F3 part B). Self-ticks from real DB state, dismissible,
    auto-retires when complete. Scoped to users who went through the wizard (DB.settings.onboarded) so an
    existing user is never surprised by it. "Send your first hello" deep-links compose; "Add a channel" (F5)
