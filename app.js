@@ -652,7 +652,7 @@ function viewToday(){
   const _mp={morning:'Your morning minute. Keep your people warm.',afternoon:'A quiet minute to keep your people warm.',evening:'Your evening minute. Keep your people warm.'}[DB.settings.dailyMoment]||'Keep your people warm.';
   let h='<div class="view"><h1 class="title">Today</h1><p class="muted">'+(DB.settings.myName?('Hello '+esc(firstName(DB.settings.myName))+'. '):'')+_mp+'</p>';
   if(!DB.contacts.length){
-    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your circle is quiet for now.</div><div style="font-weight:600;margin:2px 0 12px;color:var(--ink)">Each day Sovenn shows you who to reach and writes the first message. You always tap send.</div>Everything you add lives here, on your phone, with no account and no one watching. Bring in the few people you would hate to lose touch with.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button><div class="sub" style="margin-top:16px;color:var(--ink-soft)">New phone, or reinstalled? <a style="color:var(--green-2);cursor:pointer" onclick="go(\'settings\')">Restore from Google Drive or a backup</a>.</div></div></div>';
+    h+='<div class="empty"><svg viewBox="0 0 48 48" width="66" height="66" aria-hidden="true" style="display:block;margin:0 auto 18px"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--line)" stroke-width="1.8"/><circle cx="24" cy="24" r="6.6" fill="var(--ink)"/><circle cx="36.7" cy="16.3" r="4.6" fill="#E0552E"/></svg><div class="big">Your directory is quiet.</div>Bring in your contacts, searchable and untouched. Pick a few to keep warm and we will write the first line.<br><br><button class="btn primary" onclick="captureHub()">Add your first person</button> <button class="btn ghost" onclick="go(\'import\')">Import contacts</button><div class="sub" style="margin-top:16px;color:var(--ink-soft)">New phone, or reinstalled? <a style="color:var(--green-2);cursor:pointer" onclick="go(\'settings\')">Restore from Google Drive or a backup</a>.</div></div></div>';
     return render(h);
   }
   h+='<div class="today-top">';
@@ -669,7 +669,15 @@ function viewToday(){
     actions:'<button class="btn primary" onclick="event.stopPropagation();compose(\''+d.c.id+'\',\'reconnect\')">Say hi to '+esc(callName(d.c))+'</button><button class="btn ghost" onclick="event.stopPropagation();logToday(\''+d.c.id+'\')">Log call</button>' }); });
   deck=deck.slice(0,5); window._deck=deck;  /* #10: a finite, completable deck (max 5) drives return, not an endless list */
   if(deck.length) h+='<div class="deckwrap"><div class="deckstack" id="deckstack"></div><div class="deckbar"><span class="deckcount" id="deckcount"></span><button type="button" class="deck-hint" aria-label="Show the next card" onclick="enableShake();deckAdvance()">swipe a card &middot; or shake your phone &middot; or tap here</button></div></div>';
-  else h+='<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Everyone is warm and there are no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>';
+  else { let hasInner=DB.contacts.some(function(c){ return c.tier===1; });
+    /* "Everyone is warm" is only true once someone has actually been chosen (SOV-UX-006 /
+       directory-model fix): a fresh silent import lands everyone at tier 3 with no cadence,
+       so an empty deck at that point means nothing has been picked yet, not that everyone
+       is being kept warm. */
+    h+= hasInner
+      ? '<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">All caught up</div><div class="sub" style="margin-top:6px">Everyone is warm and there are no dates in the next ten days. Enjoy the calm, or rekindle someone below.</div></div>'
+      : '<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">No one chosen yet</div><div class="sub" style="margin-top:6px">'+(DB.contacts.length===1?'1 person is':DB.contacts.length+' people are')+' in your directory, searchable and quiet. Pick your inner circle and we will write the first line.</div></div>';
+  }
   h+=setupCard();  /* self-ticking "Get set up" checklist sits just under the deck (F3 part B, additive) */
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
@@ -1786,11 +1794,16 @@ function capIcon(k){ const I={
 function obDots(active){ var s=''; for(var i=1;i<=3;i++){ s+='<i class="'+(i<=active?'on':'')+'"></i>'; } return s; }
 /* Search-first inner-circle picker (Phase 2 Unit B): filters the FULL directory, no cap, so contact 500
    is as reachable as contact 1. Only renders what obTogglePin can act on, never sets a tier itself.
-   Empty query shows a short starting list (SovennShuffle directory mode); typing ranks the matches the
-   same way instead of raw import order. Each row's sub-line, in priority order: a genuine SovennShuffle
-   reason (review correction: this is the only case marked with the extra "why" class, for testability);
-   else the user's own context note (a fact they entered, e.g. "college" or "gym", often the only way
-   to tell two same-first-name people apart in a big directory, so it is not filler); else nothing. */
+   Empty query shows a short starting list (SovennShuffle directory mode), headed by a "A few to start
+   with" kicker (Phase 4); typing ranks the matches the same way instead of raw import order, with no
+   kicker (it is a shortlist label, not a results label). Each row's sub-line, in priority order: a
+   genuine SovennShuffle reason (review correction: this is the only case marked with the extra "why"
+   class, for testability); else the user's own context note (a fact they entered, e.g. "college" or
+   "gym", often the only way to tell two same-first-name people apart in a big directory, so it is not
+   filler); else the honest, always-true "In your directory" fallback (Phase 4) so a row is never
+   silent about why it is showing up. Never a fabricated ranking claim: the mockup's "Starred in your
+   contacts" row is speculative on the unverified People API `memberships` field and is deliberately
+   NOT shipped here (see phase4-copy-palette.md). */
 function obSpotListHTML(q){
   q=(q||'').trim();
   var ql=q.toLowerCase();
@@ -1809,15 +1822,16 @@ function obSpotListHTML(q){
     }catch(e){ if(window.logErr) logErr('obSpot',e); }
   }
   if(!q) list=list.slice(0,6);
-  return list.map(function(c){ var sel=(c.tier===1);
+  var rows=list.map(function(c){ var sel=(c.tier===1);
     /* sub-line priority: a real ranking reason ("why", styled + tested distinctly) beats the
-       user's own context note, which beats showing nothing at all. */
-    var sub=reasons[c.id]?'<span class="rel why">'+esc(reasons[c.id])+'</span>':(c.context?'<span class="rel">'+esc(c.context)+'</span>':'');
+       user's own context note, which beats the honest "In your directory" fallback (never blank). */
+    var sub=reasons[c.id]?'<span class="rel why">'+esc(reasons[c.id])+'</span>':(c.context?'<span class="rel">'+esc(c.context)+'</span>':'<span class="rel">In your directory</span>');
     return '<button class="ob-person'+(sel?' sel':'')+'" onclick="obTogglePin(\''+c.id+'\')">'
       +avatarHTML(c,'width:46px;height:46px;border-radius:13px;flex:0 0 auto;font-size:16px;')
       +'<span class="obp-txt"><span class="nm">'+esc(c.name)+'</span>'+sub+'</span>'
       +'<span class="heart">'+(sel?'♥':'♡')+'</span></button>';
   }).join('');
+  return (q?'':'<div class="kick" style="margin-top:20px">A few to start with</div>')+rows;
 }
 function viewOnboard(step){
   step = step || 'welcome';
@@ -1828,7 +1842,7 @@ function viewOnboard(step){
     h+='<div class="ob-dots">'+obDots(1)+'</div>'
       +'<div class="ob-kicker">Welcome</div>'
       +'<h1>Let\'s warm up<br>your circle.</h1>'
-      +'<div class="ob-sub">See who to reach today. We write the first line. You just tap send. It takes about a minute to set up.</div>'
+      +'<div class="ob-sub">Bring your contacts in quietly. Then pick the few who matter most.</div>'
       +'<div class="ob-field"><label for="obName">What should we call you?</label>'
       +'<input id="obName" type="text" autocomplete="given-name" autocapitalize="words" placeholder="Your first name" value="'+esc(DB.settings.myName||'')+'" onkeydown="if(event.key===\'Enter\')obSaveName()"></div>'
       +'<div class="ob-grow"></div>'
@@ -1837,14 +1851,14 @@ function viewOnboard(step){
   } else if(step==='import'){
     h+='<div class="ob-dots">'+obDots(2)+'</div>'
       +'<div class="ob-kicker">Step 2 of 3</div>'
-      +'<h1>Bring in the<br>people who matter.</h1>'
-      +'<div class="ob-sub">Start with a few. You\'ll pick who\'s closest next, and you can always add more later.</div>'
-      +'<button class="ob-opt hot" onclick="obStartImport()"><span class="ic acc">📇</span><span><h3>Import from your phone</h3><p>One tap. Pick exactly who to keep.</p></span><span class="go">→</span></button>'
+      +'<h1>Bring in everyone.</h1>'
+      +'<div class="ob-sub">Your whole address book, silent and searchable.</div>'
+      +'<button class="ob-opt hot" onclick="obStartImport()"><span class="ic cor">📇</span><span><h3>Import from Google</h3><p>One tap. Nobody is added to your day.</p></span><span class="go">→</span></button>'
       +'<button class="ob-opt" onclick="obAddByHand()"><span class="ic">✍️</span><span><h3>Paste or add by hand</h3><p>A signature, a bio, or one at a time.</p></span><span class="go">→</span></button>'
       +'<div class="ob-grow"></div>'
       +((DB.contacts&&DB.contacts.length)?'<button class="ob-btn primary" onclick="go(\'onboard\',\'circle\')">Continue</button>':'')
       +'<button class="ob-btn ghost" onclick="obSkip()">I\'ll do this later</button>'
-      +'<div class="ob-fine">The moment your contacts land, we move you straight on. No pop-ups.</div>';
+      +'<div class="ob-fine">Not one person becomes a task.</div>';
   } else if(step==='hello'){
     /* C4, the first-hello graft (Phase 3): reuses obTopInner() for who, and the same freshDraft() +
        sendChannel()/_confirmSent() mechanic compose() already uses for drafting and sending, so this
@@ -1865,7 +1879,7 @@ function viewOnboard(step){
       +'<div class="grow"><div class="nm">'+esc(hc.name)+'</div><div class="sub">'+_tierLabel+(_reason?' · '+esc(_reason):'')+'</div></div></div>'
       +'<textarea id="msg" style="margin-top:12px;min-height:120px">'+esc(_draft)+'</textarea></div>'
       +'<div class="ob-grow"></div>'
-      +(_wa?'<button class="ob-btn primary" onclick="obHelloSend()">Send on WhatsApp</button>':'<div class="muted" style="text-align:center">No usable phone number. Add one with its country code to message on WhatsApp.</div>')
+      +(_wa?'<button class="ob-btn coral" onclick="obHelloSend()">Send on WhatsApp</button>':'<div class="muted" style="text-align:center">No usable phone number. Add one with its country code to message on WhatsApp.</div>')
       +'<button class="ob-btn ghost" onclick="go(\'onboard\',\'circle\')">Pick someone else</button>'
       +'<button class="ob-btn ghost" onclick="obFinish()">Not now</button>';
   } else {
@@ -1878,7 +1892,7 @@ function viewOnboard(step){
       +'<div class="ob-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="obSpotQ" type="text" placeholder="search '+DB.contacts.length+' people" autocomplete="off" autocapitalize="words" value="'+esc(q)+'" oninput="obSpotFilter(this.value)"></div>'
       +'<div class="ob-people" id="obSpotList">'+obSpotListHTML(q)+'</div>'
       +'<div class="ob-count">'+(chosen?(chosen+' chosen'+(chosen>=5?' · a warm, close circle':'')):'Search above to choose')+'</div>'
-      +'<button class="ob-btn primary" onclick="go(\'onboard\',\'hello\')">'+(chosen?'Start keeping them warm':'Skip for now')+'</button>';
+      +'<button class="ob-btn coral" onclick="go(\'onboard\',\'hello\')">'+(chosen?'Start keeping them warm':'Skip for now')+'</button>';
   }
   h+='</div></div>';
   render(h);
