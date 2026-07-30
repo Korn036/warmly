@@ -11,7 +11,7 @@ const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo', BDAY_TOAST_KEY='sovenn.bd
    this-device affordance, and anything inside DB rides mergeDB() to every other device. Same
    reasoning as UNDO_KEY above. */
 const RETIER_KEY='sovenn.retierUndo';
-const VERSION='0.69.2', BUILT='2026-07-26';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.70.0', BUILT='2026-07-30';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -337,8 +337,8 @@ function _abs(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u)?u:('htt
 function liUrl(u){ return /linkedin\.com/i.test(u)?_abs(u):('https://www.linkedin.com/in/'+_handle(u)); }
 /* only ever let http(s)/mailto/tel reach an href; neutralises javascript:/data: URIs from imported or synced fields */
 function safeUrl(u){ u=String(u==null?'':u).trim(); return /^(https?:|mailto:|tel:)/i.test(u)?u:'#'; }
-/* an imported or synced address can smuggle mailto header fields (?cc= ?bcc= ?subject= ?body=), which would quietly pre-fill a hidden recipient the moment the user taps Email; cut anything after the '?' and only let a plain single address through */
-function mailUrl(e){ e=String(e==null?'':e).trim().split('?')[0].trim(); return /^[^\s@<>"']+@[^\s@<>"']+$/.test(e)?('mailto:'+e):''; }
+/* an imported or synced address can smuggle mailto header fields (?cc= ?bcc= ?subject= ?body=), which would quietly pre-fill a hidden recipient the moment the user taps Email; cut anything after the '?' and only let a plain single address through. The allowlist forbids '%' and ':' too, so a percent-encoded CRLF (victim@evil.com%0D%0ABcc:...) can't smuggle a header once the mail client decodes the URI. */
+function mailUrl(e){ e=String(e==null?'':e).trim().split('?')[0].trim(); return /^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(e)?('mailto:'+e):''; }
 function socialLinks(c){ const o=[];
   const wa=c.phone?normalizePhone(c.phone):''; if(wa) o.push(['wa','WhatsApp','https://wa.me/'+wa]);
   if(c.phone) o.push(['call','Call','tel:'+c.phone.replace(/[^\d+]/g,'')]);

@@ -52,6 +52,8 @@ tooling/node_modules/
 tooling/test-results/
 tooling/playwright-report/
 tooling/package-lock.json
+# underscore-prefixed tooling scripts are local QA/render scratch harnesses, never ship them
+tooling/_*.mjs
 SHA256SUMS
 
 # wrangler files
