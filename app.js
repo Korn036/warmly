@@ -133,7 +133,7 @@ function persist(){
     if(raw){ const disk=JSON.parse(raw); if(disk&&disk.contacts&&(disk.savedAt||0)!==_lastSavedAt){ DB=mergeDB(DB,disk); snapInit(); } }
   }catch(e){}
   DB.savedAt=Date.now(); _lastSavedAt=DB.savedAt;
-  try{ localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
+  try{ const s=JSON.stringify(DB); localStorage.setItem(KEY, s); window._dbBytes=s.length; return true; }
   catch(e){ logErr('save', e); return false; }
 }
 /* keep this tab's in-memory DB fresh when ANOTHER tab writes, and re-render — pairs with the
@@ -141,9 +141,51 @@ function persist(){
 window.addEventListener('storage', function(ev){ if(ev.key!==KEY||!ev.newValue) return;
   try{ const disk=JSON.parse(ev.newValue); if(disk&&disk.contacts){ DB=mergeDB(DB,disk); _lastSavedAt=disk.savedAt||_lastSavedAt; snapInit(); if(window.route) route(); } }catch(e){}
 });
+/* v0.71.0 (audit Critical-3): a failed save must never look like success. First failure still gets the
+   blocking alert; after that a persistent banner owns the truth until a later save actually lands.
+   A soft meter warns BEFORE the wall so the failure state is rare in the first place. */
+const QUOTA_WARN=4000000;  /* ~80% of the usual 5M-unit localStorage budget (string length = UTF-16 units) */
+let _saveFailed=false,_quotaLater=false;
+function saveHealthUI(){
+  var bar=document.getElementById('savebar');
+  var warn=!_saveFailed&&!_quotaLater&&(window._dbBytes||0)>QUOTA_WARN;
+  if(!_saveFailed&&!warn){ if(bar) bar.remove(); return; }
+  if(!bar){ bar=document.createElement('div'); bar.id='savebar'; document.body.appendChild(bar); }
+  bar.className='savebar'+(_saveFailed?' bad':'');
+  bar.innerHTML=_saveFailed
+    ? 'Storage is full. Your latest changes are <b>not saved</b> on this device yet. <button class="linkbtn" onclick="go(\'settings\',\'data\')">Free up space</button>'
+    : 'Sovenn is using most of its storage space. Back up now so nothing is ever lost. <button class="linkbtn" onclick="go(\'settings\',\'data\')">Back up</button><button class="linkbtn dim" onclick="quotaLater()">Later</button>';
+}
+window.quotaLater=function(){ _quotaLater=true; saveHealthUI(); };
+/* v0.71.0 (audit Critical-2): iOS Safari clears ALL script-writable storage for a NON-installed site
+   after ~7 days without a visit, and storage.persist() is a no-op there. The one real protection is
+   Add to Home Screen, so nudge exactly that audience once they have something to lose. Dismissal is a
+   device-local key (never on DB, it must not sync to other devices). */
+const IOS_NUDGE_KEY='sovenn.iosNudge';
+function iosNeedsInstallNudge(){
+  try{
+    var ua=navigator.userAgent||'';
+    var isIOS=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    var standalone=(navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+    return isIOS&&!standalone;
+  }catch(e){ return false; }
+}
+function iosInstallCard(){
+  try{
+    if(!iosNeedsInstallNudge()||!(DB.contacts&&DB.contacts.length)) return '';
+    if(localStorage.getItem(IOS_NUDGE_KEY)==='1') return '';
+  }catch(e){ return ''; }
+  return '<div class="card ios-nudge"><div class="kick">Keep your people safe</div>'
+    +'<div class="muted">You are using Sovenn as a browser tab. iPhones can clear a tab’s storage after about a week away. Add Sovenn to your Home Screen and everything stays put: tap <b>Share</b>, then <b>Add to Home Screen</b>.</div>'
+    +'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="iosNudgeDismiss()">Got it</button></div></div>';
+}
+window.iosNudgeDismiss=function(){ try{ localStorage.setItem(IOS_NUDGE_KEY,'1'); }catch(e){} route(); };
 function save(){ stampChanges();
-  if(!persist()){ alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.'); return false; }
-  schedulePush(); return true;
+  if(!persist()){
+    if(!_saveFailed) alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.');
+    _saveFailed=true; saveHealthUI(); return false; }
+  if(_saveFailed){ _saveFailed=false; toast('Saved. Everything is safely on this device again.'); }
+  saveHealthUI(); schedulePush(); return true;
 }
 /* ---- privacy-respecting LOCAL diagnostics: errors stay on the device (capped ring buffer); the user can copy them into beta feedback. NO network, ever. ---- */
 function logErr(where, e){ try{
@@ -245,6 +287,24 @@ function mergeDB(local,remote){ const out=JSON.parse(JSON.stringify(local)); con
     merged.notes=_mergeArr(lc.notes,rc.notes,n=>n&&(n.id||((n.date||'')+'|'+(n.text||''))));
     merged.msgHistory=_mergeArr(lc.msgHistory,rc.msgHistory,m=>m&&(typeof m==='object'?(m.id||((m.at||'')+'|'+(m.text||m.opener||''))):String(m)));
     merged.log=_mergeArr(lc.log,rc.log,l=>l&&(typeof l==='object'?(l.id||((l.at||l.date||'')+'|'+(l.type||''))):String(l)));
+    /* v0.71.0 (audit 2026-08-01, Critical-1): the other eight array fields used to fall through to
+       whole-object newer-wins, silently dropping the older side's additions (a gift added on the phone
+       vanished if the laptop edited the same contact later). Union them like notes/log. Same accepted
+       trade-off as notes: an item deleted on one device while another still holds it can reappear after
+       a merge; a rare resurrection beats silent loss. Winner-side items go FIRST so on a key collision
+       (same task/gift id on both sides) the newer contact's copy wins, keeping mutable sub-fields like
+       task.done and gift.status current. Fields empty on both sides stay absent (no []-bloat on the
+       serialized DB). */
+    const w=(rc.updatedAt||0)>(lc.updatedAt||0)?rc:lc, o=(w===rc)?lc:rc;
+    const _u=(f,keyOf)=>{ if((w[f]&&w[f].length)||(o[f]&&o[f].length)) merged[f]=_mergeArr(w[f],o[f],keyOf); };
+    _u('tags',t=>String(t));
+    _u('children',x=>x&&(x.name||JSON.stringify(x)));
+    _u('pets',x=>x&&(x.name||JSON.stringify(x)));
+    _u('activities',x=>x&&(x.id||((x.date||'')+'|'+(x.text||''))));
+    _u('tasks',x=>x&&(x.id||(x.text||'')));
+    _u('gifts',x=>x&&(x.id||(x.desc||'')));
+    _u('debts',x=>x&&(x.id||((x.dir||'')+'|'+(x.amount||'')+'|'+(x.note||''))));
+    _u('customDates',x=>x&&((x.label||'')+'|'+(x.m||0)+'-'+(x.d||0)));
     byId[rc.id]=merged; });
   const now=Date.now();
   const del={}; [remote.deleted||{},out.deleted||{}].forEach(m=>Object.keys(m).forEach(id=>{ del[id]=Math.max(del[id]||0,m[id]); }));
@@ -679,6 +739,7 @@ function viewToday(){
       : '<div class="card" style="text-align:center;padding:22px"><div class="kick" style="margin:0">No one chosen yet</div><div class="sub" style="margin-top:6px">'+(DB.contacts.length===1?'1 person is':DB.contacts.length+' people are')+' in your directory, searchable and quiet. Pick your inner circle and we will write the first line.</div></div>';
   }
   h+=setupCard();  /* self-ticking "Get set up" checklist sits just under the deck (F3 part B, additive) */
+  h+=iosInstallCard();  /* v0.71.0: iOS-Safari-only Add to Home Screen nudge, dismissible (audit Critical-2) */
   /* progress: warmth */
   const tracked=DB.contacts.filter(c=>c.cadence);
   const warm=Math.max(0, tracked.length - due.filter(d=>d.c.cadence).length);
@@ -1425,7 +1486,8 @@ function viewSettings(section){
     h+='<div class="kick">Sync across your devices</div><div class="card"><div class="muted">Link your Google account once on each device. Sovenn keeps a private copy in a hidden folder of <b>your own</b> Google Drive (app-only) and syncs automatically. No Sovenn server ever touches your contacts.</div>'
       +'<div class="btn-row" style="margin-top:12px">'+(connected?'<button class="btn primary sm" onclick="syncNow()">Sync now</button><button class="btn ghost sm" onclick="gDisconnect()">Disconnect</button>':'<button class="btn primary sm" onclick="gConnect()">Sign in with Google</button>')+'</div>'
       +'<div id="gstat" class="muted" style="margin-top:10px;font-size:12.5px">'+(connected?'Connected, auto-syncs on changes':'Not connected')+'</div></div>';
-    h+='<div class="kick">Backup &amp; move device</div><div class="card"><div class="muted">Your data lives only in this browser. Export a backup to keep it safe or move it.</div>'
+    h+='<div class="kick">Backup &amp; move device</div><div class="card"><div class="muted">Your data lives only in this browser. Export a backup to keep it safe or move it.'
+      +(iosNeedsInstallNudge()?' On iPhone, a plain browser tab can be cleared by iOS after about a week of not opening it. Add Sovenn to your Home Screen (Share, then Add to Home Screen) or keep a backup, and your people are safe.':'')+'</div>'
       +'<div class="btn-row" style="margin-top:12px"><button class="btn primary sm" onclick="exportEnc()">Encrypted backup</button><button class="btn ghost sm" onclick="exportJSON()">Plain JSON</button>'
       +'<button class="btn ghost sm" onclick="document.getElementById(\'imp\').click()">Restore backup</button><input type="file" id="imp" accept=".enc,.kith,.json" style="display:none" onchange="importFile(event)"></div>'
       +(localStorage.getItem(UNDO_KEY)?'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="undoRestore()">Undo last restore</button></div>':'')+'</div>';
@@ -1659,7 +1721,9 @@ window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   c.name=g('e_name')||'Unnamed'; c.callName=g('e_call')||firstName(c.name)||c.name; c.petName=g('e_pet'); c.style=g('e_style'); c.review=false; c.phone=g('e_phone'); c.tier=+$('#e_tier').value; c.email=g('e_email'); c.linkedin=g('e_li'); c.instagram=g('e_ig'); c.x=g('e_x'); c.telegram=g('e_tg'); c.website=g('e_web');
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; if(!id && !c.cadence) c.cadence=cadenceForTier(c.tier); c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
-  save(); closeModal(); route();
+  /* v0.71.0 (audit Critical-3): stay in the editor when the write failed, so the user can free space
+     and press Save again without retyping; the edits are kept in memory and the savebar tells the truth. */
+  if(save()){ closeModal(); route(); }
 };
 /* ---- Quick add: paste anything, we extract the details ---- */
 const _MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
@@ -1773,10 +1837,14 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
     if(g('qa_job')&&!c.jobTitle) c.jobTitle=g('qa_job');
     if(g('qa_ctx')&&!c.context) c.context=g('qa_ctx');
     if(bd&&!c.bday) c.bday=bd;
-    c.review=false; save(); closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); return;
+    c.review=false; if(save()){ closeModal(); alert('Updated '+(callName(c)||c.name)+' from their details.'); go('person',c.id); } return;
   }
   const nc={id:uid(),customDates:[],log:[],createdAt:new Date().toISOString(),name:name,callName:(g('qa_call')||firstName(name)),petName:g('qa_pet'),phone:phone,location:g('qa_loc'),tier:+$('#qa_tier').value,cadence:cadenceForTier(+$('#qa_tier').value),email:g('qa_email'),linkedin:g('qa_li'),instagram:g('qa_ig'),x:g('qa_x'),telegram:g('qa_tg'),website:g('qa_web'),company:g('qa_company'),jobTitle:g('qa_job'),context:g('qa_ctx'),bday:bd,review:true};
-  DB.contacts.push(nc); save(); closeModal(); go('person',nc.id); };
+  DB.contacts.push(nc);
+  /* v0.71.0 (audit Critical-3): only navigate on a REAL save. On quota failure roll the push back so
+     memory matches disk and a retry can't create a duplicate; the alert + savebar own the messaging. */
+  if(save()){ closeModal(); go('person',nc.id); }
+  else { DB.contacts=DB.contacts.filter(x=>x.id!==nc.id); snapInit(); } };
 
 /* ===== Capture hub: every effortless way to add someone, in one place ===== */
 function capIcon(k){ const I={

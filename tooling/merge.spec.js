@@ -47,6 +47,44 @@ test('tombstones older than 90 days are pruned so DB.deleted cannot grow forever
   expect('z' in out.deleted, 'stale tombstone should be gone').toBe(false);
 });
 
+// v0.71.0 regression guards (audit 2026-08-01, Critical-1): the eight array fields that used to fall
+// through to whole-object newer-wins. Each test fails on pre-fix mergeDB (verified by mutation check).
+
+test('gift added on the older device survives a newer scalar edit on the other device', async ({ page }) => {
+  const local = { contacts: [{ id: 'x', updatedAt: 1, gifts: [{ id: 'g1', desc: 'book', status: 'idea' }] }], deleted: {}, savedAt: 1 };
+  const remote = { contacts: [{ id: 'x', updatedAt: 2, context: 'met at expo' }], deleted: {}, savedAt: 2 };
+  const out = await merge(page, local, remote);
+  expect(out.contacts[0].context, 'newer scalar must still win').toBe('met at expo');
+  expect((out.contacts[0].gifts || []).map(g => g.id), 'older side gift must survive').toEqual(['g1']);
+});
+
+test('tags, children, pets, customDates union across devices', async ({ page }) => {
+  const local = { contacts: [{ id: 'x', updatedAt: 2, tags: ['uni'], children: [{ name: 'Mia', age: '4' }], customDates: [{ label: 'work anniversary', m: 3, d: 4 }] }], deleted: {}, savedAt: 2 };
+  const remote = { contacts: [{ id: 'x', updatedAt: 1, tags: ['climbing'], pets: [{ name: 'Rex', kind: 'dog' }], customDates: [{ label: 'moved abroad', m: 7, d: 1 }] }], deleted: {}, savedAt: 1 };
+  const out = await merge(page, local, remote);
+  const c = out.contacts[0];
+  expect(c.tags.sort(), 'tags from both devices').toEqual(['climbing', 'uni']);
+  expect(c.children.map(k => k.name), 'children survive').toEqual(['Mia']);
+  expect(c.pets.map(p => p.name), 'pets from the older side survive').toEqual(['Rex']);
+  expect(c.customDates.map(d => d.label).sort(), 'custom reminders union').toEqual(['moved abroad', 'work anniversary']);
+});
+
+test('same task id on both sides: the newer contact side wins the collision (done state kept)', async ({ page }) => {
+  const local = { contacts: [{ id: 'x', updatedAt: 1, tasks: [{ id: 't1', text: 'call back', done: false }] }], deleted: {}, savedAt: 1 };
+  const remote = { contacts: [{ id: 'x', updatedAt: 2, tasks: [{ id: 't1', text: 'call back', done: true }] }], deleted: {}, savedAt: 2 };
+  const out = await merge(page, local, remote);
+  expect(out.contacts[0].tasks, 'no duplicate task rows').toHaveLength(1);
+  expect(out.contacts[0].tasks[0].done, 'newer side done state must win').toBe(true);
+});
+
+test('fields empty on both sides stay absent, not empty arrays (DB size guard)', async ({ page }) => {
+  const local = { contacts: [{ id: 'x', updatedAt: 2, name: 'A' }], deleted: {}, savedAt: 2 };
+  const remote = { contacts: [{ id: 'x', updatedAt: 1, name: 'A' }], deleted: {}, savedAt: 1 };
+  const out = await merge(page, local, remote);
+  for (const f of ['tags', 'children', 'pets', 'activities', 'tasks', 'gifts', 'debts', 'customDates'])
+    expect(f in out.contacts[0], f + ' must not be materialized as []').toBe(false);
+});
+
 test('a restored contact (freshly stamped) beats a stale tombstone', async ({ page }) => {
   // mirrors the restore path: contact stamped now, so a pre-existing tombstone can't re-delete it
   const now = Date.now();

@@ -717,3 +717,12 @@ textarea{ resize:vertical; min-height:90px; line-height:1.5; }
   .tbtns{ margin-left:auto; }
   .three{ grid-template-columns:1fr 1fr 1fr; gap:6px; }
 }
+
+/* v0.71.0 save-health bar (audit Critical-3): persistent truth about unsaved changes / storage pressure.
+   Body-level fixed bar so route() re-renders never remove it; sits above the FAB, both skins legible. */
+.savebar{ position:fixed; left:0; right:0; bottom:0; z-index:8500; padding:11px 16px calc(11px + env(safe-area-inset-bottom,0px)); text-align:center; font-family:var(--serif); font-size:13.5px; line-height:1.45; background:var(--card); color:var(--ink); border-top:1px solid var(--line); box-shadow:0 -8px 24px rgba(40,30,20,.14); }
+.savebar.bad{ background:#B03A1D; color:#FFF7F0; border-top-color:#8F2E16; }
+.savebar.bad b{ color:#fff; }
+.savebar .linkbtn{ background:none; border:none; padding:0 4px; margin-left:8px; font:inherit; font-weight:700; color:var(--accent); text-decoration:underline; cursor:pointer; }
+.savebar.bad .linkbtn{ color:#FFE1D1; }
+.savebar .linkbtn.dim{ font-weight:600; opacity:.75; }
