@@ -16,8 +16,11 @@ no Sovenn server, no account, and no tracking. Nothing is sent to anyone until *
 ## Run / edit locally
 - Serve the folder over HTTP (e.g. `python -m http.server 8753`) and open it — a real origin is
   needed for the service worker, install, and the Contacts Picker.
-- Everything is hand-editable: `app.js` (views + logic), `styles.css`, `index.html`,
-  feature modules (`shuffle/memory/streak/capture/qr/ai/notify/enrich.js`), `sw.js`.
+- Everything is hand-editable: `app.js` (views + logic), `styles.css`, `index.html`, `sw.js`.
+- Feature modules, two tiers (each file's STATUS header is the source of truth):
+  **live** `shuffle/memory/streak/notify.js` (loaded by app.html) + `capture/qr.js` (lazy-loaded);
+  **built but not wired in** `enrich.js` (import dedupe) and `ai.js` — self-tested in CI, loaded by
+  nothing in the app yet, so changes to them cannot affect production behavior.
 
 ## Getting contacts in
 - **Android:** the in-app Contacts Picker (no sign-in, on-device).

@@ -20,8 +20,8 @@
    everyone who just needs the app to actually remind them — one glanceable
    daily line, not a wall of numbers.
 
-   STATUS: standalone. NOT yet referenced by index.html, app.js or sw.js.
-   No side effects on load beyond defining window.SovennNotify.
+   STATUS: LIVE. Loaded by app.html and precached in sw.js SHELL; app.js drives the daily digest,
+   permission flow, and Settings toggle through SovennNotify. (Header corrected 2026-08-01.)
 
    INTEGRATION (later, all additive): (1) load notify.js in index.html +
    add it to the sw.js SHELL list; (2) on app open / visibilitychange,

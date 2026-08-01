@@ -27,8 +27,8 @@
    Never throws on bad/missing/huge input — always a safe default. Returns
    DATA only; the app renders. No global leakage beyond window.SovennShuffle.
 
-   STATUS: standalone. NOT referenced by index.html / app.js / sw.js. No
-   side effects on load beyond defining window.SovennShuffle.
+   STATUS: LIVE. Loaded by app.html and precached in sw.js SHELL; app.js calls SovennShuffle for the
+   Today deck, serendipity resurfacing, and directory-mode Spotlight ranking. (Header corrected 2026-08-01.)
 
    INTEGRATION (later, additive): in the daily view, call
      var top = SovennShuffle.pick(DB.contacts, {today:todayISO(), seed:daySeed, limit:1});
