@@ -42,3 +42,17 @@ test('soft storage meter warns before the wall and can be snoozed', async ({ pag
   await page.click('#savebar >> text=Later');
   await expect(page.locator('#savebar')).toHaveCount(0);
 });
+
+// (review finding) the full "New contact" editor path: a failed save must roll back its push, or the
+// retry (Save button re-enters with id='') would create a second uid() copy of the same person.
+test('quota-failed editor save: retry produces exactly one contact, not duplicates', async ({ page }) => {
+  page.on('dialog', d => d.accept());
+  await page.goto('/app.html#people');
+  await page.evaluate(() => { window._failWrites = true; editContact(''); });
+  await page.fill('#e_name', 'Retry Rita');
+  await page.evaluate(() => saveContact(''));
+  expect(await page.evaluate(() => DB.contacts.filter(c => c.name === 'Retry Rita').length), 'failed push must roll back').toBe(0);
+  await page.evaluate(() => { window._failWrites = false; return saveContact(''); });
+  const n = await page.evaluate(() => JSON.parse(localStorage.getItem('kith.v1')).contacts.filter(c => c.name === 'Retry Rita').length);
+  expect(n, 'one tap-retry, ONE contact').toBe(1);
+});

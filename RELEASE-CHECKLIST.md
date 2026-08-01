@@ -27,3 +27,7 @@ files marked [CRITICAL] must get a deliberate diff-read on every change.
 ## After deploy
 - [ ] Poll the live `app.js` VERSION to confirm the deploy went live
 - [ ] Spot-check the live site loads + Today renders
+- [ ] If any vendored OCR file (ocr-core.wasm.js / ocr-tesseract.min.js / ocr-worker.min.js /
+      eng.traineddata.gz) is ever upgraded, RENAME it (and its 3 references in app.js + the _headers
+      rules): those paths are served with a 1-year immutable Cache-Control, so an in-place swap would
+      leave returning users on the old copy for up to a year.

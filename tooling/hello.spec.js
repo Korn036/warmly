@@ -159,3 +159,16 @@ test('quick add during onboarding returns to the circle step instead of abandoni
   const saved = await page.evaluate(() => DB.contacts.some(c => c.name === 'Wizard Wanda'));
   expect(saved, 'the contact must still be saved').toBe(true);
 });
+
+// (review finding) leaving the wizard by plain navigation must end the onboarding flow flag, so a
+// LATER unrelated quick-add goes to the person page, not back into the wizard.
+test('back-navigating out of onboarding clears the flow: later quick add goes to the person page', async ({ page }) => {
+  await page.goto('/app.html#onboard/import');
+  await page.evaluate(() => { window.obAddByHand(); closeModal(); });    // enter the flow, then bail out
+  await page.evaluate(() => { location.hash = '#today'; });              // back/away navigation
+  await expect.poll(() => page.evaluate(() => window._obFlow)).toBe(false);
+  await page.evaluate(() => { window.quickAdd(); });
+  await page.fill('#qa_name', 'Later Lena');
+  await page.evaluate(() => quickSave());
+  await expect.poll(() => page.evaluate(() => location.hash), 'must go to the person page, not the wizard').toContain('#person/');
+});

@@ -11,7 +11,7 @@ const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo', BDAY_TOAST_KEY='sovenn.bd
    this-device affordance, and anything inside DB rides mergeDB() to every other device. Same
    reasoning as UNDO_KEY above. */
 const RETIER_KEY='sovenn.retierUndo';
-const VERSION='0.70.0', BUILT='2026-07-30';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.71.0', BUILT='2026-08-01';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
@@ -109,7 +109,7 @@ function defaultCountry(){ try{
   }catch(e){} return '91'; }
 let DB = load();
 function load(){
-  try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.contacts) return d; }catch(e){}
+  try{ const raw=localStorage.getItem(KEY); const d=JSON.parse(raw); if(d&&d.contacts){ window._dbBytes=raw.length; return d; } }catch(e){}
   return { v:1, contacts:[], templates:DEFAULT_TEMPLATES.slice(), settings:{ myName:'', country:defaultCountry(), leadDays:1, localTouch:true } };
 }
 /* change-tracking so devices merge cleanly (newest edit per contact wins) */
@@ -149,12 +149,15 @@ let _saveFailed=false,_quotaLater=false;
 function saveHealthUI(){
   var bar=document.getElementById('savebar');
   var warn=!_saveFailed&&!_quotaLater&&(window._dbBytes||0)>QUOTA_WARN;
-  if(!_saveFailed&&!warn){ if(bar) bar.remove(); return; }
+  if(!_saveFailed&&!warn){ if(bar) bar.remove(); document.body.classList.remove('has-savebar'); return; }
   if(!bar){ bar=document.createElement('div'); bar.id='savebar'; document.body.appendChild(bar); }
   bar.className='savebar'+(_saveFailed?' bad':'');
   bar.innerHTML=_saveFailed
     ? 'Storage is full. Your latest changes are <b>not saved</b> on this device yet. <button class="linkbtn" onclick="go(\'settings\',\'data\')">Free up space</button>'
     : 'Sovenn is using most of its storage space. Back up now so nothing is ever lost. <button class="linkbtn" onclick="go(\'settings\',\'data\')">Back up</button><button class="linkbtn dim" onclick="quotaLater()">Later</button>';
+  /* (review finding) lift the FABs and toast above the bar, else it covers the primary + button */
+  document.body.classList.add('has-savebar');
+  document.documentElement.style.setProperty('--savebar-h', (bar.offsetHeight||60)+'px');
 }
 window.quotaLater=function(){ _quotaLater=true; saveHealthUI(); };
 /* v0.71.0 (audit Critical-2): iOS Safari clears ALL script-writable storage for a NON-installed site
@@ -706,6 +709,10 @@ window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
   if((localStorage.getItem('warmly.skin')||'stillmorning')==='auto') applySkin(autoSkinForNow());  /* re-check on every navigation, not just cold boot, so a session left open across sunset still relights */
   const [view,arg]=location.hash.replace('#','').split('/');
+  /* v0.71.0 (review finding): _obFlow is a plain in-memory flag; browser back out of the wizard used
+     to leave it stuck true, so a LATER unrelated quick-add rerouted into onboarding. Any navigation
+     that lands outside the wizard's own views ends the flow. */
+  if(window._obFlow&&view!=='onboard'&&view!=='import') window._obFlow=false;
   document.querySelectorAll('#tabs a, #navMenu a').forEach(a=>{ var on=a.dataset.go===(view||'today'); a.classList.toggle('active',on); if(a.parentNode&&a.parentNode.id==='tabs') a.setAttribute('aria-current', on?'page':'false'); });
   if(window.closeNavMenu) closeNavMenu();
   if(window.closeNotif) closeNotif();
@@ -1732,8 +1739,11 @@ window.saveContact=(id)=>{ const g=i=>$('#'+i).value.trim();
   c.bday=parseDateStr(g('e_bday')); c.anniv=parseDateStr(g('e_anniv')); c.cadence=+g('e_cad')||null; if(!id && !c.cadence) c.cadence=cadenceForTier(c.tier); c.context=g('e_ctx');
   c.address=g('e_addr'); c.location=g('e_loc'); c.jobTitle=g('e_job'); c.company=g('e_co'); c.howMet=g('e_met'); c.food=g('e_food');
   /* v0.71.0 (audit Critical-3): stay in the editor when the write failed, so the user can free space
-     and press Save again without retyping; the edits are kept in memory and the savebar tells the truth. */
+     and press Save again without retyping; the edits are kept in memory and the savebar tells the truth.
+     (Review finding) A NEW contact's failed push must roll back like quickSave's does: the Save button
+     re-enters with id='' on retry and would otherwise push a second uid() copy — one tap, two contacts. */
   if(save()){ closeModal(); route(); }
+  else if(!id){ DB.contacts=DB.contacts.filter(x=>x.id!==c.id); snapInit(); }
 };
 /* ---- Quick add: paste anything, we extract the details ---- */
 const _MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
@@ -2314,6 +2324,7 @@ route();
 /* ask the browser to make our storage persistent so Chrome/Android is far less likely to evict the
    user's whole circle under storage pressure (no account, so this is the only durability lever) */
 try{ if(navigator.storage&&navigator.storage.persist){ navigator.storage.persisted().then(function(p){ if(!p) navigator.storage.persist(); }); } }catch(e){}
+try{ saveHealthUI(); }catch(e){}  /* v0.71.0 (review nit): surface the storage meter on boot, not only after the first edit */
 try{ fbBump('opens'); }catch(e){}
 maybeNudge();
 try{ maybeChurnAsk(); }catch(e){}
