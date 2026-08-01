@@ -17,5 +17,13 @@
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ],
+  "screenshots": [
+    { "src": "shots/today.png", "sizes": "960x2080", "type": "image/png", "form_factor": "narrow", "label": "Today: who to reach out to" },
+    { "src": "shots/compose.png", "sizes": "960x2080", "type": "image/png", "form_factor": "narrow", "label": "A drafted hello, one tap to send" }
+  ],
+  "shortcuts": [
+    { "name": "Today", "url": "./app#today", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "People", "url": "./app#people", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
   ]
 }

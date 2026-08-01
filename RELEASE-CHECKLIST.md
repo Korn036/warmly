@@ -19,6 +19,9 @@ files marked [CRITICAL] must get a deliberate diff-read on every change.
 - [ ] Drive sync round-trips on a clean profile (export -> import / sync)
 - [ ] Opt-in telemetry (if/when added) still OFF by default
 - [ ] Manual install-as-PWA + offline launch on a real Android device (CI cannot fake this)
+- [ ] iOS Safari: Add to Home Screen on a real iPhone, confirm data survives a relaunch, and the
+      install nudge/durability copy reads right (iOS is the platform where an uninstalled tab's
+      storage is wiped after ~7 idle days, so it must not be the one platform never checked)
 - [ ] WhatsApp / Calendar deep-link hand-off works inside the TWA on a real device
 
 ## After deploy

@@ -146,3 +146,16 @@ test('Pick someone else returns to the circle step without finishing onboarding'
   const after = await readDB(page);
   expect(after.settings.onboarded, 'going back to pick someone else must not finish onboarding').not.toBe(true);
 });
+
+// v0.71.0 (audit Medium-8): a quick add taken from INSIDE the wizard must return to the circle
+// step, not orphan onboarding on the person page (which also hid the setup checklist forever,
+// since DB.settings.onboarded was never set on that path).
+test('quick add during onboarding returns to the circle step instead of abandoning the wizard', async ({ page }) => {
+  await page.goto('/app.html#onboard/import');
+  await page.evaluate(() => { window._obFlow = true; window.quickAdd(); });
+  await page.fill('#qa_name', 'Wizard Wanda');
+  await page.evaluate(() => quickSave()); // the modal's Add person button; real-click coverage lives in quota.spec.js
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#onboard/circle');
+  const saved = await page.evaluate(() => DB.contacts.some(c => c.name === 'Wizard Wanda'));
+  expect(saved, 'the contact must still be saved').toBe(true);
+});

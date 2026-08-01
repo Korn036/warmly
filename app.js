@@ -180,13 +180,23 @@ function iosInstallCard(){
     +'<div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" onclick="iosNudgeDismiss()">Got it</button></div></div>';
 }
 window.iosNudgeDismiss=function(){ try{ localStorage.setItem(IOS_NUDGE_KEY,'1'); }catch(e){} route(); };
-function save(){ stampChanges();
+function save(){ clearTimeout(_saveSoonT); _saveSoonT=null; stampChanges();
   if(!persist()){
     if(!_saveFailed) alert('This device’s storage is full, so that change could not be saved. Open Settings and export a backup, then remove a few card photos or long notes to free space.');
     _saveFailed=true; saveHealthUI(); return false; }
   if(_saveFailed){ _saveFailed=false; toast('Saved. Everything is safely on this device again.'); }
   saveHealthUI(); schedulePush(); return true;
 }
+/* v0.71.0 (audit Medium-10): typing fields (name, country, templates, My Card, context) used to run a
+   full stampChanges + double-stringify + full-DB write on EVERY keystroke. saveSoon() batches those to
+   one write per 400ms idle; DB in memory is always current, only the disk write is deferred. Flush on
+   hide/pagehide closes the abrupt-close window. Any interleaved direct save() also flushes (it clears
+   the pending timer above), so ordering can never go backwards. */
+let _saveSoonT=null;
+function saveSoon(){ clearTimeout(_saveSoonT); _saveSoonT=setTimeout(function(){ _saveSoonT=null; save(); },400); }
+function saveFlush(){ if(_saveSoonT){ clearTimeout(_saveSoonT); _saveSoonT=null; save(); } }
+window.addEventListener('pagehide',saveFlush);
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') saveFlush(); });
 /* ---- privacy-respecting LOCAL diagnostics: errors stay on the device (capped ring buffer); the user can copy them into beta feedback. NO network, ever. ---- */
 function logErr(where, e){ try{
     const msg=(e&&(e.message||(e.reason&&e.reason.message)||e.type))||String((e&&e.reason)||e||'');
@@ -891,7 +901,7 @@ function viewPeople(){
   h+='<div class="row between" style="flex-wrap:wrap;gap:8px;align-items:center">';
   h+='<div class="chips" style="margin:6px 0">'+[[0,'all'],[1,'inner circle'],[2,'keep warm'],[3,'loose ties']].map(([t,l])=>'<span class="chip '+((!f.review&&f.tier===t)?'on':'')+'" onclick="pTier('+t+')">'+l+'</span>').join('')+(reviewN?'<span class="chip '+(f.review?'on':'')+'" onclick="pReview()">to review ('+reviewN+')</span>':'')+'</div>';
   h+='<div class="seg">'+[['tiles','tiles'],['list','list'],['area','area']].map(([m,l])=>'<button class="'+(mode===m?'on':'')+'" onclick="pView(\''+m+'\')">'+l+'</button>').join('')+'</div>';
-  h+='<select class="sortsel" onchange="pSort(this.value)">'+[['name','A to Z'],['overdue','most overdue'],['recent','recently contacted'],['close','closeness']].map(([v,l])=>'<option value="'+v+'"'+(sort===v?' selected':'')+'>'+l+'</option>').join('')+'</select>';
+  h+='<select class="sortsel" aria-label="Sort people" onchange="pSort(this.value)">'+[['name','A to Z'],['overdue','most overdue'],['recent','recently contacted'],['close','closeness']].map(([v,l])=>'<option value="'+v+'"'+(sort===v?' selected':'')+'>'+l+'</option>').join('')+'</select>';
   h+='</div>';
   if(!list.length){ h+='<div class="empty">No matches.</div></div>'; return render(h); }
   if(mode==='area'){
@@ -1072,7 +1082,7 @@ function viewPerson(id){
   h+='</div>'; render(h);
 }
 function detailRow(k,v){ return '<div class="row between" style="padding:8px 0;border-bottom:0.5px solid var(--line)"><span class="sub">'+k+'</span><span style="text-align:right;font-size:14px">'+v+'</span></div>'; }
-window.saveCtx=(id,v)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.context=v; save(); } };
+window.saveCtx=(id,v)=>{ const c=DB.contacts.find(x=>x.id===id); if(c){ c.context=v; saveSoon(); } };
 /* ---- rich-detail handlers (relationships, notes, activities, tasks, gifts, debts, reminders) ---- */
 function patch(id,fn){ const c=DB.contacts.find(x=>x.id===id); if(c){ fn(c); save(); route(); } }
 const TODAYISO=()=>todayISO();  /* local date, unified with the reminder engine so "today" agrees across notes, logs, and nudges (no UTC split) */
@@ -1245,7 +1255,7 @@ function viewTemplates(){
     h+='<div class="card"><div class="row between"><div class="kick" style="margin-top:0">'+esc(t.name)+' · '+esc(t.occasion)+'</div>'+(def?'':'<a class="sub" style="color:var(--rose);cursor:pointer" onclick="delTemplate(\''+t.id+'\')">delete</a>')+'</div><textarea oninput="tplSet(\''+t.id+'\',this.value)">'+esc(t.body)+'</textarea></div>'; });
   h+='</div>'; render(h);
 }
-window.tplSet=(id,v)=>{ const t=DB.templates.find(x=>x.id===id); if(t){ t.body=v; save(); } };
+window.tplSet=(id,v)=>{ const t=DB.templates.find(x=>x.id===id); if(t){ t.body=v; saveSoon(); } };
 window.addTemplate=()=>{ let h='<button class="x" onclick="closeModal()">&times;</button><h3>New template</h3>';
   h+='<label class="fl">Name</label><input id="t_name" placeholder="e.g. Festival wishes">';
   h+='<label class="fl">When it is for</label><select id="t_occ"><option value="reconnect">reconnect</option><option value="birthday">birthday</option><option value="anniversary">anniversary</option><option value="custom">custom</option></select>';
@@ -1292,7 +1302,7 @@ function renderQR(text, el){ if(!el) return; const q=window.QR&&QR.matrix(text);
   for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(q.modules[r][c]) ctx.fillRect((c+quiet)*scale,(r+quiet)*scale,scale,scale); }
   cv.className='qrcanvas'; el.innerHTML=''; el.appendChild(cv);
 }
-window.setMe=(k,v)=>{ DB.me=DB.me||{}; DB.me[k]=v; save(); clearTimeout(_qrT); _qrT=setTimeout(()=>{ const el=document.getElementById('qrbox'); if(el) ensureQR().then(()=>renderQR(myVCard(), el)); },400); };
+window.setMe=(k,v)=>{ DB.me=DB.me||{}; DB.me[k]=v; saveSoon(); clearTimeout(_qrT); _qrT=setTimeout(()=>{ const el=document.getElementById('qrbox'); if(el) ensureQR().then(()=>renderQR(myVCard(), el)); },400); };
 window.mePhoto=(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return;
   const rd=new FileReader(); rd.onload=()=>{ const img=new Image();
     img.onload=()=>{ const s=Math.min(1,256/Math.max(img.width,img.height)); const w=Math.round(img.width*s), h=Math.round(img.height*s); const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); DB.me=DB.me||{}; try{ DB.me.photo=cv.toDataURL('image/jpeg',0.6); }catch(e){ DB.me.photo=rd.result; } save(); route(); };
@@ -1553,7 +1563,7 @@ function viewSettings(section){
   render(h+'</div></div>');
 }
 window.settingsFilter=function(){ var el=document.getElementById('setSearch'); if(!el) return; var q=(el.value||'').toLowerCase().trim(); var rows=document.querySelectorAll('#setList [data-kw]'); for(var i=0;i<rows.length;i++){ var r=rows[i]; var hay=((r.getAttribute('data-kw')||'')+' '+(r.textContent||'')).toLowerCase(); r.style.display=(!q||hay.indexOf(q)>=0)?'':'none'; } };
-window.setS=(k,v)=>{ DB.settings[k]=v; save(); };
+window.setS=(k,v)=>{ DB.settings[k]=v; saveSoon(); };
 window.toggleLocal=()=>{ DB.settings.localTouch=(DB.settings.localTouch===false); save(); route(); };
 window.toggleNotify=async()=>{ DB.settings=DB.settings||{};
   if(DB.settings.notify){ DB.settings.notify=false; save(); route(); return; }
@@ -1843,7 +1853,13 @@ window.quickSave=()=>{ const name=$('#qa_name').value.trim(); if(!name){ alert('
   DB.contacts.push(nc);
   /* v0.71.0 (audit Critical-3): only navigate on a REAL save. On quota failure roll the push back so
      memory matches disk and a retry can't create a duplicate; the alert + savebar own the messaging. */
-  if(save()){ closeModal(); go('person',nc.id); }
+  if(save()){ closeModal();
+    /* v0.71.0 (audit Medium-8): a quick add taken from INSIDE the wizard used to jump to the person
+       page and orphan the rest of onboarding (circle pick + first hello never happened, and the
+       checklist never showed because onboarded was never set). Return to the wizard instead, same as
+       the import path above. */
+    if(window._obFlow){ go('onboard','circle'); toast('Saved '+(callName(nc)||nc.name)+'. Now pick your inner circle.'); }
+    else go('person',nc.id); }
   else { DB.contacts=DB.contacts.filter(x=>x.id!==nc.id); snapInit(); } };
 
 /* ===== Capture hub: every effortless way to add someone, in one place ===== */
