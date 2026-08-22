@@ -333,7 +333,7 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
     const remote=_gfile?await gDownload(_gfile):null; let changed=false;
     if(remote&&remote.contacts){ const before=JSON.stringify(DB.contacts); DB=mergeDB(DB,remote); snapInit(); changed=JSON.stringify(DB.contacts)!==before; }
     /* persist the merged result through the same quota-guarded path as save(); never claim "Synced" if the local write failed */
-    if(!persist()){ _gstatus('Storage full — couldn’t save the synced copy here. Free a little space, then retry.'); return; }
+    if(!persist()){ _gstatus('Storage full: couldn’t save the synced copy here. Free a little space, then retry.'); return; }
     const up=await gUpload(_gfile,DB);
     if(up&&up.ok){
       if(!_gfile){ try{ const j=await up.json(); if(j&&j.id) _gfile=j.id; }catch(_){ _gfile=await gFindFile(); } }  /* capture the new file id so the next sync PATCHes instead of creating a duplicate */
@@ -341,12 +341,12 @@ async function syncNow(){ if(!_gtok||_gsyncing) return; _gsyncing=true; _gstatus
       _gstatus('Synced · '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
     } else if(up&&up.status===401){
       _gtok=null; try{ sessionStorage.removeItem('warmly.gtok'); }catch(_){}    /* token expired: stop the silent-retry loop and tell the truth */
-      _gstatus('Sign in again to resume Drive backup — your changes are saved on this device.');
+      _gstatus('Sign in again to resume Drive backup. Your changes are saved on this device.');
     } else {
       if(up&&up.status===404&&_gfile) _gfile=null;                            /* backup file vanished remotely: recreate it on the next sync */
-      _gstatus('Backup didn’t go through — your changes are saved on this device. Will retry.');
+      _gstatus('Backup didn’t go through. Your changes are saved on this device. Will retry.');
     }
-  }catch(e){ logErr('sync', e); _gstatus('Sync paused (offline?) — your changes are saved on this device. Will retry.'); }
+  }catch(e){ logErr('sync', e); _gstatus('Sync paused (offline?). Your changes are saved on this device. Will retry.'); }
   finally{ _gsyncing=false; } }
 window.syncNow=syncNow;
 function schedulePush(){ if(localStorage.getItem('warmly.gsync')!=='1'||!_gtok) return; clearTimeout(_gpush); _gpush=setTimeout(syncNow,2500); }
@@ -704,6 +704,21 @@ const WORLD_PATHS='<g class="map-land">'
    =================================================================== */
 function go(view,arg){ location.hash = '#'+view+(arg?('/'+arg):''); }
 window.addEventListener('hashchange',route);
+let _exitGuardArmed=false, _exitArmed=false, _exitTimer=null;
+function _armExitGuardOnce(){
+  if(_exitGuardArmed) return;
+  _exitGuardArmed=true;
+  try{ history.pushState({sovennExit:true},'',location.href); }catch(e){}
+}
+window.addEventListener('popstate', function(){
+  const view=(location.hash.replace('#','').split('/')[0])||'today';
+  if(view!=='today'){ _exitGuardArmed=false; return; }
+  if(_exitArmed){ _exitArmed=false; clearTimeout(_exitTimer); _exitGuardArmed=false; return; }
+  _exitArmed=true; _exitGuardArmed=false;
+  toast('Press back again to exit');
+  _armExitGuardOnce();
+  _exitTimer=setTimeout(()=>{ _exitArmed=false; },2000);
+});
 let _lastView='', _shuffleId=null, _rerollN=0;
 window.shuffleToday=()=>{ _shuffleId='reroll'; _rerollN++; route(); };
 function route(){
@@ -719,6 +734,7 @@ function route(){
   const v=view||'today';
   if(v==='today' && _lastView!=='today') _shuffleId='reroll';
   _lastView=v;
+  if(v==='today') _armExitGuardOnce();
   ({ today:viewToday, people:viewPeople, person:viewPerson, map:viewMap, mycard:viewMyCard, import:viewImport, templates:viewTemplates, settings:viewSettings, onboard:viewOnboard }[v]||viewToday)(arg);
   if(window.updateBell) updateBell();
   window.scrollTo(0,0);
@@ -1366,6 +1382,16 @@ window.feedbackSend=function(){ var ta=document.getElementById('fbText'); var t=
   window.open(u,'_blank','noopener'); feedbackClose(); };
 window.feedbackDiag=function(){ if(window.copyDiag){ copyDiag(); } };
 window.fbHide=function(){ feedbackClose(); };
+window.rateSovenn=function(){
+  var pkg='app.sovenn.twa';
+  var web='https://play.google.com/store/apps/details?id='+pkg;
+  try{
+    var fellBack=false;
+    var t=setTimeout(function(){ fellBack=true; window.open(web,'_blank','noopener'); }, 800);
+    document.addEventListener('visibilitychange', function h(){ if(document.hidden){ clearTimeout(t); document.removeEventListener('visibilitychange', h); } });
+    window.location.href='market://details?id='+pkg;
+  }catch(e){ window.open(web,'_blank','noopener'); }
+};
 /* ---- top nav: notification bell + tucked menu ---- */
 function notifItems(){ var out=[]; try{ (dueToReach()||[]).forEach(function(d){ out.push({c:d.c, txt:(d.overdue<0?'Drifting':'Time to say hi'), k:'d'}); }); (upcoming(10)||[]).forEach(function(x){ out.push({c:x.c, txt:String(x.o.label)+' '+whenLabel(x.n), k:'e'}); }); }catch(e){} return out.slice(0,15); }
 function dueCount(){ try{ return notifItems().length; }catch(e){ return 0; } }
@@ -1536,6 +1562,9 @@ function viewSettings(section){
     h+='<div class="card"><div class="nm" style="font-size:15px">Private by design</div><div class="sub" style="margin-top:5px">Your people stay on this device by default. There is no Sovenn account and no Sovenn server, so we never see your contacts, your notes, or your messages. If you turn on Google Drive backup, an encrypted copy goes only to your own Drive, never to us.</div></div>';
     h+='<div class="kick">Diagnostics</div><div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Copy error log</div><div class="sub">If something glitches, copy this and paste it into the feedback chat. Nothing leaves your device until you do.</div></div><button class="btn sm ghost" onclick="copyDiag()">Copy</button></div></div>';
     h+='<div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Your private counts</div><div class="sub">Kept only on this phone, never sent anywhere: '+_fbSummary()+'</div></div><button class="btn sm ghost" onclick="fbClear()">Clear</button></div></div>';
+    h+='<div class="card"><a href="/privacy.html" class="row between" style="color:inherit;text-decoration:none;padding:9px 0"><span class="nm" style="font-size:15px">Privacy Policy</span><span style="color:var(--soft)">&rsaquo;</span></a>'
+      +'<a href="/terms.html" class="row between" style="color:inherit;text-decoration:none;padding:9px 0;border-top:.5px solid var(--line)"><span class="nm" style="font-size:15px">Terms of Service</span><span style="color:var(--soft)">&rsaquo;</span></a></div>';
+    h+='<div class="card"><div class="row between"><div class="grow"><div class="nm" style="font-size:15px">Enjoying Sovenn?</div><div class="sub">A quick rating helps other people find it.</div></div><button class="btn sm ghost" onclick="rateSovenn()">Rate Sovenn</button></div></div>';
     h+='<div class="kick">Danger zone</div><div class="card"><button class="btn ghost sm" style="color:var(--rose)" onclick="wipe()">Erase everything on this device</button></div>';
     h+='<div class="muted" style="margin-top:18px;font-size:12.5px">Sovenn v'+VERSION+', built '+BUILT+', '+DB.contacts.length+' contacts, all local, no tracking.</div>';
     return render(h+'</div>');
@@ -2224,7 +2253,7 @@ function lockPaint(){ const d=document.getElementById('lkDots'); if(!d) return; 
 /* ---- app-lock brute-force resistance: escalating cooldown after repeated wrong passcodes (persists across restarts) ---- */
 function lockFail(){ try{ return JSON.parse(localStorage.getItem('warmly.lockfail'))||{n:0,until:0}; }catch(e){ return {n:0,until:0}; } }
 function lockFailSet(o){ try{ localStorage.setItem('warmly.lockfail', JSON.stringify(o)); }catch(e){} }
-function lockCoolMsg(){ const ms=Math.max(0,(lockFail().until||0)-Date.now()); if(ms>0){ const m=document.getElementById('lkMsg'); if(m){ m.textContent='Too many tries — wait '+Math.ceil(ms/1000)+'s'; m.classList.add('err'); } setTimeout(lockCoolMsg,500); return true; } return false; }
+function lockCoolMsg(){ const ms=Math.max(0,(lockFail().until||0)-Date.now()); if(ms>0){ const m=document.getElementById('lkMsg'); if(m){ m.textContent='Too many tries, wait '+Math.ceil(ms/1000)+'s'; m.classList.add('err'); } setTimeout(lockCoolMsg,500); return true; } return false; }
 function lockShow(){ _unlocked=false; _entered=''; const el=document.getElementById('lockScreen'); if(!el) return;
   el.innerHTML=lockMarkup(); el.style.display='flex'; el.classList.remove('unlocked'); lockPaint();
   const c=lockCfg(); if(c&&c.bio) setTimeout(()=>{ if(!_unlocked) lockTapBio(); }, 350); }

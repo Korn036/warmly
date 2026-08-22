@@ -189,7 +189,7 @@
     var reason = c.lastContacted
       ? (age ? "It's been " + age + ' since you reached out to ' + name + '.'
              : 'Time to reconnect with ' + name + '.')
-      : 'You set a reminder to keep up with ' + name + ' — say hi.';
+      : 'You set a reminder to keep up with ' + name + '. Say hi.';
     return { contact: c, kind: 'reconnect', reason: reason, _n: -over, _order: ORDER.reconnect };
   }
 
@@ -238,7 +238,7 @@
   /* digest: one short, warm summary line for a single daily notification. Pure. */
   function digest(contacts, today){
     var nudges = dueToday(contacts, { today: today, horizonDays: 0, includeOverdueCadence: true });
-    if(!nudges.length) return 'No nudges today — you are all caught up.';
+    if(!nudges.length) return 'No nudges today. You are all caught up.';
     var counts = { birthday: 0, anniversary: 0, custom: 0, reconnect: 0 };
     for(var i = 0; i < nudges.length; i++) counts[nudges[i].kind]++;
 
@@ -386,7 +386,7 @@
     ok('digest-birthdays', /2 birthdays today/.test(dg), dg);
     ok('digest-reconnect', /3 people to reconnect with/.test(dg), dg);
     ok('digest-joined', /and/.test(dg) && /\.$/.test(dg), dg);
-    eq('digest-empty', digest([], T), 'No nudges today — you are all caught up.');
+    eq('digest-empty', digest([], T), 'No nudges today. You are all caught up.');
 
     /* robustness: garbage/missing input never throws, returns safe defaults */
     eq('null-contacts', dueToday(null).length, 0);
