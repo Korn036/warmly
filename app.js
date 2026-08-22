@@ -11,7 +11,7 @@ const ERR_KEY='sovenn.errlog', UNDO_KEY='sovenn.undo', BDAY_TOAST_KEY='sovenn.bd
    this-device affordance, and anything inside DB rides mergeDB() to every other device. Same
    reasoning as UNDO_KEY above. */
 const RETIER_KEY='sovenn.retierUndo';
-const VERSION='0.71.0', BUILT='2026-08-01';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
+const VERSION='0.71.1', BUILT='2026-08-22';  /* bumped on every deploy, shown in Settings so you can verify the live site is current */
 const BETA=true;            /* show the floating beta-feedback button; flip to false for public launch */
 const FB_WA='918698636302'; /* beta feedback opens this WhatsApp (you tap send; nothing tracked) */
 const DEFAULT_TEMPLATES=[
