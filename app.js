@@ -446,7 +446,7 @@ function socialRow(c, withAdd, skip){ let links=socialLinks(c); if(skip) links=l
        links) that would make no sense, so those stay plain link-outs. */
     if(withAdd && k==='tg') h+='<button type="button" class="soc soc-'+k+'" onclick="compose(\''+c.id+'\',\'reconnect\',\'tg\')" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</button>';
     else if(withAdd && (k==='ig'||k==='in'||k==='x')) h+='<button type="button" class="soc soc-'+k+'" onclick="reachSocial(\''+c.id+'\',\''+k+'\')" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</button>';
-    else h+='<a class="soc soc-'+k+'" href="'+esc(url)+'" target="_blank" rel="noopener" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</a>';
+    else h+='<a class="soc soc-'+k+'" href="'+esc(safeUrl(url))+'" target="_blank" rel="noopener" title="'+label+'" aria-label="'+label+'">'+socIcon(k)+'</a>';
   });
   if(withAdd) h+='<button class="soc socadd" onclick="event.stopPropagation();editContact(\''+c.id+'\')" title="add a link" aria-label="add a link">+</button>';
   return h+'</div>';
@@ -456,8 +456,8 @@ function socialRow(c, withAdd, skip){ let links=socialLinks(c); if(skip) links=l
    "brave first line" isn't exclusive to channels that happen to support a text= URL parameter */
 window.reachSocial=(id,channel)=>{ const c=DB.contacts.find(x=>x.id===id); if(!c) return;
   const fr=freshDraft(c,'reconnect'); const txt=fr.text;
-  const url = channel==='ig'?igDmLink(c.instagram) : channel==='in'?liUrl(c.linkedin) : channel==='x'?('https://x.com/'+_handle(c.x)) : '';
-  if(!url) return;
+  const url = safeUrl(channel==='ig'?igDmLink(c.instagram) : channel==='in'?liUrl(c.linkedin) : channel==='x'?('https://x.com/'+_handle(c.x)) : '');
+  if(!url || url==='#') return;
   try{ navigator.clipboard&&navigator.clipboard.writeText(txt); }catch(e){}
   window.open(url,'_blank','noopener');
   _reachSocialConfirm(id,channel,txt);
@@ -1252,11 +1252,11 @@ window.doImport=()=>{ const keep=(window._imp||[]).filter(r=>r._keep); if(!keep.
   /* DEDUPE: index the existing book so a re-import updates matches instead of duplicating everyone
      (the Settings tile promises "merge"); match on normalized phone, else name+email. */
   const byPhone={}, byNM={};
-  const nmKey=(nm,em)=>((nm||'').trim().toLowerCase()+'|'+(em||'').trim().toLowerCase());
-  DB.contacts.forEach(c=>{ const p=c.phone?normalizePhone(c.phone):''; if(p) byPhone[p]=c; const k=nmKey(c.name,c.email); if(k!=='|') byNM[k]=c; });
+  const nmKey=(nm,em)=>{ nm=(nm||'').trim().toLowerCase(); em=(em||'').trim().toLowerCase(); return (nm&&em)?(nm+'|'+em):null; };
+  DB.contacts.forEach(c=>{ const p=c.phone?normalizePhone(c.phone):''; if(p) byPhone[p]=c; const k=nmKey(c.name,c.email); if(k) byNM[k]=c; });
   let added=0, updated=0;
   keep.forEach(r=>{ const p=r.phone?normalizePhone(r.phone):''; const k=nmKey(r.name,r.email);
-    const hit=(p&&byPhone[p])||(k!=='|'&&byNM[k])||null;
+    const hit=(p&&byPhone[p])||(k&&byNM[k])||null;
     if(hit){ ['name','phone','email','linkedin','context','photo','bday'].forEach(f=>{ if(!hit[f]&&r[f]) hit[f]=r[f]; }); updated++; return; }
     /* TIER-3 INVARIANT: a bulk import never creates an obligation. Imported people land in the
        directory (tier 3, cadence null); only a deliberate choice promotes someone to a tier that
